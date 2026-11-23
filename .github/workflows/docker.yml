@@ -39,7 +39,7 @@ jobs:
       - id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ github.repository_owner }}/mirrorsync
+          images: ghcr.io/dermilderjoghurt/mirrorsync
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
             type=raw,value=${{ steps.ver.outputs.version }}
@@ -69,26 +69,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Neue Version?
-        id: chk
+      - name: Release anlegen oder Text aktualisieren
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          v=$(tr -d ' \n\r' < app/VERSION)
-          echo "version=$v" >> "$GITHUB_OUTPUT"
-          if gh release view "v$v" >/dev/null 2>&1; then
-            echo "Release v$v gibt es schon, nichts zu tun."
-            echo "new=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "new=true" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Release anlegen
-        if: steps.chk.outputs.new == 'true'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          V: ${{ steps.chk.outputs.version }}
-        run: |
+          V=$(tr -d ' \n\r' < app/VERSION)
           # CHANGELOG-Abschnitt "## <Version> – Datum" bis zur naechsten "## "-Zeile
           awk -v v="$V" '
             /^## / { if (p) exit; if (index($0, "## " v " ") == 1) { p = 1; next } }
@@ -97,9 +82,14 @@ jobs:
             echo
             echo "### Docker"
             echo '```'
-            echo "docker pull ghcr.io/${{ github.repository_owner }}/mirrorsync:$V"
+            echo "docker pull ghcr.io/dermilderjoghurt/mirrorsync:$V"
             echo '```'
           } >> notes.md
-          git archive --format=zip --prefix=mirrorsync/ -o "mirrorsync-$V.zip" HEAD
-          gh release create "v$V" "mirrorsync-$V.zip" \
-            --target "$GITHUB_SHA" --title "MirrorSync $V" --notes-file notes.md --latest
+          if gh release view "v$V" >/dev/null 2>&1; then
+            echo "Release v$V gibt es schon, nur der Text wird aus dem CHANGELOG aktualisiert."
+            gh release edit "v$V" --notes-file notes.md
+          else
+            git archive --format=zip --prefix=mirrorsync/ -o "mirrorsync-$V.zip" HEAD
+            gh release create "v$V" "mirrorsync-$V.zip" \
+              --target "$GITHUB_SHA" --title "MirrorSync $V" --notes-file notes.md --latest
+          fi
