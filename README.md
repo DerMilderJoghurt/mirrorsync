@@ -4,7 +4,7 @@
 
 # MirrorSync – 1:1 mirroring with a web GUI and schedules
 
-Version **1.35.0** · Changes: [CHANGELOG.md](CHANGELOG.md) · [Deutsche Version](README.de.md)
+Version **1.36.0** · Changes: [CHANGELOG.md](CHANGELOG.md) · [Deutsche Version](README.de.md)
 
 A Docker container that **mirrors folders one-way, 1:1** (like FreeFileSync "Mirror"):
 the destination becomes an exact copy of the source, including deletions. The sync engine is
@@ -33,7 +33,7 @@ docker run -d --name mirrorsync --restart unless-stopped \
   -v ./config:/config -v ./logs:/logs \
   ghcr.io/dermilderjoghurt/mirrorsync:latest
 ```
-Then open `http://<docker-host>:8080` and enter the setup code from `docker logs mirrorsync`.
+Then open `http://<docker-host>:8080` and create the first admin.
 
 ## Features
 - **Multiple users** with **custom roles** (individual permissions per action, can be limited to specific jobs and storage locations), **2FA** with an authenticator app incl. backup codes, and **passkeys**
@@ -67,7 +67,7 @@ Changed files are transferred completely (no delta transfer like rsync).
 
 ## Installation
 The ready-made image is in the GitHub Container Registry: `ghcr.io/dermilderjoghurt/mirrorsync`
-(for amd64 and arm64, e.g. Raspberry Pi). Tags: `latest` (newest version), `1.35.0` (fixed version),
+(for amd64 and arm64, e.g. Raspberry Pi). Tags: `latest` (newest version), `1.36.0` (fixed version),
 `1.34` (newest patch of this version).
 
 ### With Docker Compose (recommended)
@@ -156,15 +156,16 @@ Passwords are stored hashed in the database `config/mirrorsync.db`.
   from the compose file, they are only needed for emergencies (`ADMIN_RESET`).
 
 ### First-time setup
-On the first start (no user yet) the container writes a **setup code** to the log, e.g. `6E7W-U9DF-3HK3`:
-```
-docker logs mirrorsync
-```
-1. Open the web GUI, enter the setup code, user name and password → the first admin is created.
-   Without the code nobody else can take over the fresh container; failed attempts are throttled and logged.
+As long as no user exists, the first visit in the browser leads straight to the first-time setup:
+1. Open the web GUI, enter a user name and password → the first admin is created.
 2. Optionally set up 2FA (authenticator app) and/or a passkey right away, or click "Done".
 
-The code is also in `config/setup_token` and is valid until the admin has been created, then it is deleted.
+> **Caution:** until the admin has been created, anyone who can reach the web GUI can create that admin. So create
+> it right after the first start. If the container is reachable from the internet before that (e.g. through a port
+> forward), set `SETUP_TOKEN=true`: the container then writes a **setup code** to the log on the first start
+> (`docker logs mirrorsync`, also in `config/setup_token`), and the admin cannot be created without it. Failed
+> attempts are throttled and logged, the code is deleted after the setup.
+
 If you keep setting `WEB_USER`/`WEB_PASS`, the admin is created automatically as before.
 
 ### Passkeys

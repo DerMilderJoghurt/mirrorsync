@@ -1087,11 +1087,15 @@ IPGUARD_OFF = os.environ.get("IPGUARD", "").lower() in ("0", "off", "false", "ne
 
 SETUP_TOKEN_FILE = os.path.join(CONFIG_DIR, "setup_token")
 SETUP_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"   # ohne 0/O und 1/I
+# Einmal-Code bei der Ersteinrichtung nur auf Wunsch (SETUP_TOKEN=true), z. B. wenn der Container vor dem ersten
+# Admin schon aus dem Internet erreichbar ist. Standard: der erste Aufruf im Browser legt direkt den Admin an.
+SETUP_TOKEN_ON = os.environ.get("SETUP_TOKEN", "").strip().lower() in ("1", "true", "yes", "on", "ja")
 
 
 def setup_token(show=False):
-    """Einmal-Code fuer die Ersteinrichtung. Existiert nur, solange es keinen Benutzer gibt, und steht im Container-Log."""
-    if store.load():
+    """Einmal-Code fuer die Ersteinrichtung (nur mit SETUP_TOKEN=true). Existiert nur, solange es keinen Benutzer gibt,
+    und steht im Container-Log."""
+    if store.load() or not SETUP_TOKEN_ON:
         try:
             os.remove(SETUP_TOKEN_FILE)
         except OSError:
@@ -1667,7 +1671,7 @@ def setup():
     elif request.method == "POST":
         name, pw = request.form.get("user", "").strip(), request.form.get("password", "")
         typed = re.sub(r"[^A-Z0-9]", "", request.form.get("token", "").upper())
-        if not token or not hmac.compare_digest(typed, token.replace("-", "")):
+        if SETUP_TOKEN_ON and (not token or not hmac.compare_digest(typed, token.replace("-", ""))):
             _fail()
             print(f"Ersteinrichtung: falscher Einrichtungs-Code von {_client_ip()}", flush=True)
             err = "Einrichtungs-Code falsch. Er steht im Container-Log (docker logs mirrorsync)."
@@ -1692,7 +1696,7 @@ def setup():
             session["welcome"] = True
             return redirect(url_for("account"))
     return render_template("login.html", mode="setup", err=err, user=request.form.get("user", ""),
-                           token_typed=request.form.get("token", ""))
+                           token_typed=request.form.get("token", ""), need_token=SETUP_TOKEN_ON)
 
 
 @app.route("/login", methods=["GET", "POST"])

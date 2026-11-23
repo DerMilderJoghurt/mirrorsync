@@ -18,7 +18,7 @@ RUN for i in 1 2 3; do \
     exit 1
 COPY app/ .
 
-ARG VERSION=1.35.0
+ARG VERSION=1.36.0
 LABEL org.opencontainers.image.title="MirrorSync" org.opencontainers.image.version=$VERSION
 ENV TZ=Europe/Berlin CONFIG_DIR=/config LOG_DIR=/logs PORT=8080 PYTHONUNBUFFERED=1
 VOLUME ["/config", "/logs"]

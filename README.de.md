@@ -4,7 +4,7 @@
 
 # MirrorSync – 1:1-Spiegelung mit Web-GUI und Zeitplänen
 
-Version **1.35.0** · Änderungen siehe [CHANGELOG.md](CHANGELOG.md) (englisch) · [English version](README.md)
+Version **1.36.0** · Änderungen siehe [CHANGELOG.md](CHANGELOG.md) (englisch) · [English version](README.md)
 
 Ein Docker-Container, der Ordner **einweg 1:1 spiegelt** (wie FreeFileSync „Spiegeln"):
 Das Ziel wird exakt wie die Quelle, inklusive Löschungen. Als Sync-Motor dient
@@ -33,7 +33,7 @@ docker run -d --name mirrorsync --restart unless-stopped \
   -v ./config:/config -v ./logs:/logs \
   ghcr.io/dermilderjoghurt/mirrorsync:latest
 ```
-Dann `http://<docker-host>:8080` öffnen und den Einrichtungs-Code aus `docker logs mirrorsync` eingeben.
+Dann `http://<docker-host>:8080` öffnen und den ersten Admin anlegen.
 
 ## Funktionen
 - **Mehrere Benutzer** mit **eigenen Rollen** (Einzelrechte pro Aktion, beschränkbar auf einzelne Aufgaben und Speicherorte), **2FA** per Authenticator-App inkl. Backup-Codes und **Passkeys**
@@ -68,7 +68,7 @@ Geänderte Dateien werden komplett neu übertragen (kein Delta wie bei rsync).
 
 ## Installation
 Das fertige Image liegt in der GitHub Container Registry: `ghcr.io/dermilderjoghurt/mirrorsync`
-(für amd64 und arm64, z. B. Raspberry Pi). Tags: `latest` (neueste Version), `1.35.0` (feste Version),
+(für amd64 und arm64, z. B. Raspberry Pi). Tags: `latest` (neueste Version), `1.36.0` (feste Version),
 `1.34` (neuester Patch dieser Version).
 
 ### Mit Docker Compose (empfohlen)
@@ -158,16 +158,16 @@ Passwörter werden gehasht in der Datenbank `config/mirrorsync.db` gespeichert.
   aus der Compose-Datei löschen, sie werden nur noch für den Notfall (`ADMIN_RESET`) gebraucht.
 
 ### Ersteinrichtung
-Beim ersten Start (noch kein Benutzer angelegt) schreibt der Container einen **Einrichtungs-Code**
-ins Log, z. B. `6E7W-U9DF-3HK3`:
-```
-docker logs mirrorsync
-```
-1. Web-GUI öffnen, Einrichtungs-Code, Benutzername und Passwort eingeben → der erste Admin ist angelegt.
-   Ohne den Code kann niemand sonst den frischen Container übernehmen; Fehlversuche werden gebremst und geloggt.
+Solange noch kein Benutzer angelegt ist, führt der erste Aufruf im Browser direkt zur Ersteinrichtung:
+1. Web-GUI öffnen, Benutzername und Passwort eingeben → der erste Admin ist angelegt.
 2. Optional gleich 2FA (Authenticator-App) und/oder einen Passkey einrichten, oder „Fertig“.
 
-Der Code steht auch in `config/setup_token` und gilt bis der Admin angelegt ist, danach wird er gelöscht.
+> **Achtung:** Bis der Admin angelegt ist, kann jeder, der die Web-GUI erreicht, diesen Admin anlegen. Lege ihn
+> deshalb gleich nach dem ersten Start an. Ist der Container schon vorher aus dem Internet erreichbar (z. B. über
+> eine Portfreigabe), setze `SETUP_TOKEN=true`: Dann schreibt der Container beim ersten Start einen
+> **Einrichtungs-Code** ins Log (`docker logs mirrorsync`, auch in `config/setup_token`), ohne den sich der Admin
+> nicht anlegen lässt. Fehlversuche werden gebremst und geloggt, nach der Einrichtung wird der Code gelöscht.
+
 Wer weiter `WEB_USER`/`WEB_PASS` setzt, bekommt wie früher den Admin automatisch angelegt.
 
 ### Passkeys

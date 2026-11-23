@@ -3,6 +3,13 @@
 Version numbers follow [SemVer](https://semver.org/): MAJOR.MINOR.PATCH
 (MAJOR = incompatible change, MINOR = new feature, PATCH = bug fix).
 
+## 1.36.0 – 2026-11-23
+- **First-time setup without a one-time code:** as long as no user exists, the first visit in the browser creates
+  the admin directly (user name and password are enough). The setup code from the container log is gone.
+- If you still want the code (e.g. because the container is reachable from the internet before the setup), set
+  `SETUP_TOKEN=true`. The setup then works as before. The README explains the risk.
+- Existing installations with users are not affected.
+
 ## 1.35.0 – 2026-11-23
 - **Two-way sync creates missing folders:** if the folder of side A or side B does not exist yet on the first run,
   it is created (previously the run stopped with "directory not found", except with "Also copy the source folder

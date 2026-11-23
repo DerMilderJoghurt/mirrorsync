@@ -8,7 +8,7 @@
 
 services:
   mirrorsync:
-    image: ghcr.io/dermilderjoghurt/mirrorsync:latest   # or a fixed version, e.g. :1.35.0
+    image: ghcr.io/dermilderjoghurt/mirrorsync:latest   # or a fixed version, e.g. :1.36.0
     # Build it yourself instead of pulling (Dockerfile and app/ in the same folder):
     # build: .
     container_name: mirrorsync
@@ -16,7 +16,8 @@ services:
     environment:
       - TZ=Europe/Berlin
       # No user/password needed here: you create the admin when you first open the web GUI.
-      # The setup code for that is shown by:  docker logs mirrorsync
+      # - SETUP_TOKEN=true   # optional: require a setup code (then shown by: docker logs mirrorsync),
+      #                       useful if the container is reachable from the internet before the setup
       # - PUBLIC_URL=https://sync.example.com   # optional, address for passkeys (can also be set in the GUI)
       # Emergency, if you locked yourself out (comment out again afterwards):
       # - WEB_USER=admin

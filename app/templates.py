@@ -1234,9 +1234,9 @@ code{font-family:ui-monospace,monospace;font-size:12px;background:var(--card2);b
 <button>Bestätigen</button>
 <p style="text-align:center;margin:14px 0 0"><a href="/login" style="color:var(--mut);font-size:13px">Abbrechen</a></p>
 {% else %}
-{% if mode == "setup" %}<label for="tok">Einrichtungs-Code</label><input id="tok" type="text" name="token" value="{{ token_typed or '' }}" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="XXXX-XXXX-XXXX" required autofocus style="letter-spacing:.12em;font-family:ui-monospace,monospace">
+{% if mode == "setup" and need_token %}<label for="tok">Einrichtungs-Code</label><input id="tok" type="text" name="token" value="{{ token_typed or '' }}" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="XXXX-XXXX-XXXX" required autofocus style="letter-spacing:.12em;font-family:ui-monospace,monospace">
 <p class="sub" style="margin:6px 0 0;font-size:12.5px">Steht im Container-Log: <code>docker logs mirrorsync</code> (oder in <code>config/setup_token</code>). Damit kann niemand sonst deinen Container übernehmen, bevor du den Admin angelegt hast.</p>{% endif %}
-<label for="u">Benutzername</label><input id="u" type="text" name="user" value="{{ user }}" autocomplete="username" {{ "" if user or mode == "setup" else "autofocus" }} required>
+<label for="u">Benutzername</label><input id="u" type="text" name="user" value="{{ user }}" autocomplete="username" {{ "" if user or (mode == "setup" and need_token) else "autofocus" }} required>
 <label for="pw">Passwort</label><input id="pw" type="password" name="password" autocomplete="{{ 'new-password' if mode == 'setup' else 'current-password' }}" {{ "autofocus" if user and mode != "setup" }} required>
 {% if mode == "setup" %}<label for="pw2">Passwort wiederholen</label><input id="pw2" type="password" name="password2" autocomplete="new-password" required>
 <p class="sub" style="margin:8px 0 16px;font-size:12.5px">Mindestens 8 Zeichen. Im nächsten Schritt kannst du optional 2FA und einen Passkey einrichten.</p>
