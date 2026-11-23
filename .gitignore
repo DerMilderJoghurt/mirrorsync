@@ -1,0 +1,23 @@
+# Laufzeitdaten (enthalten Zugangsdaten, rclone.conf, Benutzer, Schlüssel)
+config/
+logs/
+data/
+*.db
+*.sqlite*
+rclone.conf
+.env
+
+# Lieferpakete gehören in GitHub Releases, nicht ins Repo
+*.zip
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Editor / OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

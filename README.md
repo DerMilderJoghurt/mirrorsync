@@ -1,0 +1,693 @@
+# MirrorSync – 1:1-Spiegelung mit Web-GUI und Zeitplänen
+
+Version **1.33.0** · Änderungen siehe [CHANGELOG.md](CHANGELOG.md)
+
+Ein Docker-Container, der Ordner **einweg 1:1 spiegelt** (wie FreeFileSync „Spiegeln"):
+Das Ziel wird exakt wie die Quelle, inklusive Löschungen. Als Sync-Motor dient
+[rclone](https://rclone.org), damit gehen **SMB, WebDAV (Nextcloud …), SFTP/SSH, FTP/FTPS,
+S3, lokale Ordner** und viele mehr, in jeder Kombination (z. B. SMB → WebDAV).
+
+## Funktionen
+- **Mehrere Benutzer** mit **eigenen Rollen** (Einzelrechte pro Aktion, beschränkbar auf einzelne Aufgaben und Speicherorte), **2FA** per Authenticator-App inkl. Backup-Codes und **Passkeys**
+- **REST-API mit Swagger** und **MCP-Server** für n8n, Home Assistant, Skripte und KI-Assistenten, mit **API-Keys** und Rechten wie bei Benutzern
+- **Fünf Sprachen**: Englisch (Standard), Deutsch, Spanisch, Italienisch, Französisch. Sprache bei der Einrichtung wählen, jeder Benutzer stellt seine eigene ein
+- **Automatische Sicherung** nach Zeitplan, nur wenn sich etwas geändert hat, optional verschlüsselt und mit Benachrichtigung
+- **Ersteinrichtung im Browser** mit Einmal-Code aus dem Container-Log, kein Passwort in der Compose-Datei
+- Moderne Web-GUI (Seitenleiste, helles und dunkles Design) mit eigener Login-Seite: Aufgaben anlegen, bearbeiten, starten, stoppen
+- **Aufgabenplanung** pro Aufgabe per Cron-Zeitplan, mit Vorlagen (stündlich, täglich 03:00 …), als Kette nach einer anderen Aufgabe oder **fortlaufend (Live)** alle paar Minuten
+- **Zwei-Wege-Sync** (rclone bisync): Änderungen und Löschungen auf beiden Seiten werden übertragen, mit Konfliktregel und Löschschutz
+- **Audit-Log**: wer hat wann was gemacht, mit Vorher/Nachher, Filter, Suche und CSV-Export
+- **Speicherorte für alle rclone-Speicherarten** (rund 55) direkt in der GUI anlegen, bearbeiten und per Klick testen: SMB, WebDAV, SFTP, FTP, S3 (AWS, MinIO, Wasabi …), B2, Azure, Google Drive, OneDrive, Dropbox, pCloud, MEGA, crypt usw.
+- Browser-Anmeldung (OAuth) für Google Drive, OneDrive, Dropbox, pCloud … mit Schritt-für-Schritt-Anleitung in der GUI
+- **Dateimanager** (Seitenleiste „Dateien“): in einem oder zwei Speicherorten nebeneinander browsen, Ordnergrößen
+  und Berechtigungen ansehen, Textdateien bearbeiten, hoch- und herunterladen, umbenennen, löschen, kopieren und
+  verschieben, auch von einem Speicherort in den anderen
+- **Datei-Browser** im Aufgabenformular für Quelle, Ziel und Ausschlüsse (Seitenpanel mit Größe, Datum, Sortierung, Suche)
+- Aufgaben **pausieren**, unbefristet oder bis zu einem Zeitpunkt
+- **Ausschlüsse**: Ordner, Dateien oder Muster (z. B. `/Temp/`, `*.tmp`) pro Aufgabe ausschließen, Ordner per Klick aus der Quelle wählbar
+- **Testlauf** (zeigt nur, was passieren würde), Live-Log und ein eigenes Log für jeden Lauf (Filter, Suche, Download)
+- **Versionierung**: gelöschte/überschriebene Dateien landen in `<ziel>.versions/<datum>`, optional nur die
+  letzten N Versionen bzw. höchstens X Tage behalten (Ältere werden nach jedem Lauf entfernt)
+- **Lösch-Schutz**: Lauf bricht ab, wenn mehr als N Dateien gelöscht würden
+- **Benachrichtigungen** per Webhook (ntfy, Discord, Slack, Home Assistant, n8n …), E-Mail (SMTP), Telegram und **Apprise** (über 100 Dienste, direkt oder über einen Apprise-API-Server), mit Test-Knopf; wann (immer / nur bei Fehler / nie) als Standard für alle Aufgaben, oder direkt in der Aufgabe mit eigenen Kanälen, Empfängern, Chat-ID und Test-Knopf
+
+## Betrieb als Vermittler (Server A → Server B)
+Der Container muss nicht auf A oder B laufen. Er verbindet sich zu beiden und reicht die Daten durch:
+Speicherort `server-a` (z. B. SFTP) und `server-b` (z. B. SMB) anlegen, dann eine Aufgabe
+`server-a:/pfad` → `server-b:freigabe/pfad`. Lokale Ordner müssen dafür nicht eingebunden werden.
+Beachte: Alle Daten fließen durch den Docker-Host, seine Verbindung zu A und B bestimmt das Tempo.
+Geänderte Dateien werden komplett neu übertragen (kein Delta wie bei rsync).
+
+## Installation
+> **Wichtig:** `docker-compose.yml`, `Dockerfile` und der Ordner `app/` müssen **im selben Ordner** liegen,
+> und in der Compose-Datei muss **`build: .`** stehen. Das Image wird aus diesem Ordner gebaut und liegt in
+> keinem Registry. Fehlt `build: .`, sucht Docker `mirrorsync:1.33.0` online und bricht mit
+> „pull access denied“ / „repository does not exist“ ab.
+
+1. ZIP auf den Docker-Host entpacken, z. B. nach `/opt/mirrorsync/`:
+   ```
+   /opt/mirrorsync/
+   ├── docker-compose.yml
+   ├── Dockerfile
+   └── app/
+   ```
+2. In `docker-compose.yml` anpassen:
+   - Benutzer und Passwort gehören **nicht** in die Compose-Datei. Den ersten Admin legst du beim ersten Aufruf
+     der Web-GUI an (siehe „Ersteinrichtung“).
+   - Netzwerk: Beispiel ist macvlan mit fester IP `192.168.1.50` und einem bestehenden Netz `macvlan_net`.
+     Ohne macvlan den `networks:`-Teil entfernen und `ports: - "8080:80"` eintragen.
+   - `PORT` legt den Port der GUI fest (Standard im Beispiel: 80).
+   - optional lokale Ordner unter `volumes` (erscheinen in der GUI als `/data/...`)
+3. Im Ordner bauen und starten:
+   ```bash
+   cd /opt/mirrorsync
+   docker compose up -d --build
+   ```
+4. Im Browser `http://192.168.1.50` (bzw. ohne macvlan `http://<docker-host>:8080`) öffnen und anmelden.
+
+**Portainer:** Ein Stack aus dem Web-Editor hat keinen Zugriff auf das Dockerfile. Entweder den Stack
+mit „Repository“/„Upload“ aus diesem Ordner anlegen, oder das Image vorher einmal per Konsole bauen
+(`cd /opt/mirrorsync && docker build -t mirrorsync:1.33.0 .`) und im Stack-Editor die Zeile `build: .` weglassen.
+
+## Benutzer, Rechte und 2FA
+Unter **Einstellungen → Benutzer** werden Benutzer angelegt, unter **Einstellungen → Rollen** die Rollen.
+Mitgeliefert sind drei Vorlagen:
+
+| Rolle | darf |
+|---|---|
+| Admin | alles (fest, nicht änderbar, damit sich niemand aussperrt) |
+| Operator | Aufgaben anlegen, bearbeiten, löschen, starten; Speicherorte ansehen, testen, durchsuchen |
+| Nur lesen | Aufgaben, Status und Logs ansehen |
+
+**Eigene Rollen** („Neue Rolle“ oder „Als Vorlage“ bei einer bestehenden) setzen sich aus Einzelrechten zusammen:
+
+- *Aufgaben:* ansehen, anlegen, bearbeiten, löschen, starten/stoppen, Testlauf, Logs, Benachrichtigungen der
+  Aufgabe ändern, zusätzliche rclone-Optionen ändern, Zwei-Wege-Sync einrichten (schreibt auch in die Quelle;
+  ohne dieses Recht kann man eine Zwei-Wege-Aufgabe bearbeiten, aber nicht ein- oder ausschalten)
+- *Speicherorte:* ansehen, testen, Ordner durchsuchen, anlegen, bearbeiten/neu anmelden, entfernen,
+  lokale Ordner (`/data`) verwenden
+- *Dateimanager:* Dateien ansehen (durchsuchen, Größen, Berechtigungen, herunterladen), bearbeiten (hochladen,
+  bearbeiten, umbenennen, Ordner anlegen, kopieren), löschen (auch nötig zum Verschieben)
+- *Benachrichtigungen (Standard):* ansehen, ändern
+- *Benutzer und Rollen:* Benutzer ansehen, Benutzer verwalten, Rollen verwalten, Gruppen verwalten
+- *System:* allgemeine Einstellungen (Log-Aufbewahrung, Standard-Bandbreite) ändern
+
+Zusätzlich lässt sich jede Rolle auf **ausgewählte Aufgaben** und **ausgewählte Speicherorte** beschränken.
+Benutzer sehen dann nur diese; selbst angelegte Aufgaben sehen sie immer. Beim Anlegen und Bearbeiten von
+Aufgaben sind als Quelle und Ziel nur erlaubte Speicherorte möglich. Niemand kann eine Rolle mit mehr
+Rechten anlegen oder vergeben, als er selbst hat.
+
+### Gruppen und „Sichtbar für“ (seit 1.22.0)
+Unter **Einstellungen → Gruppen** (Recht „Gruppen verwalten“) fasst du Benutzer und API-Keys zu Gruppen
+zusammen, z. B. „Buchhaltung“ oder „Home Assistant“.
+
+- **Zusätzliche Rechte:** Eine Gruppe kann Rechte geben. Ein Mitglied hat die Rechte seiner Rolle plus die
+  Rechte aller seiner Gruppen. Beispiel: Rolle „Nur lesen“ plus Gruppe mit „starten und stoppen“. Vergeben kann
+  man nur Rechte, die man selbst hat.
+- **Sichtbar für:** Bei jeder Aufgabe und jedem Speicherort stellst du ein, wer ihn sieht: „alle mit dem
+  passenden Recht“ (Standard, wie bisher) oder nur ausgewählte Benutzer und Gruppen. Wer etwas nicht sieht,
+  kann es auch nicht starten, ändern, als Auslöser einer Kette oder als Quelle/Ziel wählen.
+- Admins sehen immer alles, wer eine Aufgabe angelegt hat, sieht sie auch. Man kann sich nicht selbst
+  ausblenden. Eine Beschränkung der Rolle auf einzelne Aufgaben/Speicherorte gilt zusätzlich.
+- Mitgliedschaften lassen sich auch beim Benutzer unter „Gruppen“ setzen. Die Gruppenseite zeigt, welche
+  eingeschränkten Aufgaben und Speicherorte eine Gruppe sieht.
+- Wird ein Benutzer oder eine Gruppe gelöscht, verschwindet er bzw. sie aus allen „Sichtbar für“-Listen.
+- Änderungen stehen im Audit-Log, Gruppen und Sichtbarkeit sind in Sicherung und Export enthalten.
+
+Unter **Einstellungen → Mein Konto** richtet jeder Benutzer selbst 2FA ein (QR-Code mit Google/Microsoft
+Authenticator, Aegis, 2FAS, Bitwarden … scannen) und bekommt 10 Backup-Codes, die nur einmal angezeigt werden.
+Passwörter werden gehasht in der Datenbank `config/mirrorsync.db` gespeichert.
+
+- **Bestehende Installation:** Sind schon Benutzer angelegt, ändert sich nichts. `WEB_USER`/`WEB_PASS` kannst du
+  aus der Compose-Datei löschen, sie werden nur noch für den Notfall (`ADMIN_RESET`) gebraucht.
+
+### Ersteinrichtung
+Beim ersten Start (noch kein Benutzer angelegt) schreibt der Container einen **Einrichtungs-Code**
+ins Log, z. B. `6E7W-U9DF-3HK3`:
+```
+docker logs mirrorsync
+```
+1. Web-GUI öffnen, Einrichtungs-Code, Benutzername und Passwort eingeben → der erste Admin ist angelegt.
+   Ohne den Code kann niemand sonst den frischen Container übernehmen; Fehlversuche werden gebremst und geloggt.
+2. Optional gleich 2FA (Authenticator-App) und/oder einen Passkey einrichten, oder „Fertig“.
+
+Der Code steht auch in `config/setup_token` und gilt bis der Admin angelegt ist, danach wird er gelöscht.
+Wer weiter `WEB_USER`/`WEB_PASS` setzt, bekommt wie früher den Admin automatisch angelegt.
+
+### Passkeys
+Statt Passwort (+ 2FA) kann sich jeder Benutzer mit einem **Passkey** anmelden: Fingerabdruck, Gesicht,
+Geräte-PIN, Passwort-Manager oder Sicherheitsschlüssel (YubiKey). Einrichten unter **Einstellungen → Mein
+Konto → Passkeys**, mehrere pro Benutzer möglich (umbenennen, entfernen). Auf der Anmeldeseite dann
+„Mit Passkey anmelden“, ein Benutzername ist nicht nötig.
+
+- Passkeys brauchen **HTTPS und einen Domainnamen**, z. B. `https://sync.example.de` über deinen Reverse-Proxy (bei dir OPNsense). Über
+  `http://192.168.1.50` bietet MirrorSync keine Passkeys an und erklärt, warum: Browser erlauben Passkeys nur
+  auf sicheren HTTPS-Seiten, und ein Passkey ist immer an einen Domainnamen gebunden, nie an eine IP.
+- MirrorSync nimmt die aufgerufene Adresse. Leitet der Proxy den Host nicht durch, unter **Einstellungen →
+  Allgemein → Passkeys** die öffentliche Adresse eintragen (oder `PUBLIC_URL=` in der Compose-Datei).
+  Eine spätere Änderung der Adresse macht bestehende Passkeys unbrauchbar.
+- Gerät verloren: Ein Admin entfernt die Passkeys des Benutzers unter „Bearbeiten“. Anmelden mit Passwort
+  geht immer weiter. Hinzufügen und Entfernen steht im Audit-Log.
+- **Handy verloren:** Ein anderer Admin setzt die 2FA unter „Bearbeiten“ zurück, oder du meldest dich mit
+  einem Backup-Code an.
+- **Admin-Passwort vergessen:** In der Compose-Datei `ADMIN_RESET=true` setzen, Container neu starten
+  (`docker compose up -d`). Passwort und 2FA von `WEB_USER` sind dann wieder `WEB_PASS`. Danach
+  `ADMIN_RESET` wieder auskommentieren und neu starten.
+
+## Erste Schritte
+1. **Speicherorte** → z. B. SMB-Freigabe anlegen (Name `nas`, Server, Benutzer, Passwort) → **Testen**.
+2. **Neue Aufgabe**: Quelle `/data/daten/fotos`, Ziel `nas:backup/fotos`, Zeitplan wählen.
+3. Zuerst **Test** klicken und im Log prüfen, was kopiert/gelöscht würde.
+4. Passt alles → **▶** oder auf den Zeitplan warten.
+
+Pfadschreibweise: lokal `/data/…`, entfernt `name:pfad` (bei SMB: `name:freigabe/ordner`).
+
+**Ordner oder nur Inhalt?** Standard ist wie bei rsync mit Schrägstrich am Ende: der *Inhalt* der Quelle
+landet direkt im Ziel. Mit dem Häkchen „Quellordner selbst mitkopieren“ wird im Ziel ein Ordner mit dem
+Namen der Quelle angelegt. Beispiel Quelle `NAS:backup/OPNsense`, Ziel `backup-server:sicherung`:
+
+| Häkchen | Ergebnis im Ziel | gelöscht wird nur in |
+|---|---|---|
+| aus | `sicherung/config.xml …` | `sicherung` |
+| an | `sicherung/OPNsense/config.xml …` | `sicherung/OPNsense` |
+
+Mit Häkchen bleiben andere Ordner im Ziel (z. B. `sicherung/Anderes`) unberührt. Ausschlüsse gelten immer
+relativ zur Quelle, die Versionierung landet in `sicherung/OPNsense.versions/…`. Das Formular zeigt das
+Ergebnis vor dem Speichern an.
+
+## Nur einzelne Dateien und Ordner
+Im Feld **Nur diese Dateien und Ordner** stehen Einträge relativ zur Quelle, einer pro Zeile, Ordner mit `/` am
+Ende (z. B. `Projekte/` und `bericht.docx`). Am einfachsten setzt du im Quell-Browser Häkchen an Ordner und
+Dateien, auch über mehrere Unterordner verteilt, und klickst „Übernehmen“. Liegt alles in der bisherigen Quelle,
+bleibt sie Basisordner, sonst wird der gemeinsame Elternordner zur Quelle.
+
+- Nur die Auswahl wird geprüft und gespiegelt. Im Ziel wird nur innerhalb der Auswahl gelöscht (z. B. eine
+  ausgewählte Datei, die in der Quelle verschwindet), alles andere im Ziel bleibt unberührt.
+- Ausschlüsse gelten zusätzlich (z. B. `*.tmp` in einem ausgewählten Ordner). „Ausgeschlossenes auch im Ziel
+  löschen“ ist bei einer Auswahl wirkungslos, damit nichts außerhalb gelöscht wird.
+- Trägst du als Quelle direkt eine Datei ein (`NAS:data/f3.txt`), wird beim Speichern daraus Quelle
+  `NAS:data` mit Auswahl `f3.txt`.
+- Live-Sync, Testlauf und Versionierung funktionieren wie gewohnt. **„Quellordner mitkopieren“ ist bei einer
+  Auswahl aus** (seit 1.27.0): Die gewählten Ordner und Dateien landen direkt im Ziel, z. B. Quelle
+  `NAS:share` mit Auswahl `10-Temp/` und Ziel `Familie-NAS:share` ergibt `Familie-NAS:share/10-Temp`.
+- Leeres Feld = der ganze Quellordner wie bisher.
+
+## Ausschlüsse
+Ein Eintrag pro Zeile, relativ zur Quelle:
+
+| Eintrag | schließt aus |
+|---|---|
+| `/Temp/` | Ordner `Temp` direkt in der Quelle |
+| `Temp/` | jeden Ordner namens `Temp`, egal wie tief |
+| `/Projekte/alt/bericht.docx` | genau diese Datei |
+| `*.tmp` | alle `.tmp`-Dateien |
+| `**/node_modules/**` | alle `node_modules`-Ordner |
+
+Volle Pfade (z. B. `/data/daten/Temp/`) werden automatisch umgerechnet. Ausgeschlossenes bleibt
+im Ziel standardmäßig liegen; mit „Ausgeschlossenes auch im Ziel löschen" wird es dort entfernt.
+
+## Anmeldungen, Sperren und Länder
+- **Einstellungen → Benutzer** zeigt pro Konto die letzte Anmeldung mit IP und Land, den Status (aktiv,
+  deaktiviert, gesperrt bis …) und Fehlversuche. „Anmeldeverlauf“ listet die letzten 1000 Versuche.
+- **Konto bearbeiten:** Aktiv oder Deaktiviert, dazu optional ein Sperrzeitraum mit „gesperrt ab“ und
+  „wieder aktiv ab“ (z. B. Urlaub eines Mitarbeiters). Das Konto wird zur Uhrzeit automatisch gesperrt bzw. wieder frei.
+- **Einstellungen → Allgemein → Anmeldung und Sicherheit:** nach wie vielen Fehlversuchen ein Konto gesperrt
+  wird, für wie lange (0 = bis ein Admin es freigibt) und ob du benachrichtigt wirst. Zusätzlich bremst MirrorSync
+  pro IP-Adresse für 5 Minuten.
+- **Land:** Der Container lädt die freie Länder-Datenbank von DB-IP (ca. 8 MB) nach `config/geoip/` und erneuert
+  sie entweder **nach Intervall** (täglich, wöchentlich, alle 2 Wochen, monatlich = Standard, alle 2 oder 3 Monate)
+  oder **nach Zeitplan** mit Uhrzeit und einem oder mehreren Wochentagen (seit 1.32.0, z. B. Mo und Do um 04:30;
+  dann wird zur gewählten Zeit immer neu geladen; DB-IP erscheint monatlich). Dafür braucht er Internetzugang zu `download.db-ip.com`. Abgefragt wird nur lokal. Alternativ eine eigene
+  `GeoLite2-Country.mmdb` dorthin legen, oder `GEOIP=off` setzen.
+- **Hinter einem Reverse-Proxy** (Nginx Proxy Manager, Traefik …) das Häkchen „Reverse-Proxy“ setzen, sonst
+  steht überall die IP des Proxys. Ohne Proxy das Häkchen aus lassen.
+- **Benutzernamen** sind bei der Anmeldung unabhängig von Groß-/Kleinschreibung (`Max` = `max`).
+- **Fehlversuche melden:** Unter „Anmeldung und Sicherheit“ wählst du „bei jedem Fehlversuch“, „nur bei Sperre“
+  oder „nie“, dazu eine Drosselzeit (Standard 15 Minuten). Gesammelte Fehlversuche kommen gebündelt in einer Nachricht.
+- **Fehlversuche bestätigen oder löschen:** Unbestätigte zeigt eine rote Zahl bei „Einstellungen“ und „Benutzer“.
+  Im Anmeldeverlauf („Unbestätigt“) einzeln oder alle bestätigen bzw. löschen.
+- Ausgesperrt? `ADMIN_RESET=true` setzt den Admin aus `WEB_USER` zurück und hebt Sperren auf.
+
+## Zugriff nach IP-Adresse und Land
+Unter Einstellungen → Zugriff (Recht „Zugriff nach IP-Adresse und Land verwalten“):
+
+- **Erlaubt-Liste:** Nur diese Adressen/Netze/Hostnamen dürfen zugreifen, z. B. nur das lokale Netz (Knopf „Nur
+  lokales Netz erlauben“). Leer = alle.
+- **Sperrliste:** einzelne IPs, Netze (`1.2.3.4`, `10.0.0.0/8`, IPv6) oder Hostnamen, dauerhaft oder für 1 Stunde bis 30 Tage.
+- **Hostnamen (FQDN, seit 1.32.0)** wie `buero.example.de` oder `facebook.com` gehen in beiden Listen. Bei einer
+  Anfrage löst MirrorSync den Namen per DNS auf (IPv4 und IPv6, 5 Minuten Cache, höchstens 3 Sekunden) und prüft,
+  ob die Adresse dazu gehört. So lassen sich z. B. DynDNS-Adressen erlauben. Ist ein Name gerade nicht auflösbar,
+  gilt der letzte bekannte Stand. Die Seite zeigt zu jedem Namen die aktuell aufgelösten Adressen. Platzhalter
+  (`*.example.de`) gehen nicht.
+  Im Anmeldeverlauf sperrt „IP sperren“ eine Adresse mit einem Klick.
+- **Länder:** „nur diese Länder erlauben“ (z. B. DE) oder „diese Länder sperren“. Das lokale Netz ist immer
+  ausgenommen, Adressen mit unbekanntem Land werden nicht gesperrt. Braucht die Länder-Datenbank.
+- **Automatisch sperren:** IP nach X Fehlversuchen in Y Minuten für Z Minuten oder dauerhaft sperren, optional mit
+  Benachrichtigung. Das lokale Netz kann ausgenommen werden (Standard).
+- **Kein Aussperren:** Regeln, die deine aktuelle Adresse treffen würden, werden nicht gespeichert.
+- **Notfall:** `IPGUARD_RESET=true` in der Compose-Datei setzen, neu starten, wieder entfernen (löscht alle IP- und
+  Länderregeln). `IPGUARD=off` schaltet den Schutz ab. Die Sperrseite selbst nennt diese Möglichkeit nicht (seit 1.32.0).
+- **Hinter einem Reverse-Proxy** (OPNsense/HAProxy, Nginx Proxy Manager …) unbedingt unter Allgemein „Reverse-Proxy“
+  einschalten, sonst sieht MirrorSync nur die IP des Proxys.
+
+## Zwei-Wege-Sync (seit 1.31.0)
+Ganz oben in der Aufgabe wählst du die **Art**: „Spiegeln (Einweg): Quelle → Ziel“ oder „Zwei-Wege-Sync:
+Seite A ⇄ Seite B“. Beim Zwei-Wege-Sync (`rclone bisync`) wird alles, was sich auf einer Seite ändert, auf die
+andere übertragen: neue und geänderte Dateien, Umbenennungen und Löschungen. Beide Seiten werden also beschrieben.
+Dafür gibt es ein eigenes Recht „Zwei-Wege-Sync einrichten“.
+
+- **Erster Lauf** (und nach einer Änderung von Seite A, Seite B, Ausschlüssen oder Prüfsumme): Beide Seiten
+  werden zusammengeführt (`--resync`). Was nur auf einer Seite liegt, wird auf die andere kopiert, gelöscht wird
+  nichts. Ist eine Datei auf beiden Seiten verschieden, gewinnt die neuere. Löschungen werden erst ab dem zweiten
+  Lauf übertragen. Tipp: Den ersten Lauf als Testlauf starten.
+- **Konflikt** (Datei auf beiden Seiten geändert): wählbar „die neuere gewinnt“ (Standard), „beide behalten“,
+  „Seite A gewinnt“ oder „Seite B gewinnt“. Die unterlegene Fassung bleibt immer umbenannt erhalten
+  (`datei.txt.konflikt1`) und liegt auf beiden Seiten.
+- **Löschschutz** in Prozent (Standard 50): Würden auf einer Seite mehr Dateien gelöscht, bricht der Lauf ohne
+  Änderung ab und meldet einen Fehler (z. B. wenn ein Laufwerk nicht eingehängt ist). Ist die Löschung gewollt,
+  vorübergehend den Wert erhöhen. Mit „Neu zusammenführen“ (Übersicht oder Aufgabe) werden die Seiten stattdessen
+  wieder vereint, die fehlenden Dateien kommen dann zurück.
+- **Abbruch:** Verlangt rclone nach einem schweren Fehler einen neuen Abgleich, zeigt die Übersicht einen Hinweis
+  und den Knopf **„Neu zusammenführen“**. Live-Runden sind bis dahin ausgesetzt.
+- Ausschlüsse gelten für beide Seiten. „Ausgeschlossenes löschen“ und „Max. Löschungen“ gibt es beim Zwei-Wege-Sync
+  nicht. Versionierung legt Stände in `<seite>.versions/` auf beiden Seiten an. Eine Seite darf nicht in der anderen liegen.
+- **Ordnerauswahl und „Quellordner selbst mitkopieren“** (seit 1.33.0) gehen wie beim Spiegeln, auch per Häkchen im
+  Durchsuchen-Fenster. Die Auswahl gilt für beide Seiten: Nur die gewählten Ordner und Dateien werden in beide
+  Richtungen abgeglichen, alles andere bleibt auf beiden Seiten unberührt. Mit dem Häkchen „Quellordner selbst
+  mitkopieren“ ist Seite B der Ordner `<Seite B>/<Name von Seite A>`, er wird beim ersten Lauf angelegt. Eine
+  Änderung von Auswahl oder Häkchen führt beim nächsten Lauf neu zusammen (ohne Löschen).
+- Live: Jede Runde ist ein Zwei-Wege-Abgleich, Runden ohne Änderung bleiben still.
+- Der Zustand (Listen der letzten Runde) liegt in `/config/bisync/<Aufgabe>`.
+- API/MCP: Felder `direction` (`mirror`|`bisync`), `bisync_conflict` (`newer`|`none`|`path1`|`path2`),
+  `bisync_max_delete`; neu zusammenführen per `POST /api/v1/jobs/{id}/resync` bzw. Tool `resync_job`. Laufende
+  Aufgaben: `GET /api/v1/jobs/running` bzw. Tool `list_running_jobs`.
+
+## Start: Uhrzeit, Kette, Live oder manuell
+Im Abschnitt „Start“ jeder Aufgabe wählst du:
+
+- **Zu einer Uhrzeit:** Uhrzeit und Wochentage anklicken (z. B. Mo–Fr 03:00). Unter „Erweitert“ geht weiter ein
+  Cron-Ausdruck für „alle 15 Minuten“, „stündlich“ usw.
+- **Nach einer anderen Aufgabe:** Aufgabe aus der Liste wählen und die Bedingung „nur wenn sie erfolgreich war“
+  oder „immer, auch nach einem Fehler“. So entstehen Ketten wie A → B → C. Nach einem Testlauf oder einem Stopp
+  startet keine Folgeaufgabe. Schleifen (A nach C, C nach A) werden beim Speichern abgelehnt.
+- **Fortlaufend (Live):** siehe unten.
+- **Nur manuell:** Start nur über die Übersicht.
+
+Alle Startzeiten an einem Ort zeigt der Menüpunkt **Zeitpläne** mit vier Bereichen: „Nach Uhrzeit“ (Uhrzeit,
+Tage, aktiv direkt bearbeiten), „Fortlaufend (Live)“ (Intervall, voller Abgleich, aktiv), „Nach einer anderen Aufgabe“ (Ketten untereinander, Reihenfolge per Drag & Drop
+oder ↑ ↓, Bedingung je Aufgabe) und „Nur manuell“. Über die Auswahl „Startart“ wechselt eine Aufgabe sofort in den
+passenden Bereich. Alles ist dieselbe Einstellung wie in der Aufgabe selbst.
+
+**Nächster Lauf** (seit 1.33.0): In der Übersicht steht bei jeder Aufgabe unter dem Status, wann sie das nächste
+Mal startet, z. B. „heute, 14:30“, „morgen, 03:00“ oder ein Datum. Bei Live-Aufgaben ist es die nächste Runde. Bei
+Folgeaufgaben wird die Zeit über den Vorgänger geschätzt („ca. morgen, 03:00“, Tooltip nennt den Vorgänger), läuft
+der Vorgänger gerade, steht dort „wenn „…“ fertig ist“. Sonst „nur manuell“, „pausiert“ oder „keiner geplant“
+(z. B. Zeitplan aus). REST-API und MCP (`list_jobs`, `get_job`) liefern dazu `next_start` (ISO-Zeit) und
+`next_start_kind` (`time`, `live`, `after`, `parent_running`, `manual`, `paused`, `off`).
+
+Die Übersicht zeigt Ketten eingerückt unter ihrer Startaufgabe, mit „nach …“ und „danach: …“. Im Log der vorherigen
+Aufgabe steht, welche Folgeaufgaben gestartet wurden. Wird eine Aufgabe gelöscht, stehen ihre Folgeaufgaben auf
+„Nur manuell“.
+
+### Fortlaufend (Live)
+Echtes Live-Spiegeln per Dateisystem-Ereignis geht nicht, weil Quelle und Ziel entfernte Server sind. MirrorSync
+kommt dem mit Runden alle N Minuten nahe (Standard 1, bis 1440). Pro Aufgabe wählst du, was eine Runde tut:
+
+**Wie Spiegeln (Standard, seit 1.30.0):** Jede Runde ist ein normaler Spiegel-Lauf (`rclone sync`). Neue und
+geänderte Dateien werden kopiert, was in der Quelle gelöscht oder umbenannt wurde, wird auch im Ziel entfernt.
+Übertragen wird nur, was sich wirklich geändert hat, aber beide Seiten werden in jeder Runde aufgelistet. Bei
+sehr großen Quellen (mehrere 100.000 Dateien) lieber ein größeres Intervall oder „Schnell“ wählen. „Max.
+Löschungen pro Lauf“, Versionierung und Ausschlüsse gelten in jeder Runde. Folgeaufgaben starten nach jeder
+Runde, die etwas geändert hat. Ein extra voller Abgleich ist hier nicht nötig.
+
+**Schnell:** zwei Arten von Läufen:
+
+- **Schnelle Live-Läufe** alle N Minuten (Standard 1, bis 1440): `rclone copy --max-age` kopiert nur, was sich
+  seit dem letzten erfolgreichen Lauf geändert hat (plus 2 Minuten Puffer), und löscht nichts. Bei wenig
+  Änderungen dauert so ein Lauf nur Sekunden, die Quelle wird trotzdem einmal aufgelistet.
+- **Voller Abgleich** zu einer Uhrzeit (Standard täglich 03:00), **nach Intervall** (z. B. alle 6 Stunden,
+  in der API `@every 6h` oder `@every 90m`, 5 Minuten bis 30 Tage) oder per Cron, abschaltbar: ein normaler Spiegel-Lauf, damit
+  Löschungen und Umbenennungen im Ziel ankommen. Der erste Lauf und der nach einer Änderung von Quelle, Ziel
+  oder Ausschlüssen ist immer ein voller Abgleich.
+
+Läufe überlappen nie: Läuft der vorige noch, wird die Runde ausgelassen. Live-Läufe ohne Änderung erscheinen
+nicht im Verlauf, ihr Log wird sofort gelöscht, die Übersicht zeigt nur „zuletzt geprüft“. Läufe mit kopierten
+Dateien stehen mit Kennzeichen „Live“ im Verlauf. Ein Fehler wird einmal gemeldet und einmal protokolliert,
+weitere Fehler in Folge zählt die Übersicht nur mit; nach dem nächsten erfolgreichen Lauf meldet sich ein neuer
+Fehler wieder. Bandbreite, Ausschlüsse und Versionierung gelten wie sonst. Im Modus „Schnell“ starten
+Folgeaufgaben nur nach dem vollen Abgleich. Ist „nur Testlauf“ an, fallen die Live-Läufe aus.
+
+API/MCP: Feld `live_mode` (`mirror` oder `fast`) an der Aufgabe, bei `set_job_trigger` heißt es `mode`.
+
+Grenze: Dateien, die mit altem Änderungsdatum in die Quelle kommen (z. B. verschoben oder aus einem Archiv
+entpackt), erkennt erst der volle Abgleich.
+
+## Apprise
+Unter Einstellungen → Benachrichtigungen gibt es den Kanal **Apprise**, damit gehen Meldungen an alles, was
+[Apprise](https://github.com/caronc/apprise/wiki) kennt (Discord, ntfy, Pushover, Gotify, Signal, Matrix, Teams …).
+
+- **Direkt aus MirrorSync:** Apprise-URLs eintragen, eine pro Zeile, z. B. `ntfy://ntfy.sh/mein-thema` oder
+  `discord://webhook_id/webhook_token`. Die Apprise-Bibliothek ist im Image enthalten.
+- **Über einen Apprise-API-Server** (z. B. Container `caronc/apprise`): Adresse eintragen, etwa
+  `http://192.168.1.20:8000`. Mit Konfigurations-Key nutzt MirrorSync die dort gespeicherten Ziele
+  (`/notify/<key>`, optional mit Tag), ohne Key schickt es die eingetragenen URLs mit (`/notify`).
+
+In jeder Aufgabe lässt sich Apprise unter „Eigene Benachrichtigung“ an- und abwählen, mit eigenen URLs oder
+eigenem Tag. Apprise gilt auch für die Meldungen zu fehlgeschlagenen Anmeldungen und IP-Sperren. URLs und Key
+werden nach dem Speichern nur maskiert angezeigt (`discord://•••`) und nie ins Audit-Log geschrieben.
+
+## Eigene Benachrichtigungstexte
+Unter Einstellungen → Benachrichtigungen, Karte „Texte der Benachrichtigungen“, lassen sich Betreff und Text für
+jedes Ereignis anpassen: Lauf erfolgreich, Lauf fehlgeschlagen oder gestoppt, fehlgeschlagene Anmeldungen, Konto
+gesperrt, IP gesperrt und Testnachricht. Der Text gilt für alle Kanäle (E-Mail-Betreff und -Text, Telegram,
+Apprise, Webhook-Feld `message`).
+
+- Variablen wie `{job}`, `{status}`, `{status_icon}`, `{quelle}`, `{ziel}`, `{start}`, `{ende}`, `{dauer}`,
+  `{kopiert}`, `{geloescht}`, `{fehler}`, `{fehler_liste}`, `{gestartet_von}`, `{art}`, bei Anmeldungen `{benutzer}`,
+  `{ip}`, `{land}`, `{flagge}`, `{anzahl}`, `{liste}` sowie überall `{datum}`, `{zeit}`, `{version}` und im Text
+  `{titel}`. Jede Variable lässt sich anklicken und wird an der Cursor-Position eingefügt.
+- Die Vorschau zeigt den Text sofort mit Beispieldaten.
+- „Auf Standard zurücksetzen“ stellt den eingebauten Text wieder her. Unveränderte Texte werden nicht gespeichert,
+  so kommen Verbesserungen am Standardtext bei Updates automatisch an.
+- Unbekannte Variablen bleiben stehen, `{{` und `}}` ergeben geschweifte Klammern.
+
+In jeder Aufgabe kann unter Benachrichtigungen „Eigene Texte für diese Aufgabe“ eigene Texte für „Lauf
+erfolgreich“ und „Lauf fehlgeschlagen“ festlegen. Der Test-Knopf der Aufgabe schickt den Erfolgstext mit Beispielzahlen.
+
+Beim **Webhook** lässt sich zusätzlich der ganze JSON-Body als Vorlage festlegen, mit Vorlagen für Discord,
+Slack/Mattermost, Gotify und Home Assistant/n8n. Werte werden JSON-sicher eingesetzt, Texte gehören in
+Anführungszeichen (`"text": "{nachricht}"`), Zahlen dürfen ohne (`"copied": {kopiert}`). Die Vorschau prüft, ob
+gültiges JSON entsteht. Ungültige Vorlagen werden nicht gespeichert. Passt eine Vorlage nicht zu einem Ereignis,
+kommt das Standard-JSON.
+
+## Seitenleiste einklappen (seit 1.33.0)
+Der Pfeil oben in der Seitenleiste (neben „MirrorSync“) klappt sie auf eine schmale Leiste mit nur den Symbolen ein,
+der Inhalt nutzt dann die ganze Breite. Beim Überfahren zeigt jedes Symbol seinen Namen. Ein Klick auf den Pfeil
+klappt wieder aus. Die Einstellung gilt je Benutzer und wird im Konto gespeichert, also auf allen Geräten und nach
+dem Neuladen. Dafür braucht es kein eigenes Recht. Admins mit „Benutzer verwalten“ können sie per REST-API oder MCP
+setzen: `PATCH /api/v1/users/{name}` bzw. `update_user` mit `"sidebar": "mini"` oder `"full"`; `get_user` und
+`list_users` zeigen sie als `sidebar`. Auf dem Handy gibt es weiter die Leiste oben.
+
+## Datei-Browser
+In der Aufgabe öffnet **Durchsuchen** neben Quelle oder Ziel rechts ein Browser-Panel. Auf breiten Bildschirmen
+steht es neben dem Formular, sonst darüber, auf dem Handy über die ganze Breite.
+
+- Zuerst den Speicherort wählen (oder `/data`), dann durch die Ordner klicken. SFTP und FTP beginnen bei `/`.
+- Ordner und Dateien mit Größe und Änderungsdatum, klickbare Pfadleiste, „..“ für eine Ebene höher, Sortierung
+  per Klick auf die Spaltenköpfe, Suche im aktuellen Ordner.
+- **Übernehmen** trägt den aktuellen Ordner ins Feld ein. Bei der Quelle markieren ☑ einzelne Dateien oder Ordner,
+  dann übernimmt der Knopf die Auswahl (siehe „Nur einzelne Dateien und Ordner“). Esc oder ✕ schließt das Panel.
+- **Ausschlüsse:** „Ordner oder Dateien aus der Quelle ausschließen“ öffnet denselben Browser in der Quelle. ⛔
+  neben einem Ordner oder einer Datei trägt sie als Ausschluss ein (`/Ordner/` bzw. `/Ordner/datei.txt`), ein
+  zweiter Klick nimmt sie wieder heraus. Ausgeschlossenes ist durchgestrichen.
+
+Der Browser liest nur. Er braucht das Recht „Speicherorte: Ordner durchsuchen“, Rollen mit Beschränkung sehen
+nur ihre Speicherorte. Alle Seiten nutzen jetzt die volle Fensterbreite.
+
+## Dateimanager
+Unter **Dateien** in der Seitenleiste (Recht „Dateimanager: Dateien ansehen“) wählst du oben links einen
+Speicherort (oder `/data`). Mit **„Zwei Speicherorte nebeneinander“** kommt rechts ein zweiter dazu.
+
+- **Browsen:** Ordner anklicken, Pfadleiste oben, „Nach oben“. SFTP und FTP beginnen bei `/`. Die Spalten zeigen
+  Größe, Änderungszeit und **Berechtigungen** (`rwxr-xr-x`, wenn der Speichertyp sie liefert: lokal und SFTP ja,
+  SMB, WebDAV und Clouds nein, dann steht dort „–“). **Ordnergrößen** berechnet Größe sowie Anzahl Unterordner
+  und Dateien für alle Ordner der Ansicht, „berechnen“ für einen.
+- **Ansicht:** Mit einem Speicherort nimmt er die ganze Breite ein, mit zwei jeweils die Hälfte. Die Listen reichen
+  bis zum unteren Fensterrand und scrollen für sich.
+- **Rechtsklick** auf einen Eintrag öffnet ein Kontextmenü mit allen Aktionen, bei mehreren markierten für alle.
+  Rechtsklick auf die freie Fläche bietet Neuer Ordner, Neue Datei, Hochladen, Neu laden, Ordnergrößen und
+  Alle auswählen.
+- **⋯ an jeder Zeile:** Eigenschaften (Größe, Zeit, Rechte, Besitzer uid:gid), Bearbeiten (Textdateien bis 1 MB im
+  Editor), Herunterladen, Umbenennen, Kopieren nach …, Verschieben nach …, Löschen.
+- **Oben:** neuer Ordner, neue Datei, Hochladen (mehrere Dateien). Mit ☑ mehrere Einträge markieren, dann
+  Kopieren, Verschieben oder Löschen für alle.
+- **Drag & Drop:** Dateien und ganze Ordner vom Computer in eine Liste ziehen lädt sie hoch (auf einen Ordner
+  gezogen: in diesen Ordner). Zeilen auf die andere Seite ziehen kopiert sie, mit gedrückter Umschalttaste
+  werden sie verschoben. Auf einen Ordner derselben Seite gezogen werden sie dorthin verschoben. Vorher kommt
+  eine Rückfrage, bei vorhandenen Dateien einmal „alle überschreiben oder überspringen“.
+- **Zwischen zwei Speicherorten:** „Nach rechts kopieren →“ bzw. „← Nach links verschieben“ nimmt den gerade
+  geöffneten Ordner der anderen Seite als Ziel. Kopieren und Verschieben laufen als **Auftrag im Hintergrund** mit
+  Fortschritt. Der Knopf **„Aufträge“** oben rechts (auf jeder Seite) zeigt als Zahl, wie viele gerade laufen. Ein
+  Klick öffnet ein schwebendes Fenster. Oben stehen die **gerade laufenden Aufgaben** (Spiegeln, Zwei-Wege, Live)
+  mit Prozent, Balken, Link zum Log und Stopp-Knopf; sie zählen in der Zahl mit und verschwinden, sobald sie fertig
+  sind (seit 1.31.0, Recht „Aufgaben ansehen“). Darunter alle Aufträge des Dateimanagers: Status, Prozent und Balken (blau = läuft, grün = fertig,
+  rot = Fehler). Laufende lassen sich abbrechen, fertige einzeln oder mit „Alle fertigen entfernen“ entfernen.
+  Klick daneben oder Esc schließt es. Man kann die Seite währenddessen verlassen.
+- **Rückfragen:** Löschen fragt immer nach. Gibt es im Ziel schon eine Datei oder einen Ordner mit dem Namen,
+  fragt MirrorSync vor dem Überschreiben (beim Hochladen, Anlegen, Kopieren, Verschieben).
+- **Rechte:** „ansehen“ (durchsuchen, Größen, Berechtigungen, herunterladen), „bearbeiten“ (hochladen,
+  bearbeiten, umbenennen, Ordner anlegen, kopieren), „löschen“ (auch nötig zum Verschieben). Es gelten die
+  Beschränkung der Rolle und „Sichtbar für“ der Speicherorte, `/data` nur mit „lokale Ordner verwenden“.
+- Alles Ändernde und jeder Download steht im Audit-Log (Kategorie „Dateien“).
+- API/MCP: `list_file_locations`, `list_files`, `file_size`, `file_info`, `read_file`, `write_file`,
+  `upload_file`, `download_file`, `create_folder`, `rename_file`, `delete_files` (mit `confirm=true`),
+  `copy_files`, `move_files` (mit `overwrite=true` bei Konflikt), `list_file_tasks`, `cancel_file_task`,
+  `delete_file_task`, `clear_file_tasks`.
+
+## Aufgaben pausieren
+In der Übersicht hat jede Aufgabe einen Knopf **Pause** (das Menü schließt bei einem Klick daneben oder mit Esc): bis ich fortsetze, 1 Stunde, 24 Stunden, 1 Woche oder
+bis zu Datum und Uhrzeit. Eine pausierte Aufgabe ist in Übersicht und Zeitplänen markiert („pausiert bis …“),
+startet weder nach Zeitplan noch live noch in einer Kette und läuft nach Ablauf der Zeit von selbst wieder normal
+(geprüft jede Minute). Von Hand starten geht weiterhin. „Fortsetzen“ beendet die Pause sofort.
+
+In der Aufgabe unter „Start“ lässt sich dasselbe einstellen, dazu was in einer **Kette** passiert, wenn die
+pausierte Aufgabe an der Reihe ist:
+- **überspringen** (Standard): Die Aufgabe läuft nicht, ihre Folgeaufgaben starten trotzdem.
+- **Kette anhalten:** Die Aufgabe und alles danach läuft nicht.
+
+Das Log der vorherigen Aufgabe vermerkt, was passiert ist. Pausieren, Fortsetzen und das automatische Ende einer
+Pause stehen im Audit-Log. Das Recht dafür ist „Aufgaben: bearbeiten“.
+
+## Audit-Log
+Der Menüpunkt **Audit-Log** (Recht „System: Audit-Log ansehen und exportieren“, Admins haben es immer) zeigt, wer
+wann was gemacht hat:
+
+- Anlegen, Ändern und Löschen von Aufgaben, Zeitplänen, Speicherorten, Benutzern, Rollen, Einstellungen und
+  Zugriffsregeln, jeweils mit Vorher/Nachher der geänderten Felder
+- manuelle Starts, Testläufe und Stopps, Verbindungstests, Entsperren
+- Anmeldungen (auch fehlgeschlagene), Abmeldungen, automatische IP-Sperren, `ADMIN_RESET` und `IPGUARD_RESET`
+- zu jedem Eintrag Benutzer, IP-Adresse und Land
+
+**Details (seit 1.32.0):** Ein Klick auf einen Eintrag öffnet ein Fenster mit allem, was dazu bekannt ist: wer, wann,
+von welcher IP und welchem Land, über welchen Weg (Weboberfläche mit Browser, REST-API oder MCP, mit Anfrage),
+jedes geänderte Feld mit vollständigem altem und neuem Wert, bei Listen und mehrzeiligen Feldern (Ausschlüsse,
+Auswahl, Erlaubt-/Sperrliste, Rechte, Mitglieder …) einzeln „+ hinzugefügt“ und „− entfernt“. Beim Anlegen und
+Löschen steht der ganze Inhalt da. Im Dateimanager: Pfad, Größe, Änderungsdatum, bei Ordnern die enthaltenen
+Dateien (bis 200), beim Bearbeiten einer Textdatei die geänderten Zeilen (Auszug, Werte von Zeilen wie
+`password=` oder `token:` werden maskiert), bei Kopieren/Verschieben Von, Nach und Statistik. Bei Starts die Quelle,
+das Ziel und die Lauf-Nummer. Alte Einträge zeigen, was damals gespeichert wurde. Die API liefert dieselben Felder
+(`changes[].added/removed/old_full/new_full`, `info`).
+
+Passwörter, Tokens, 2FA-Schlüssel und andere Geheimnisse landen nie im Log, nur der Hinweis „geändert“. Filter
+nach Bereich, Benutzer und Zeitraum, Freitextsuche (auch in alten und neuen Werten), Export als CSV (für Excel,
+mit `;` getrennt) mit denselben Filtern. Gespeichert in `config/audit.jsonl`, Aufbewahrung unter
+Einstellungen → Allgemein (Standard 365 Tage, höchstens 20 000 Einträge).
+
+## Bandbreite
+Unter Einstellungen → Allgemein legst du die Standard-Bandbreite fest, in jeder Aufgabe unter „Bandbreite“
+lässt sie sich überschreiben („Standard verwenden“, „Eigene Grenzen“, „Immer unbegrenzt“).
+
+- **Außerhalb der Zeitfenster:** Grenze, die gilt, wenn kein Zeitfenster passt (leer = unbegrenzt).
+- **Einheit:** MB/s (Megabyte pro Sekunde, Standard) oder Mbit/s (Megabit pro Sekunde, wie bei Internetanschlüssen),
+  wählbar bei der Standard-Bandbreite; gilt für alle Anzeigen. 1 MB/s = 8 Mbit/s. Gespeichert wird immer in MB/s,
+  ein Wechsel rechnet die Felder um.
+- **Zeitfenster:** Wochentage, von–bis, Upload und Download. Beispiel: Mo–Fr 08:00–18:00 10 MB/s,
+  sonst unbegrenzt. Fenster wie 22:00–06:00 gehen über Mitternacht; bei Überschneidung gilt das untere.
+- Upload = zum Ziel, Download = von der Quelle. Als Vermittler (A → B) reicht meist ein Wert, weil alles von A
+  direkt nach B weitergereicht wird.
+- Die Grenzen wechseln auch während eines laufenden Spiegelns zur eingestellten Uhrzeit (Zeitzone aus `TZ`).
+- Intern wird daraus eine rclone-Zeittabelle (`--bwlimit "Mon-08:00,10M Mon-18:00,off …"`), sichtbar im Log.
+  Ein eigenes `--bwlimit` in den zusätzlichen rclone-Optionen hat Vorrang.
+
+## Logs
+Jeder Lauf bekommt ein eigenes Log unter `logs/<aufgabe>/<datum-uhrzeit>.log`. Über „Log" bei einer Aufgabe
+siehst du den letzten Lauf und den Verlauf mit Anzahl kopierter, gelöschter und fehlerhafter Dateien. Ein Klick
+auf einen Lauf öffnet sein ganzes Log:
+
+- Filter: Alle, Fehler, Kopiert, Gelöscht (auch „in Versionierung verschoben"), Hinweise
+- Suche nach Dateinamen oder Ordnern, kombinierbar mit dem Filter
+- „Herunterladen" speichert das vollständige Log als Textdatei
+- Ein laufender Lauf aktualisiert sich alle 3 Sekunden
+
+Aufbewahrung unter Einstellungen → Allgemein: Standard sind die letzten 50 Läufe pro Aufgabe und höchstens
+30 Tage (0 = unbegrenzt). Der neueste Lauf bleibt immer erhalten. Das Log aus Version 1.4 und älter wird beim
+ersten Start als Lauf „alt-…" übernommen.
+
+## API-Keys, REST-API und MCP
+Unter **Einstellungen → API** legst du API-Keys an (Recht „API-Keys verwalten“, Admins haben es):
+
+- **Name** (z. B. n8n, Home Assistant, Claude) und **Rolle**. Der Key hat genau die Rechte und
+  Beschränkungen dieser Rolle (Aufgaben, Speicherorte), wie ein Benutzer. Für einen Key mit wenigen Rechten
+  unter Rollen eine eigene Rolle anlegen, z. B. nur „Aufgaben ansehen“ und „starten“. Vergeben kann man nur
+  Rollen, deren Rechte man selbst hat.
+- Optional **Ablaufdatum** und **erlaubte IP-Adressen** (einzelne IPs oder Netze wie `192.168.1.0/24`).
+- Der Key (`msk_…`) wird nach dem Anlegen angezeigt. Seit 1.24.0 kann man ihn später mit **„Anzeigen“**
+  nochmal sehen, nach Eingabe des eigenen Passworts (plus 2FA-Code, falls eingerichtet) oder mit einem
+  Passkey. Das geht nur in der Web-GUI, nicht per API oder MCP, und steht im Audit-Log („API-Key angezeigt“).
+  Gespeichert ist er dafür verschlüsselt (Schlüssel aus `config/secret_key`). **Keys von vor 1.24.0 lassen sich
+  nicht nachträglich anzeigen**, von ihnen existiert nur der SHA-256-Hash; bei Bedarf neu anlegen. Nach
+  einem Import ohne den alten `secret_key` gilt das ebenso. Die Liste zeigt „zuletzt benutzt“ mit IP.
+- **Bearbeiten**: Name, Rolle (Rechte), Ablaufdatum, IPs, Gruppen sowie **Aktiv/Deaktiviert**, eine
+  **Pause** von–bis und **Zeitfenster** pro Wochentag (z. B. Mo–Fr 08:00–18:00, über Mitternacht geht auch).
+  Außerhalb wird der Key abgelehnt, die Liste zeigt den Status. Den gerade benutzten Key kann man nicht
+  deaktivieren oder seine Rolle ändern. API `PATCH /api-keys/{id}`, MCP `update_api_key`.
+- **Widerrufen** sperrt ihn endgültig, er bleibt aber in der Liste.
+  **Entfernen** entfernt ihn ganz (auch aus Gruppen), Einträge im Audit-Log bleiben. Den Key, mit dem man
+  gerade über die API zugreift, kann man nicht löschen. API: `POST /api-keys/{id}/revoke` bzw.
+  `DELETE /api-keys/{id}`, MCP: `revoke_api_key` bzw. `delete_api_key`.
+- Alles, was ein Key tut, steht im Audit-Log als Benutzer `API:<Name>` (Knopf „Audit“ in der Liste).
+  Fehlversuche zählen wie falsche Passwörter (IP-Bremse, Anmeldeverlauf), IP- und Länderregeln gelten
+  auch für die API, höchstens 300 Anfragen pro Minute und Key.
+
+### REST-API
+Basis `https://sync.example.de/api/v1`, Anmeldung mit `Authorization: Bearer <Key>`. Die Dokumentation zum
+Ausprobieren liegt unter **`/api/docs`** (Swagger-UI, mit GUI-Anmeldung oder über „Authorize“ mit Key), die
+Spezifikation unter `/api/v1/openapi.json`. Die Links unter Einstellungen → API öffnen einen neuen Tab.
+
+| Methode und Pfad | Zweck | Recht |
+|---|---|---|
+| `GET /status` | Version, laufende, fehlgeschlagene, pausierte Aufgaben, Rechte des Keys | – |
+| `GET /jobs`, `GET /jobs/{id}` | Aufgaben mit Status und nächstem Start | jobs.view |
+| `POST /jobs`, `PATCH /jobs/{id}`, `DELETE /jobs/{id}` | anlegen, ändern (nur angegebene Felder), löschen | jobs.create / edit / delete |
+| `POST /jobs/{id}/run` (`?dry_run=true`), `/stop` | starten, Testlauf, stoppen | jobs.run / jobs.dryrun |
+| `POST /jobs/{id}/pause` (`?hours=2` oder `?until=…`), `/resume` | pausieren, fortsetzen | jobs.edit |
+| `GET /jobs/{id}/history`, `GET /jobs/{id}/log` (`?filter=error&q=…`) | Verlauf, Log eines Laufs | jobs.logs |
+| `GET /remotes`, `GET /browse?path=NAS:daten` | Speicherorte (ohne Zugangsdaten), Ordner | remotes.view / browse |
+| `GET /schedules`, `GET /audit`, `GET /users` | Zeitpläne, Audit-Log, Benutzer | jobs.view / system.audit / users.view |
+
+```bash
+KEY=msk_xxxxxxxx_xxxxxxxxxxxxxxxxxxxx
+curl -H "Authorization: Bearer $KEY" https://sync.example.de/api/v1/status
+curl -H "Authorization: Bearer $KEY" https://sync.example.de/api/v1/jobs
+curl -X POST -H "Authorization: Bearer $KEY" "https://sync.example.de/api/v1/jobs/<id>/run?dry_run=true"
+curl -X POST -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
+     -d '{"name":"Fotos","source":"NAS:fotos","dest":"Server:/backup/fotos","trigger":"time","schedule":"0 3 * * *"}' \
+     https://sync.example.de/api/v1/jobs
+curl -X PATCH -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
+     -d '{"versioning":true,"excludes":["*.tmp"]}' https://sync.example.de/api/v1/jobs/<id>
+```
+Fehler kommen als `{"error": "…"}` mit passendem Status (400, 401, 403, 404, 409, 429).
+
+**Alles aus der GUI geht auch per API und MCP** (seit 1.21.0): Zusätzlich zu den Aufgaben gibt es Endpunkte für
+Zeitpläne und Ketten, Speicherorte (anlegen mit Assistent-Fragen, ändern, testen, neu anmelden, löschen),
+Benachrichtigungen und Vorlagen, allgemeine Einstellungen (Logs, Sicherheit, Länder-Datenbank, Sprache,
+Bandbreite mit Einheit), Zugriff nach IP und Land, Gruppen, Sichtbarkeit (`visible_to` bei Aufgaben und
+Speicherorten, `groups` bei Benutzern), Benutzer (anlegen, ändern, sperren, entsperren, 2FA und
+Passkeys zurücksetzen, löschen), Anmeldeverlauf, Rollen, API-Keys sowie Sicherung, Export, Import und
+Wiederherstellen. Die vollständige Liste steht in `/api/docs`.
+- Jede Aktion läuft intern durch dieselbe Funktion wie in der GUI: gleiche Prüfungen, gleiche Rechte (Rolle des
+  Keys), gleiche Schutzregeln (z. B. bleibt immer ein aktiver Admin, man kann sich nicht selbst aussperren) und
+  ein Eintrag im Audit-Log als `API:<Name>`.
+- Passwörter, Tokens und andere Geheimnisse lassen sich nur schreiben, nie lesen (Antwort z. B. `"token_set": true`).
+- Sicherung, Export, Import und Wiederherstellen nur mit Admin-Rolle. Import zeigt zuerst eine Vorschau und
+  übernimmt erst mit `confirm=true`.
+- Nicht per Key: eigenes Passwort, eigene 2FA und Passkeys (das bleibt beim Konto unter „Mein Konto“).
+- Sprache der Antworten (Meldungen, Swagger-Texte, MCP-Tool-Beschreibungen): `?lang=en|de|es|it|fr`, sonst
+  `Accept-Language`, sonst die Einstellung **„Sprache der API-Antworten“** am Key. Standard dort ist „Wie der
+  Benutzer“: die Sprache des Benutzers, der den Key angelegt hat (Mein Konto → Sprache). Ist kein Benutzer
+  bekannt (z. B. gelöscht oder noch nicht angemeldet), antwortet die API auf Englisch. Per API/MCP: Feld
+  `lang` bei `create_api_key`/`update_api_key`.
+**n8n:** HTTP-Request-Node mit „Header Auth“ (`Authorization` = `Bearer msk_…`). **Home Assistant:**
+`rest_command` bzw. `rest`-Sensor mit demselben Header, z. B. `POST …/jobs/<id>/run`.
+
+### MCP-Server
+`https://sync.example.de/mcp` (Streamable HTTP, Antworten als JSON, ohne Sitzung), Anmeldung mit demselben
+Header. Tools: `status`, `list_jobs`, `get_job`, `job_history`, `job_log`, `run_job`, `stop_job`, `pause_job`,
+`resume_job`, `create_job`, `update_job`, `delete_job`, `list_remotes`, `browse`, `list_schedules`,
+`audit_log`, `list_users` und dazu alle Tools für die übrigen Bereiche (siehe oben, gleiche Namen wie in
+`/api/docs`, z. B. `create_remote`, `update_user`, `set_bandwidth`, `update_security_settings`). Der Client sieht nur die Tools, für die der Key das Recht hat; ein Key mit „Nur
+lesen“ bekommt also keine schreibenden Tools.
+
+Beispiel für Clients mit JSON-Konfiguration (Claude Desktop, Cursor, VS Code u. a.; der Schlüssel heißt je nach
+Client `mcpServers` oder `servers`):
+```json
+{
+  "mcpServers": {
+    "mirrorsync": {
+      "type": "http",
+      "url": "https://sync.example.de/mcp",
+      "headers": { "Authorization": "Bearer msk_xxxxxxxx_xxxxxxxxxxxxxxxxxxxx" }
+    }
+  }
+}
+```
+Claude Code: `claude mcp add --transport http mirrorsync https://sync.example.de/mcp --header "Authorization: Bearer msk_…"`.
+Clients, die nur lokale (stdio) Server können, binden ihn über `npx mcp-remote https://sync.example.de/mcp --header "Authorization: Bearer msk_…"` an.
+
+## Datenbank, Export und Import
+Seit 1.18.0 liegen Aufgaben, Verlauf, Einstellungen, Vorlagen, Benutzer (mit 2FA und Passkeys), Rollen,
+IP-Regeln, Anmeldeverlauf und Audit-Log in einer SQLite-Datei `config/mirrorsync.db`. `rclone.conf` bleibt
+eine eigene Datei.
+
+- **Umstellung:** Beim ersten Start von 1.18.0 übernimmt MirrorSync alle alten JSON-Dateien automatisch in
+  einem Schritt (ganz oder gar nicht). Danach liegen sie unverändert in `config/json-backup/`. Bricht die
+  Übernahme ab, bleibt alles wie es war, und der nächste Start versucht es erneut. Ist eine Datei kaputt,
+  startet der Container nicht und nennt die Datei im Log, statt mit leeren Daten zu starten.
+- **Exportieren** (Einstellungen → Sicherung, nur Admins): lädt alles als ZIP herunter, also Datenbank-Inhalt,
+  `rclone.conf`, SSH-Schlüssel und andere eigene Dateien aus `config/`, optional die Lauf-Logs. Die Datei
+  enthält Geheimnisse, deshalb optional mit Passwort verschlüsseln (AES-256-GCM, Datei `.zip.enc`).
+- **Importieren:** Datei hochladen, MirrorSync prüft sie und zeigt Version, Datum und Inhalt im Vergleich zum
+  aktuellen Stand. Dateien aus einer neueren Version werden abgelehnt. Erst nach Bestätigung wird ersetzt,
+  vorher legt MirrorSync automatisch eine Sicherung in `config/backups/` an (die letzten 10 bleiben, dort auch
+  herunterladbar). Während Aufgaben laufen, ist kein Import möglich.
+- Export, Import und Download von Sicherungen stehen im Audit-Log.
+
+### Automatische Sicherung
+Einstellungen → Sicherung → **Automatische Sicherung**:
+
+- **Zeitplan** als Cron-Ausdruck mit Vorlagen (täglich 3:00, alle 6 Stunden, stündlich, sonntags, monatlich).
+- **Nur bei Änderung:** Vor jeder Sicherung bildet MirrorSync eine Prüfsumme über Aufgaben, Speicherorte,
+  Benutzer, Rollen, Einstellungen, Vorlagen, IP-Regeln, API-Keys und die Dateien in `config/`. Ist sie gleich
+  wie bei der letzten Sicherung (und die Datei existiert noch), entsteht **keine neue Datei**. Verlauf, letzte
+  Anmeldung, Fehlversuch-Zähler, Anmeldeverlauf und Audit-Log zählen nicht als Änderung.
+- **Ziel:** Standard `config/backups/`. Für eine Kopie außerhalb des Config-Ordners einen eigenen Ordner
+  einbinden, z. B. `- /mnt/nas/mirrorsync-backup:/backups` und als Ziel `/backups` eintragen.
+- **Aufbewahrung:** Anzahl und/oder höchstens N Tage, die neueste bleibt immer.
+- **Passwort** (optional, mindestens 8 Zeichen): die Dateien werden wie beim Export verschlüsselt (`.zip.enc`).
+  Das Passwort wird gespeichert, damit „Wiederherstellen…“ diese Dateien direkt öffnen kann.
+- **Benachrichtigung:** nie, nur bei Fehler oder bei Erfolg und Fehler, optional auch „nichts geändert“; Kanäle
+  frei wählbar (leer = alle aktiven). Betreff und Text unter Benachrichtigungen → Vorlagen
+  (Ereignisse „Automatische Sicherung erstellt / nichts geändert / fehlgeschlagen“).
+- **Jetzt sichern** (optional „auch ohne Änderung“), Liste aller gespeicherten Sicherungen mit Herunterladen,
+  Wiederherstellen (zeigt erst die Prüfung wie beim Import) und Löschen. Alles steht im Audit-Log.
+
+## Sprachen
+Die Oberfläche, Fehlermeldungen, API- und MCP-Texte und die Standard-Vorlagen der Benachrichtigungen gibt es
+auf **Englisch, Deutsch, Spanisch, Italienisch und Französisch**.
+
+- **Bei der Einrichtung** wird die Systemsprache gewählt (vorausgewählt: Englisch). Bestehende Installationen
+  behalten nach dem Update Deutsch.
+- **Systemsprache** ändern: Einstellungen → Allgemein → Sprache. Sie gilt für die Anmeldeseite,
+  Benachrichtigungen und alle Benutzer ohne eigene Auswahl.
+- **Eigene Sprache:** jeder Benutzer unter **Mein Konto** → Sprache.
+- **API und MCP** antworten in der Sprache aus `?lang=xx` oder dem Header `Accept-Language`, sonst in der
+  Sprache des Keys (Standard: wie der Benutzer, dem er gehört), sonst auf Englisch.
+- Selbst geschriebene Texte (Namen, eigene Vorlagen) und die Lauf-Logs bleiben, wie sie sind.
+
+**Weitere Sprache hinzufügen:** `app/i18n/en.json` kopieren, z. B. als `app/i18n/nl.json`, oben
+`"_meta": {"name": "Nederlands", "code": "nl"}` eintragen und die Werte übersetzen (die Schlüssel links sind der
+deutsche Originaltext und bleiben unverändert). Platzhalter wie `{0}`, `{job}`, HTML-Tags und `{{ … }}` müssen
+erhalten bleiben. Fehlt ein Eintrag, erscheint Englisch. Danach Image neu bauen, die Sprache erscheint
+automatisch in allen Auswahllisten.
+- Zurück auf eine Version vor 1.18.0: die Dateien aus `config/json-backup/` zurück nach `config/` legen.
+
+## Update auf eine neue Version
+Neue Dateien über die alten kopieren (`config/` und `logs/` bleiben erhalten; eigene Anpassungen in
+`docker-compose.yml` wie Passwort und Netzwerk übernehmen), dann `docker compose up -d --build`. Die laufende Version steht unten in der GUI und unter `/health`.
+
+## Hinweise
+- **Spiegeln löscht im Ziel.** Ziel nie auf einen Ordner mit anderen wichtigen Daten zeigen lassen.
+- Der Lösch-Schutz (Standard 500) bricht nach N Löschungen ab. Bis dahin Gelöschtes ist weg,
+  außer die Versionierung ist an. Für wichtige Daten Versionierung einschalten.
+- SSH-Schlüssel statt Passwort: Schlüssel nach `./config/` legen und im SFTP-Speicherort
+  `/config/id_ed25519` eintragen.
+- Dienste mit Browser-Login (OneDrive, Google Drive, Dropbox, pCloud …): Nach dem Anlegen zeigt die GUI
+  den Befehl `rclone authorize "<dienst>"`. Den einmal auf einem PC mit Browser ausführen (rclone von
+  rclone.org/downloads entpacken), anmelden und das ausgegebene Token in die GUI einfügen. Abgebrochene
+  oder abgelaufene Anmeldungen per Knopf „Anmelden“ neu starten.
+- crypt: Erst den eigentlichen Speicherort anlegen (z. B. `nas`), dann einen crypt-Speicherort mit
+  `remote = nas:verschluesselt` und Passwort. Im Job dann den crypt-Namen als Ziel verwenden.
+- Beim Bearbeiten Passwortfelder leer lassen, dann bleibt das gespeicherte Passwort erhalten.
+- Daten liegen in `./config` (Datenbank `mirrorsync.db`, Speicherorte `rclone.conf`) und `./logs` (Lauf-Logs).
+- Die GUI nur im Heimnetz betreiben oder hinter einen Reverse-Proxy mit HTTPS stellen.
+- rclone-Version im `Dockerfile` (`rclone/rclone:1.68`) bei Bedarf auf eine neuere anheben.

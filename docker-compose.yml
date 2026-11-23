@@ -1,0 +1,50 @@
+# MirrorSync – Docker Compose
+#
+# WICHTIG: Diese Datei muss im selben Ordner liegen wie das Dockerfile und der Ordner app/.
+# "build: ." baut das Image aus diesem Ordner. Ohne "build: ." findet Docker das Image
+# "mirrorsync:1.33.0" nicht (es liegt in keinem Registry) und der Start schlaegt fehl.
+#
+# Starten (im Ordner mit dieser Datei):   docker compose up -d --build
+
+services:
+  mirrorsync:
+    build: .                    # <- NICHT entfernen, baut das Image aus diesem Ordner
+    image: mirrorsync:1.33.0     # Name + Version des gebauten Images, siehe CHANGELOG.md
+    container_name: mirrorsync
+    restart: unless-stopped
+    environment:
+      - TZ=Europe/Berlin
+      # Kein Benutzer/Passwort hier noetig: Beim ersten Aufruf der Web-GUI legst du den Admin an.
+      # Den Einrichtungs-Code dafuer zeigt:  docker logs mirrorsync
+      # - PUBLIC_URL=https://sync.example.de   # optional, Adresse fuer Passkeys (sonst in der GUI einstellbar)
+      # Notfall, falls du dich ausgesperrt hast (danach wieder auskommentieren):
+      # - WEB_USER=admin
+      # - WEB_PASS=neues-passwort
+      # - ADMIN_RESET=true      # setzt Passwort+2FA von WEB_USER auf WEB_PASS zurueck
+      # - IPGUARD_RESET=true    # Notfall: entfernt alle IP- und Ländersperren,
+      #                         # danach wieder auskommentieren
+      - PORT=80                 # Port der Web-GUI im Container (beliebig aenderbar, z. B. 8080)
+    volumes:
+      - ./config:/config        # Aufgaben, Speicherorte, Benachrichtigungen, SSH-Schluessel
+      - ./logs:/logs
+      # Nur noetig, wenn auch Ordner DIESES Docker-Hosts gespiegelt werden sollen:
+      # - /srv/daten:/data/daten:ro
+
+    # --- Variante A: macvlan, Container bekommt eine eigene IP im LAN ---
+    # GUI dann unter http://192.168.1.50 (bei anderem PORT: http://192.168.1.50:<PORT>)
+    networks:
+      macvlan_net:
+        ipv4_address: 192.168.1.50
+
+    # --- Variante B: normales Bridge-Netz, GUI unter http://<docker-host>:8080 ---
+    # Dann den Block "networks:" oben und unten entfernen und stattdessen:
+    # ports:
+    #   - "8080:80"             # Host-Port 8080 -> PORT im Container
+
+networks:
+  macvlan_net:
+    # Bestehendes macvlan-Netz verwenden (Name anpassen, anzeigen mit: docker network ls)
+    external: true
+    # Falls noch keins existiert, einmalig anlegen (Subnetz, Gateway, Netzwerkkarte anpassen):
+    #   docker network create -d macvlan --subnet=192.168.1.0/24 --gateway=192.168.1.1 \
+    #     -o parent=eth0 macvlan_net
