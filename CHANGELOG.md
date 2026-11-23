@@ -3,6 +3,12 @@
 Version numbers follow [SemVer](https://semver.org/): MAJOR.MINOR.PATCH
 (MAJOR = incompatible change, MINOR = new feature, PATCH = bug fix).
 
+## 1.48.0 – 2026-11-23
+- **Test storage location: SFTP and FTP show the root folder.** "Test" now lists the folders in `/` for SFTP and FTP
+  instead of the user's home folder (for `root` that only showed `.local` and `.ssh`). The message names the listed
+  path. Paths in jobs stay unchanged. API/MCP `test_remote` returns the same. Permission `remotes.test` as before.
+  All 5 languages.
+
 ## 1.47.0 – 2026-11-23
 - **Preview: "Up" to the root folder.** In all preview browsers ("Result" and "Changes" window and the "Result in
   browser" page), "Up" or "⬆ .." now goes beyond the destination up to the root folder of the storage location.

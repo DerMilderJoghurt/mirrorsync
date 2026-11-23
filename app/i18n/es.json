@@ -1433,7 +1433,6 @@
  "Upload (zum Ziel) in MB/s": "Subida (al destino) en MB/s",
  "Variablen (anklicken fügt sie an der Cursor-Position ein):": "Variables (al hacer clic se insertan en la posición del cursor):",
  "Variablen in Anführungszeichen setzen, z. B. <code>\"text\": \"{nachricht}\"</code>, Zahlen dürfen ohne: <code>\"copied\": {kopiert}</code>. Werte werden JSON-sicher eingesetzt. Zusätzlich: <code>{titel}</code>, <code>{nachricht}</code>, <code>{ereignis}</code> (run_ok, run_fail, login_fail …), <code>{ok}</code> (true/false).": "Pon las variables entre comillas, p. ej. <code>\"text\": \"{nachricht}\"</code>; los números pueden ir sin ellas: <code>\"copied\": {kopiert}</code>. Los valores se insertan de forma segura para JSON. Además: <code>{titel}</code>, <code>{nachricht}</code>, <code>{ereignis}</code> (run_ok, run_fail, login_fail …), <code>{ok}</code> (true/false).",
- "Verbindung eines Speicherorts testen (listet die Ordner der obersten Ebene).": "Probar la conexión de un almacenamiento (lista las carpetas del nivel superior).",
  "Verbindung getestet": "Conexión probada",
  "Verbindung testen": "probar conexión",
  "Verbindung zu '{0}' OK. Ordner:\n{1}": "Conexión con “{0}” correcta. Carpetas:\n{1}",
@@ -2211,5 +2210,7 @@
  "🎯 Ziel der Aufgabe": "🎯 Destino de la tarea",
  "→ zum Ziel": "→ hacia el destino",
  "Jetzt prüfen": "Comprobar ahora",
- "Höher als das Stammverzeichnis geht es nicht.": "No se puede subir más allá de la carpeta raíz."
+ "Höher als das Stammverzeichnis geht es nicht.": "No se puede subir más allá de la carpeta raíz.",
+ "Verbindung eines Speicherorts testen (listet die Ordner der obersten Ebene, bei SFTP und FTP das Stammverzeichnis /).": "Probar la conexión de una ubicación (lista las carpetas del nivel superior, en SFTP y FTP la carpeta raíz /).",
+ "Verbindung zu '{0}' OK. Ordner in „{1}“:\n{2}": "Conexión con «{0}» correcta. Carpetas en «{1}»:\n{2}"
 }

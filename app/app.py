@@ -2962,9 +2962,12 @@ def remote_wizard(name):
 
 @app.post("/remotes/<name>/test")
 def test_remote(name):
-    rc, out = rclone("lsf", f"{name}:", "--max-depth", "1", "--dirs-only", timeout=30)
+    # SFTP/FTP: das Stammverzeichnis / zeigen statt des Home-Ordners (Pfade in Aufgaben bleiben unveraendert)
+    typ = next((r["type"] for r in list_remotes() if r["name"] == name), "")
+    path = f"{name}:/" if typ in ABS_ROOT_TYPES else f"{name}:"
+    rc, out = rclone("lsf", path, "--max-depth", "1", "--dirs-only", timeout=30)
     if rc == 0:
-        return render_remotes(msg=f"Verbindung zu '{name}' OK. Ordner:\n{out or '(leer)'}")
+        return render_remotes(msg=f"Verbindung zu '{name}' OK. Ordner in „{path}“:\n{out or '(leer)'}")
     return render_remotes(err=f"Verbindung zu '{name}' fehlgeschlagen:\n{out}")
 
 

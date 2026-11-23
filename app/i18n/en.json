@@ -1433,7 +1433,6 @@
  "Upload (zum Ziel) in MB/s": "Upload (to the destination) in MB/s",
  "Variablen (anklicken fügt sie an der Cursor-Position ein):": "Variables (click to insert at the cursor position):",
  "Variablen in Anführungszeichen setzen, z. B. <code>\"text\": \"{nachricht}\"</code>, Zahlen dürfen ohne: <code>\"copied\": {kopiert}</code>. Werte werden JSON-sicher eingesetzt. Zusätzlich: <code>{titel}</code>, <code>{nachricht}</code>, <code>{ereignis}</code> (run_ok, run_fail, login_fail …), <code>{ok}</code> (true/false).": "Put variables in quotes, e.g. <code>\"text\": \"{nachricht}\"</code>; numbers may go without: <code>\"copied\": {kopiert}</code>. Values are inserted JSON-safe. Additionally: <code>{titel}</code>, <code>{nachricht}</code>, <code>{ereignis}</code> (run_ok, run_fail, login_fail …), <code>{ok}</code> (true/false).",
- "Verbindung eines Speicherorts testen (listet die Ordner der obersten Ebene).": "Test the connection of a storage (lists the top-level folders).",
  "Verbindung getestet": "Connection tested",
  "Verbindung testen": "test connection",
  "Verbindung zu '{0}' OK. Ordner:\n{1}": "Connection to “{0}” OK. Folders:\n{1}",
@@ -2211,5 +2210,7 @@
  "🎯 Ziel der Aufgabe": "🎯 Job destination",
  "→ zum Ziel": "→ to destination",
  "Jetzt prüfen": "Check now",
- "Höher als das Stammverzeichnis geht es nicht.": "You cannot go higher than the root folder."
+ "Höher als das Stammverzeichnis geht es nicht.": "You cannot go higher than the root folder.",
+ "Verbindung eines Speicherorts testen (listet die Ordner der obersten Ebene, bei SFTP und FTP das Stammverzeichnis /).": "Test the connection of a storage location (lists the top-level folders, for SFTP and FTP the root folder /).",
+ "Verbindung zu '{0}' OK. Ordner in „{1}“:\n{2}": "Connection to “{0}” OK. Folders in “{1}”:\n{2}"
 }

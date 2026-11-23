@@ -294,7 +294,8 @@ def a_reauth_remote(a):
 
 
 @action("test_remote", "POST", "/remotes/{name}/test", "remotes.test", "Speicherorte",
-        "Verbindung eines Speicherorts testen (listet die Ordner der obersten Ebene).", {"name": S(STR)}, ["name"])
+        "Verbindung eines Speicherorts testen (listet die Ordner der obersten Ebene, bei SFTP und FTP das "
+        "Stammverzeichnis /).", {"name": S(STR)}, ["name"])
 def a_test_remote(a):
     r = gui("POST", f"/remotes/{a['name']}/test", form={})
     try:

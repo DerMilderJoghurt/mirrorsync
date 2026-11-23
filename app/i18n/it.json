@@ -1433,7 +1433,6 @@
  "Upload (zum Ziel) in MB/s": "Upload (verso la destinazione) in MB/s",
  "Variablen (anklicken fügt sie an der Cursor-Position ein):": "Variabili (clic per inserirle nella posizione del cursore):",
  "Variablen in Anführungszeichen setzen, z. B. <code>\"text\": \"{nachricht}\"</code>, Zahlen dürfen ohne: <code>\"copied\": {kopiert}</code>. Werte werden JSON-sicher eingesetzt. Zusätzlich: <code>{titel}</code>, <code>{nachricht}</code>, <code>{ereignis}</code> (run_ok, run_fail, login_fail …), <code>{ok}</code> (true/false).": "Metti le variabili tra virgolette, ad es. <code>\"text\": \"{nachricht}\"</code>; i numeri possono restarne senza: <code>\"copied\": {kopiert}</code>. I valori vengono inseriti in modo sicuro per JSON. Inoltre: <code>{titel}</code>, <code>{nachricht}</code>, <code>{ereignis}</code> (run_ok, run_fail, login_fail …), <code>{ok}</code> (true/false).",
- "Verbindung eines Speicherorts testen (listet die Ordner der obersten Ebene).": "Prova la connessione di un archivio (elenca le cartelle di primo livello).",
  "Verbindung getestet": "Connessione provata",
  "Verbindung testen": "provare la connessione",
  "Verbindung zu '{0}' OK. Ordner:\n{1}": "Connessione a “{0}” OK. Cartelle:\n{1}",
@@ -2211,5 +2210,7 @@
  "🎯 Ziel der Aufgabe": "🎯 Destinazione dell'attività",
  "→ zum Ziel": "→ verso la destinazione",
  "Jetzt prüfen": "Controlla ora",
- "Höher als das Stammverzeichnis geht es nicht.": "Non si può salire oltre la cartella radice."
+ "Höher als das Stammverzeichnis geht es nicht.": "Non si può salire oltre la cartella radice.",
+ "Verbindung eines Speicherorts testen (listet die Ordner der obersten Ebene, bei SFTP und FTP das Stammverzeichnis /).": "Testare la connessione di una posizione (elenca le cartelle del livello superiore, per SFTP e FTP la cartella radice /).",
+ "Verbindung zu '{0}' OK. Ordner in „{1}“:\n{2}": "Connessione a «{0}» OK. Cartelle in «{1}»:\n{2}"
 }

@@ -1433,7 +1433,6 @@
  "Upload (zum Ziel) in MB/s": "Envoi (vers la destination) en Mo/s",
  "Variablen (anklicken fügt sie an der Cursor-Position ein):": "Variables (un clic les insère à la position du curseur) :",
  "Variablen in Anführungszeichen setzen, z. B. <code>\"text\": \"{nachricht}\"</code>, Zahlen dürfen ohne: <code>\"copied\": {kopiert}</code>. Werte werden JSON-sicher eingesetzt. Zusätzlich: <code>{titel}</code>, <code>{nachricht}</code>, <code>{ereignis}</code> (run_ok, run_fail, login_fail …), <code>{ok}</code> (true/false).": "Mets les variables entre guillemets, p. ex. <code>\"text\": \"{nachricht}\"</code> ; les nombres peuvent s’en passer : <code>\"copied\": {kopiert}</code>. Les valeurs sont insérées de façon sûre pour JSON. En plus : <code>{titel}</code>, <code>{nachricht}</code>, <code>{ereignis}</code> (run_ok, run_fail, login_fail …), <code>{ok}</code> (true/false).",
- "Verbindung eines Speicherorts testen (listet die Ordner der obersten Ebene).": "Tester la connexion d’un stockage (liste les dossiers du premier niveau).",
  "Verbindung getestet": "Connexion testée",
  "Verbindung testen": "tester la connexion",
  "Verbindung zu '{0}' OK. Ordner:\n{1}": "Connexion à « {0} » OK. Dossiers :\n{1}",
@@ -2211,5 +2210,7 @@
  "🎯 Ziel der Aufgabe": "🎯 Destination de la tâche",
  "→ zum Ziel": "→ vers la destination",
  "Jetzt prüfen": "Vérifier maintenant",
- "Höher als das Stammverzeichnis geht es nicht.": "Impossible de remonter au-delà du dossier racine."
+ "Höher als das Stammverzeichnis geht es nicht.": "Impossible de remonter au-delà du dossier racine.",
+ "Verbindung eines Speicherorts testen (listet die Ordner der obersten Ebene, bei SFTP und FTP das Stammverzeichnis /).": "Tester la connexion d'un emplacement (liste les dossiers du premier niveau, pour SFTP et FTP le dossier racine /).",
+ "Verbindung zu '{0}' OK. Ordner in „{1}“:\n{2}": "Connexion à « {0} » OK. Dossiers dans « {1} » :\n{2}"
 }
