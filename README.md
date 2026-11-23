@@ -1,6 +1,6 @@
 # MirrorSync – 1:1 mirroring with a web GUI and schedules
 
-Version **1.33.2** · Changes: [CHANGELOG.md](CHANGELOG.md) · [Deutsche Version](README.de.md)
+Version **1.34.0** · Changes: [CHANGELOG.md](CHANGELOG.md) · [Deutsche Version](README.de.md)
 
 A Docker container that **mirrors folders one-way, 1:1** (like FreeFileSync "Mirror"):
 the destination becomes an exact copy of the source, including deletions. The sync engine is
@@ -63,8 +63,8 @@ Changed files are transferred completely (no delta transfer like rsync).
 
 ## Installation
 The ready-made image is in the GitHub Container Registry: `ghcr.io/dermilderjoghurt/mirrorsync`
-(for amd64 and arm64, e.g. Raspberry Pi). Tags: `latest` (newest version), `1.33.2` (fixed version),
-`1.33` (newest patch of this version).
+(for amd64 and arm64, e.g. Raspberry Pi). Tags: `latest` (newest version), `1.34.0` (fixed version),
+`1.34` (newest patch of this version).
 
 ### With Docker Compose (recommended)
 1. Create a folder and put the [`docker-compose.yml`](docker-compose.yml) into it, e.g. `/opt/mirrorsync/`.
@@ -681,6 +681,17 @@ The interface, error messages, API and MCP texts and the default notification te
 the original German text and stay unchanged). Placeholders like `{0}`, `{job}`, HTML tags and `{{ … }}` must be
 kept. Missing entries fall back to English. Then rebuild the image, the language appears automatically in all
 selection lists. Pull requests with new languages are welcome.
+
+## New version notice (since 1.34.0)
+Every 6 hours MirrorSync asks GitHub (`api.github.com`, repository `DerMilderJoghurt/mirrorsync`) whether a newer
+version exists. If so, the bottom left shows "⬆ vX.Y.Z available" below the version number; clicking it opens the
+release with all changes. Only the installed version number is sent.
+
+- Turn it on or off under **Settings → General → Updates**, which also has "Save and check now" and shows when the
+  last check happened. Nothing is updated automatically, that stays up to you (see below).
+- API/MCP: `GET /api/v1/update` (`get_update`), `POST /api/v1/update/check` (`check_update`),
+  `PATCH /api/v1/settings/update` with `{"update_check": false}` (`update_update_settings`); `/status` contains `update`.
+- Another repository (e.g. your own fork) can be set with `UPDATE_REPO=owner/repo`.
 
 ## Updating to a new version
 ```bash

@@ -3,6 +3,18 @@
 Version numbers follow [SemVer](https://semver.org/): MAJOR.MINOR.PATCH
 (MAJOR = incompatible change, MINOR = new feature, PATCH = bug fix).
 
+## 1.34.0 – 2026-11-23
+- **New version notice:** every 6 hours MirrorSync asks GitHub whether a newer version exists. If so, the bottom left
+  shows "⬆ vX.Y.Z available" below the version number, linking to the release. Can be turned off under
+  Settings → General → Updates, which also offers "Save and check now" and shows the last check. Only the installed
+  version number is sent. Changing the setting is recorded in the audit log. API/MCP: `GET /update` (`get_update`),
+  `POST /update/check` (`check_update`, permission "general settings"), `PATCH /settings/update` with `update_check`
+  (`update_update_settings`), plus `update` in `/status` and `get_settings`. Use another repository via the
+  environment variable `UPDATE_REPO`. All texts in 5 languages.
+- Fixed: some texts still appeared in German in other languages: "aktiv", "immer", "aus" and "manuell" on the
+  Schedules page, "sonst"/"immer" in the bandwidth preview, and the storage type names "S3 and S3-compatible" and
+  "Encryption (crypt)" in the type selection when creating a storage location.
+
 ## 1.33.2 – 2026-11-23
 - **GitHub repository in English:** README, CHANGELOG, compose file and workflow comments are now in English.
   The German README is still available as [README.de.md](README.de.md).

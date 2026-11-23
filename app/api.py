@@ -367,7 +367,7 @@ def op_status():
             "failed": [{"id": jid, "name": j["name"], "last_run": j.get("last_run")} for jid, j in jobs.items()
                        if j.get("last_status") == "fehler"],
             "paused": [{"id": jid, "name": j["name"]} for jid, j in jobs.items() if core.is_paused(j)],
-            "key": g.user, "permissions": sorted(g.access.perms)}
+            "key": g.user, "permissions": sorted(g.access.perms), "update": core.update_status()}
 
 
 def op_jobs():

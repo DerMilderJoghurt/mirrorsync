@@ -34,6 +34,7 @@ import db as dbmod
 import files as filemgr
 import geoip
 import i18n
+import update
 import ipguard
 import msgtpl
 import notify
@@ -118,6 +119,7 @@ app.jinja_env.globals.update(_=i18n.t, lang_code=i18n.current, LANGS=i18n.langua
                              bw_unit=lambda: load_settings().get("bw_unit") or "MB/s")
 app.jinja_env.filters["regex_cmd"] = lambda h: (re.search(r'rclone authorize "[^\n]*', h or "") or [None])[0]
 app.jinja_env.globals["VERSION"] = VERSION
+app.jinja_env.globals["UPDATE"] = lambda: update_status() if g.get("user") else None
 notify.VERSION = VERSION
 app.jinja_env.globals["ICON"] = {k: Markup(v) for k, v in ICONS.items()}
 app.jinja_env.globals["STATUS"] = {"ok": "OK", "fehler": "Fehler", "laeuft": "läuft",
@@ -131,6 +133,7 @@ scheduler = BackgroundScheduler(timezone=TZ)
 
 # ---------------------------------------------------------------- Speicher
 DB = dbmod.DB(os.path.join(CONFIG_DIR, dbmod.DB_NAME))
+update.init(DB, VERSION)
 try:
     dbmod.migrate(DB, CONFIG_DIR, log=lambda m: print(m, flush=True))
 except Exception as _e:   # nichts uebernommen, JSON-Dateien unveraendert -> lieber nicht starten als leer starten
@@ -366,7 +369,7 @@ SETTINGS_FILE = os.path.join(CONFIG_DIR, "settings.json")
 LOG_DEFAULTS = {"log_keep_runs": "50", "log_keep_days": "30", "trust_proxy": False, "geoip_auto": True, "geoip_days": "30",
                 "geoip_mode": "interval", "geoip_time": "03:00", "geoip_dow": "mon",
                 "lock_attempts": "5", "lock_minutes": "15", "lock_notify": True,
-                "fail_notify": "", "fail_notify_minutes": "15", "audit_keep_days": "365"}
+                "fail_notify": "", "fail_notify_minutes": "15", "audit_keep_days": "365", "update_check": True}
 RUN_ID_RE = re.compile(r"^[A-Za-z0-9_.-]{1,64}$")
 
 
@@ -379,6 +382,27 @@ def load_settings():
 
 def save_settings(data):
     DB.put_map("settings", data)
+
+
+def update_status():
+    """Ergebnis der Pruefung auf eine neuere Version (siehe update.py)."""
+    return update.status(load_settings().get("update_check", True))
+
+
+def _update_loop():
+    """Beim Start (nach kurzer Pause) und danach regelmaessig bei GitHub nach einer neueren Version fragen."""
+    time.sleep(30)
+    while True:
+        try:
+            if load_settings().get("update_check", True) and update.due():
+                st = update.check()
+                if st.get("error"):
+                    print(f"Update-Prüfung: {st['error']}", flush=True)
+                elif update.newer(st.get("latest"), VERSION):
+                    print(f"Neue MirrorSync-Version {st['latest']} verfügbar: {st.get('url')}", flush=True)
+        except Exception as e:  # noqa: BLE001
+            print(f"Update-Prüfung: {e}", flush=True)
+        time.sleep(600)
 
 
 def keep_limits():
@@ -2428,6 +2452,11 @@ def providers():
     return _providers
 
 
+def providers_tr():
+    """providers() mit Bezeichnungen in der Sprache der Anfrage (fuer die GUI)."""
+    return [dict(p, label=i18n.t(p["label"])) for p in providers()]
+
+
 def list_remotes():
     rc, out = rclone("listremotes", "--long", timeout=15)
     if rc != 0:
@@ -2538,7 +2567,7 @@ def edit_remote(name=None):
             err = "Mit dieser Auswahl unter „Sichtbar für“ würdest du den Speicherort selbst nicht mehr sehen."
         if err:
             return render_template("remote_edit.html", name=name, existing=_safe(existing), err=err,
-                                   providers=providers(), form=f, vis=vis, vis_opts=vis_options())
+                                   providers=providers_tr(), form=f, vis=vis, vis_opts=vis_options())
         meta = DB.get_map("remote_meta")
         if vis == "all":
             meta.pop(new_name, None)
@@ -2555,7 +2584,7 @@ def edit_remote(name=None):
             q, err = _config_step(["config", "create", new_name, typ, *params, "--obscure"])
         return _after_step(new_name, q, err, f"Speicherort '{new_name}' gespeichert. Jetzt mit „Testen“ prüfen.")
     return render_template("remote_edit.html", name=name, existing=_safe(existing), err=None,
-                           providers=providers(), form={}, vis=remote_vis_map().get(name, "all") if name else "all",
+                           providers=providers_tr(), form={}, vis=remote_vis_map().get(name, "all") if name else "all",
                            vis_opts=vis_options())
 
 
@@ -2682,6 +2711,15 @@ def general_settings():
             save_settings(s)
             i18n.default_lang = lang
             msg = "Standardsprache gespeichert."
+    elif request.method == "POST" and request.form.get("section") == "update":
+        s["update_check"] = "update_check" in request.form
+        save_settings(s)
+        msg = "Gespeichert."
+        if request.form.get("check_now"):
+            st = update.check()
+            msg = (i18n.t("Prüfung fehlgeschlagen: {0}", st["error"]) if st.get("error") else
+                   i18n.t("Neue Version {0} verfügbar.", st["latest"]) if update.newer(st.get("latest"), VERSION) else
+                   i18n.t("MirrorSync ist aktuell ({0}).", VERSION))
     elif request.method == "POST" and request.form.get("section") == "bw":
         cfg, err = bwlimit.clean(parse_bw(request.form.get("bw_json")))
         if not err:
@@ -2714,7 +2752,7 @@ def general_settings():
     pk_rp_id, _, _pk_prob = _pk_rp()
     return render_template("general.html", s=s, msg=msg, err=err, usage=usage, bw_cfg=bw, geo=geoip.status(), pk_now=pk_rp_id,
                            attribution=Markup(geoip.ATTRIBUTION), my_ip=_client_ip(), my_loc=geoip.locate(_client_ip()),
-                           next_geoip=next_run("_geoip"), tz=TZ,
+                           next_geoip=next_run("_geoip"), tz=TZ, upd=update_status(),
                            fwd=request.headers.get("X-Forwarded-For", ""),
                            bw_desc=bwlimit.describe(bw, s.get("bw_unit") or "MB/s"), bw_tt=bwlimit.timetable(bw))
 
@@ -3943,6 +3981,7 @@ def main():
         print(f"Hinweis: Benutzer {', '.join(grp)} unterscheiden sich nur in Groß-/Kleinschreibung. "
               "Anmeldung klappt nur mit exakter Schreibweise, bitte einen umbenennen oder löschen.", flush=True)
     threading.Thread(target=_geoip_loop, daemon=True).start()
+    threading.Thread(target=_update_loop, daemon=True).start()
     scheduler.start()
     schedule_all()
     from waitress import serve

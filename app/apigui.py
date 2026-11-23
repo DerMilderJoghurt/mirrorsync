@@ -432,7 +432,33 @@ def a_get_general(a):
     return {"logs": {k: s.get(k) for k in LOG_KEYS}, "security": {k: s.get(k) for k in SEC_KEYS},
             "language": s.get("language") or core.i18n.default_lang,
             "languages": [{"code": c, "name": n} for c, n in core.i18n.languages()],
-            "geoip": core.geoip.status()}
+            "geoip": core.geoip.status(), "update": core.update_status()}
+
+
+@action("get_update", "GET", "/update", None, "System",
+        "Prüfung auf eine neuere MirrorSync-Version: installierte (current) und neueste Version (latest), "
+        "update_available, Link zum Release (url), Zeitpunkt der letzten Prüfung, enabled.", ro=True)
+def a_get_update(a):
+    return core.update_status()
+
+
+@action("check_update", "POST", "/update/check", "system.settings", "System",
+        "Jetzt bei GitHub nach einer neueren Version fragen und das Ergebnis zurückgeben.")
+def a_check_update(a):
+    core.update.check()
+    return core.update_status()
+
+
+@action("update_update_settings", "PATCH", "/settings/update", "system.settings", "Einstellungen",
+        "Automatische Prüfung auf neue Versionen ein- oder ausschalten (update_check).",
+        {"update_check": S(BOOL)}, ["update_check"])
+def a_update_update_settings(a):
+    _check_keys(a, ("update_check",))
+    form = {"section": "update"}
+    if _bool(a["update_check"]):
+        form["update_check"] = "on"
+    msg = done(gui("POST", "/settings/general", form=form))
+    return {"ok": True, "message": msg, "update": core.update_status()}
 
 
 @action("update_log_settings", "PATCH", "/settings/logs", "system.settings", "Einstellungen",

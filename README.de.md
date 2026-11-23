@@ -1,6 +1,6 @@
 # MirrorSync – 1:1-Spiegelung mit Web-GUI und Zeitplänen
 
-Version **1.33.2** · Änderungen siehe [CHANGELOG.md](CHANGELOG.md) (englisch) · [English version](README.md)
+Version **1.34.0** · Änderungen siehe [CHANGELOG.md](CHANGELOG.md) (englisch) · [English version](README.md)
 
 Ein Docker-Container, der Ordner **einweg 1:1 spiegelt** (wie FreeFileSync „Spiegeln"):
 Das Ziel wird exakt wie die Quelle, inklusive Löschungen. Als Sync-Motor dient
@@ -64,8 +64,8 @@ Geänderte Dateien werden komplett neu übertragen (kein Delta wie bei rsync).
 
 ## Installation
 Das fertige Image liegt in der GitHub Container Registry: `ghcr.io/dermilderjoghurt/mirrorsync`
-(für amd64 und arm64, z. B. Raspberry Pi). Tags: `latest` (neueste Version), `1.33.2` (feste Version),
-`1.33` (neuester Patch dieser Version).
+(für amd64 und arm64, z. B. Raspberry Pi). Tags: `latest` (neueste Version), `1.34.0` (feste Version),
+`1.34` (neuester Patch dieser Version).
 
 ### Mit Docker Compose (empfohlen)
 1. Ordner anlegen und die [`docker-compose.yml`](docker-compose.yml) hineinlegen, z. B. nach `/opt/mirrorsync/`.
@@ -702,6 +702,17 @@ deutsche Originaltext und bleiben unverändert). Platzhalter wie `{0}`, `{job}`,
 erhalten bleiben. Fehlt ein Eintrag, erscheint Englisch. Danach Image neu bauen, die Sprache erscheint
 automatisch in allen Auswahllisten.
 - Zurück auf eine Version vor 1.18.0: die Dateien aus `config/json-backup/` zurück nach `config/` legen.
+
+## Hinweis auf neue Versionen (seit 1.34.0)
+MirrorSync fragt alle 6 Stunden bei GitHub (`api.github.com`, Repo `DerMilderJoghurt/mirrorsync`) nach, ob es eine
+neuere Version gibt. Wenn ja, steht unten links unter der Versionsnummer „⬆ vX.Y.Z verfügbar“, ein Klick öffnet das
+Release mit allen Änderungen. Übertragen wird dabei nur die eigene Versionsnummer.
+
+- Ein- und ausschalten unter **Einstellungen → Allgemein → Updates**, dort auch „Speichern und jetzt prüfen“ und
+  wann zuletzt geprüft wurde. Aktualisiert wird nicht automatisch, das bleibt bei dir (siehe unten).
+- API/MCP: `GET /api/v1/update` (`get_update`), `POST /api/v1/update/check` (`check_update`),
+  `PATCH /api/v1/settings/update` mit `{"update_check": false}` (`update_update_settings`); `/status` enthält `update`.
+- Ein anderes Repo (z. B. ein eigener Fork) lässt sich per `UPDATE_REPO=besitzer/repo` einstellen.
 
 ## Update auf eine neue Version
 ```bash

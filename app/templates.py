@@ -27,7 +27,7 @@ nav a{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8p
 nav a:hover{background:var(--card2);color:var(--fg)}nav a.active{background:var(--acc-soft);color:var(--acc)}
 nav svg,.btn svg{width:16px;height:16px;flex:0 0 16px}
 .side-foot{margin-top:auto;padding:12px 10px;border-top:1px solid var(--bd);display:flex;flex-direction:column;gap:2px}
-.side-foot .ver{color:var(--mut);font-size:12px;padding:6px 10px}
+.side-foot .ver{color:var(--mut);font-size:12px;padding:6px 10px}.side-foot .ver .upd{color:var(--acc);font-weight:600;text-decoration:none}.side-foot .ver .upd:hover{text-decoration:underline}
 .side-foot button,.side-foot a{all:unset;display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;color:var(--mut);cursor:pointer;font-weight:500}
 .side-foot button:hover,.side-foot a:hover{background:var(--card2);color:var(--fg)}.side-foot svg{width:16px;height:16px}
 .content{flex:1;min-width:0}
@@ -169,7 +169,7 @@ table,tbody,tr,td{display:block;width:100%}tr:first-child:has(th){display:none}t
 <button type="button" onclick="toggleTheme()" title="Design wechseln">{{ ICON.theme }}<span id="themeLabel" class="lbl">Design wechseln</span></button>
 {% if g.user %}<a href="/account" class="userchip" title="{{ g.user }}"><span class="avatar">{{ g.user[:1]|upper }}</span><span class="lbl"><b>{{ g.user }}</b><br><small>{{ role_name(g.role) }}</small></span></a>
 <a href="/logout" title="Abmelden">{{ ICON.logout }}<span class="lbl">Abmelden</span></a>{% endif %}
-<div class="ver">MirrorSync v{{ VERSION }}</div>
+<div class="ver">MirrorSync v{{ VERSION }}{% set upd_s = UPDATE() %}{% if upd_s and upd_s.update_available %}<br><a class="upd" href="{{ upd_s.url }}" target="_blank" rel="noopener" title="Neue Version verfügbar">⬆ v{{ upd_s.latest }} verfügbar</a>{% endif %}</div>
 </div>
 </aside>
 <div class="content">
@@ -1786,6 +1786,13 @@ scope();
 <div class="row"><div><label>Standardsprache</label><select name="language">{% for c, n in LANGS() %}<option value="{{ c }}" {{ "selected" if c == s.language }}>{{ n }}</option>{% endfor %}</select></div>
 <div style="align-self:end"><button class="btn pri">Speichern</button></div></div>
 <div class="hint">Gilt für die Anmeldeseite, Benachrichtigungen, API-Meldungen und alle Benutzer ohne eigene Auswahl. Jeder Benutzer stellt seine Sprache unter <a href="/account">Mein Konto</a> ein.</div></form>
+<form method="post" class="card"><input type="hidden" name="section" value="update"><h2>Updates</h2>
+<label class="check"><input type="checkbox" name="update_check" {{ "checked" if upd.enabled }}> Nach neuen Versionen suchen</label>
+<div class="hint">Fragt alle 6 Stunden bei GitHub nach, ob es eine neuere Version gibt, und zeigt sie unten links neben der Versionsnummer an. Übertragen wird dabei nur die eigene Versionsnummer.</div>
+<p style="margin:10px 0 0"><span class="mut">Installiert:</span> <b>v{{ upd.current }}</b>{% if upd.latest %} &nbsp;·&nbsp; <span class="mut">Neueste Version:</span> <a href="{{ upd.url }}" target="_blank" rel="noopener">v{{ upd.latest }}</a>{% if upd.update_available %} <span class="tag ok">Neue Version verfügbar</span>{% elif upd.enabled %} <span class="tag">aktuell</span>{% endif %}{% endif %}</p>
+{% if upd.checked %}<p class="mut" style="margin:4px 0 0"><small>Zuletzt geprüft: {{ upd.checked }}</small></p>{% endif %}
+{% if upd.error %}<p style="margin:4px 0 0;color:var(--err)"><small>Fehler bei der letzten Prüfung: {{ upd.error }}</small></p>{% endif %}
+<p style="margin-top:12px"><button class="btn pri">Speichern</button> <button class="btn" name="check_now" value="1">Speichern und jetzt prüfen</button></p></form>
 <form method="post"><div class="card"><h2>Logs aufbewahren</h2>
 <p class="mut" style="margin-top:-4px">Jeder Lauf bekommt ein eigenes Log. Ältere Läufe werden nach jedem Lauf automatisch gelöscht.</p>
 <div class="row"><div><label>Läufe pro Aufgabe behalten</label><input type="text" inputmode="numeric" name="log_keep_runs" value="{{ s.log_keep_runs }}"><div class="hint">1 bis 1000</div></div>
@@ -1869,7 +1876,7 @@ function collect(){return {up:store(document.getElementById('bw_up').value),down
 function rate(u,d){u=u?show(u)+' '+U:'unbegrenzt';d=d?show(d)+' '+U:'unbegrenzt';return u===d?u:'↑ '+u+' / ↓ '+d}
 function days(a){const s=a.join();return s==='0,1,2,3,4,5,6'?'täglich':s==='0,1,2,3,4'?'Mo–Fr':s==='5,6'?'Sa–So':a.map(i=>DD[i]).join(', ')}
 window.bwPrev=function(){const c=collect();const p=c.rules.map(r=>days(r.days)+' '+r.start+'–'+r.end+': '+rate(r.up,r.down));
-  p.push((c.rules.length?'sonst: ':'immer: ')+rate(c.up,c.down));document.getElementById('bw_prev').textContent='Ergebnis: '+p.join(' · ')};
+  p.push((c.rules.length?'sonst':'immer')+': '+rate(c.up,c.down));document.getElementById('bw_prev').textContent='Ergebnis: '+p.join(' · ')};
 ['bw_up','bw_down'].forEach(i=>document.getElementById(i).addEventListener('input',bwPrev));
 (C.rules||[]).forEach(r=>bwAdd(r));units();bwPrev();
 const us=document.getElementById('bw_unit');
@@ -2016,7 +2023,7 @@ function timeRow(j){const el=document.createElement('div');el.className='sch';co
    '<div class="ctl">'+trigSelect(j)+
    (pc?'<input type="time" class="tm" value="'+pc.t+'"><span class="days">'+[1,2,3,4,5,6,0].map(d=>'<label><input type="checkbox" value="'+d+'"'+(days.includes(d)?' checked':'')+'><span>'+DD[(d+6)%7]+'</span></label>').join('')+'</span>'
        :'<input type="text" class="cr" value="'+esc(j.schedule)+'" style="width:150px" title="Cron-Ausdruck">')+
-   '<label class="check" style="margin:0"><input type="checkbox" class="en"'+(j.enabled?' checked':'')+'> aktiv</label>'+
+   '<label class="check" style="margin:0"><input type="checkbox" class="en"'+(j.enabled?' checked':'')+'> '+'aktiv'+'</label>'+
    (E?'<button type="button" class="btn sm pri sv">Speichern</button>':'')+'</div>';
   if(!E)el.querySelectorAll('input').forEach(i=>i.disabled=true);
   bindTrig(el,j);const sv=el.querySelector('.sv');
@@ -2035,7 +2042,7 @@ function liveRow(j){const el=document.createElement('div');el.className='sch';co
    '<span class="fk-time" style="display:contents"><input type="time" class="tm" value="'+(pc?pc.t:'03:00')+'"><span class="days">'+[1,2,3,4,5,6,0].map(d=>'<label><input type="checkbox" value="'+d+'"'+(days.includes(d)?' checked':'')+'><span>'+DD[(d+6)%7]+'</span></label>').join('')+'</span></span>'+
    '<span class="fk-every" style="display:contents"><input type="number" class="fn" min="1" max="720" value="'+(ev?ev[1]:6)+'" style="width:70px"><select class="fu"><option value="h"'+(ev&&ev[2]==='m'?'':' selected')+'>'+'Std.'+'</option><option value="m"'+(ev&&ev[2]==='m'?' selected':'')+'>'+'Min.'+'</option></select></span>'+
    '<span class="fk-cron" style="display:contents"><input type="text" class="cr" value="'+esc(kind==='cron'?j.full:'0 3 * * *')+'" style="width:150px" title="'+'Cron-Ausdruck für den vollen Abgleich'+'"></span></span>'+
-   '<label class="check" style="margin:0"><input type="checkbox" class="en"'+(j.enabled?' checked':'')+'> aktiv</label>'+
+   '<label class="check" style="margin:0"><input type="checkbox" class="en"'+(j.enabled?' checked':'')+'> '+'aktiv'+'</label>'+
    (E?'<button type="button" class="btn sm pri sv">Speichern</button>':'')+'</div>';
   const q=s=>el.querySelector(s);
   const vis=()=>{const f=!tw&&q('.lm').value==='fast',k=q('.fk').value;q('.fullc').style.display=f?'contents':'none';
@@ -2052,10 +2059,10 @@ function manualRow(j){const el=document.createElement('div');el.className='sch';
   bindTrig(el,j);if(E)drag(el);return el}
 function chainRow(j){const el=document.createElement('div');el.className='sch';el.dataset.id=j.id;
   el.innerHTML=(E?'<span class="handle" title="ziehen">⠿</span>':'')+nameCell(j)+'<div class="ctl">'+
-   (E?'<select class="wh"><option value="ok"'+(j.when!=='always'?' selected':'')+'>nur bei Erfolg</option><option value="always"'+(j.when==='always'?' selected':'')+'>immer</option></select>'
-      +'<label class="check" style="margin:0"><input type="checkbox" class="en"'+(j.enabled?' checked':'')+'> aktiv</label>'
+   (E?'<select class="wh"><option value="ok"'+(j.when!=='always'?' selected':'')+'>nur bei Erfolg</option><option value="always"'+(j.when==='always'?' selected':'')+'>'+'immer'+'</option></select>'
+      +'<label class="check" style="margin:0"><input type="checkbox" class="en"'+(j.enabled?' checked':'')+'> '+'aktiv'+'</label>'
       +'<button type="button" class="btn sm up" title="nach oben">↑</button><button type="button" class="btn sm dn" title="nach unten">↓</button>'+trigSelect(j)
-      :'<small>'+(j.when==='always'?'immer':'nur bei Erfolg')+(j.enabled?'':' · aus')+'</small>')+'</div>';
+      :'<small>'+(j.when==='always'?'immer':'nur bei Erfolg')+(j.enabled?'':' · '+'aus')+'</small>')+'</div>';
   if(E){bindTrig(el,j);drag(el);el.querySelector('.wh').onchange=saveChains;el.querySelector('.en').onchange=saveChains;
     el.querySelector('.up').onclick=()=>{const p=el.previousElementSibling;if(p&&p.classList.contains('sch')){el.parentNode.insertBefore(el,p);saveChains()}};
     el.querySelector('.dn').onclick=()=>{const n=el.nextElementSibling;if(n&&n.classList.contains('sch')){el.parentNode.insertBefore(n,el);saveChains()}}}
@@ -2093,7 +2100,7 @@ function render(){
 }
 function chainBox(root,items){const r=D.jobs[root];const b=document.createElement('div');b.className='chainbox';b.dataset.root=root;
   const how=r.trigger==='time'?('🕒 '+esc(r.text||r.schedule)+(r.enabled&&r.next_run?' · nächster Lauf '+esc(r.next_run):' · Zeitplan aus'))
-    :r.trigger==='live'?('⚡ '+esc(r.live_text)+' · Folgeaufgaben nach dem vollen Abgleich'+(r.next_run?' ('+esc(r.next_run)+')':'')):'✋ manuell';
+    :r.trigger==='live'?('⚡ '+esc(r.live_text)+' · Folgeaufgaben nach dem vollen Abgleich'+(r.next_run?' ('+esc(r.next_run)+')':'')):'✋ '+'manuell';
   b.innerHTML='<div class="chainhead"><div class="nm"><b>'+esc(r.name)+'</b><small class="mut">'+how+'</small></div><small class="mut">Start der Kette</small></div><div class="drop"></div>';
   const z=b.querySelector('.drop');items.forEach(id=>z.append(chainRow(D.jobs[id])));
   if(!items.length)z.innerHTML='<div class="empty-drop">Aufgabe hierher ziehen</div>';
