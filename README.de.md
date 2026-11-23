@@ -1,6 +1,6 @@
 # MirrorSync – 1:1-Spiegelung mit Web-GUI und Zeitplänen
 
-Version **1.34.0** · Änderungen siehe [CHANGELOG.md](CHANGELOG.md) (englisch) · [English version](README.md)
+Version **1.35.0** · Änderungen siehe [CHANGELOG.md](CHANGELOG.md) (englisch) · [English version](README.md)
 
 Ein Docker-Container, der Ordner **einweg 1:1 spiegelt** (wie FreeFileSync „Spiegeln"):
 Das Ziel wird exakt wie die Quelle, inklusive Löschungen. Als Sync-Motor dient
@@ -64,7 +64,7 @@ Geänderte Dateien werden komplett neu übertragen (kein Delta wie bei rsync).
 
 ## Installation
 Das fertige Image liegt in der GitHub Container Registry: `ghcr.io/dermilderjoghurt/mirrorsync`
-(für amd64 und arm64, z. B. Raspberry Pi). Tags: `latest` (neueste Version), `1.34.0` (feste Version),
+(für amd64 und arm64, z. B. Raspberry Pi). Tags: `latest` (neueste Version), `1.35.0` (feste Version),
 `1.34` (neuester Patch dieser Version).
 
 ### Mit Docker Compose (empfohlen)
@@ -292,6 +292,10 @@ Dafür gibt es ein eigenes Recht „Zwei-Wege-Sync einrichten“.
   werden zusammengeführt (`--resync`). Was nur auf einer Seite liegt, wird auf die andere kopiert, gelöscht wird
   nichts. Ist eine Datei auf beiden Seiten verschieden, gewinnt die neuere. Löschungen werden erst ab dem zweiten
   Lauf übertragen. Tipp: Den ersten Lauf als Testlauf starten.
+- **Fehlender Ordner** (seit 1.35.0): Gibt es den Ordner von Seite A oder Seite B beim ersten Lauf noch nicht,
+  legt MirrorSync ihn an, wie beim Spiegeln. Fehlt dagegen bei einem späteren Lauf eine Seite, die schon einmal
+  da war, oder ist sie plötzlich leer (z. B. Laufwerk nicht eingehängt), bricht der Lauf zum Schutz ab, ohne etwas
+  anzulegen oder zu löschen. Das Log sagt dann, was los ist. Ist die Seite wieder da, „Neu zusammenführen“ klicken.
 - **Konflikt** (Datei auf beiden Seiten geändert): wählbar „die neuere gewinnt“ (Standard), „beide behalten“,
   „Seite A gewinnt“ oder „Seite B gewinnt“. Die unterlegene Fassung bleibt immer umbenannt erhalten
   (`datei.txt.konflikt1`) und liegt auf beiden Seiten.
@@ -704,14 +708,16 @@ automatisch in allen Auswahllisten.
 - Zurück auf eine Version vor 1.18.0: die Dateien aus `config/json-backup/` zurück nach `config/` legen.
 
 ## Hinweis auf neue Versionen (seit 1.34.0)
-MirrorSync fragt alle 6 Stunden bei GitHub (`api.github.com`, Repo `DerMilderJoghurt/mirrorsync`) nach, ob es eine
+MirrorSync fragt regelmäßig (Standard: einmal pro Stunde) bei GitHub (`api.github.com`, Repo `DerMilderJoghurt/mirrorsync`) nach, ob es eine
 neuere Version gibt. Wenn ja, steht unten links unter der Versionsnummer „⬆ vX.Y.Z verfügbar“, ein Klick öffnet das
 Release mit allen Änderungen. Übertragen wird dabei nur die eigene Versionsnummer.
 
 - Ein- und ausschalten unter **Einstellungen → Allgemein → Updates**, dort auch „Speichern und jetzt prüfen“ und
-  wann zuletzt geprüft wurde. Aktualisiert wird nicht automatisch, das bleibt bei dir (siehe unten).
+  wann zuletzt geprüft wurde. Den **Abstand** stellst du dort ebenfalls ein: Zahl eingeben, Minuten oder Stunden
+  wählen (5 Minuten bis 720 Stunden, Standard 1 Stunde). Aktualisiert wird nicht automatisch, das bleibt bei dir (siehe unten).
 - API/MCP: `GET /api/v1/update` (`get_update`), `POST /api/v1/update/check` (`check_update`),
-  `PATCH /api/v1/settings/update` mit `{"update_check": false}` (`update_update_settings`); `/status` enthält `update`.
+  `PATCH /api/v1/settings/update` mit `{"update_check": false}` und/oder `{"update_interval": 120}` (Minuten)
+  (`update_update_settings`); `/status` enthält `update` mit `interval_minutes`.
 - Ein anderes Repo (z. B. ein eigener Fork) lässt sich per `UPDATE_REPO=besitzer/repo` einstellen.
 
 ## Update auf eine neue Version

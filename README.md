@@ -1,6 +1,6 @@
 # MirrorSync – 1:1 mirroring with a web GUI and schedules
 
-Version **1.34.0** · Changes: [CHANGELOG.md](CHANGELOG.md) · [Deutsche Version](README.de.md)
+Version **1.35.0** · Changes: [CHANGELOG.md](CHANGELOG.md) · [Deutsche Version](README.de.md)
 
 A Docker container that **mirrors folders one-way, 1:1** (like FreeFileSync "Mirror"):
 the destination becomes an exact copy of the source, including deletions. The sync engine is
@@ -63,7 +63,7 @@ Changed files are transferred completely (no delta transfer like rsync).
 
 ## Installation
 The ready-made image is in the GitHub Container Registry: `ghcr.io/dermilderjoghurt/mirrorsync`
-(for amd64 and arm64, e.g. Raspberry Pi). Tags: `latest` (newest version), `1.34.0` (fixed version),
+(for amd64 and arm64, e.g. Raspberry Pi). Tags: `latest` (newest version), `1.35.0` (fixed version),
 `1.34` (newest patch of this version).
 
 ### With Docker Compose (recommended)
@@ -284,6 +284,10 @@ permission "Set up two-way sync" for this.
 - **First run** (and after changing side A, side B, excludes or checksum): both sides are merged (`--resync`).
   Whatever exists only on one side is copied to the other, nothing is deleted. If a file differs on both
   sides, the newer one wins. Deletions are transferred from the second run on. Tip: start the first run as a dry run.
+- **Missing folder** (since 1.35.0): if the folder of side A or side B does not exist yet on the first run,
+  MirrorSync creates it, just like mirroring does. If a side that existed before is missing on a later run, or is
+  suddenly empty (e.g. a drive is not mounted), the run stops as a precaution without creating or deleting anything.
+  The log explains what happened. Once the side is back, click "Merge again".
 - **Conflict** (file changed on both sides): choose "newer wins" (default), "keep both", "side A wins" or
   "side B wins". The losing version is always kept, renamed (`file.txt.konflikt1`), on both sides.
 - **Deletion protection** in percent (default 50): if more files would be deleted on one side, the run aborts
@@ -683,14 +687,16 @@ kept. Missing entries fall back to English. Then rebuild the image, the language
 selection lists. Pull requests with new languages are welcome.
 
 ## New version notice (since 1.34.0)
-Every 6 hours MirrorSync asks GitHub (`api.github.com`, repository `DerMilderJoghurt/mirrorsync`) whether a newer
+Regularly (by default once an hour) MirrorSync asks GitHub (`api.github.com`, repository `DerMilderJoghurt/mirrorsync`) whether a newer
 version exists. If so, the bottom left shows "⬆ vX.Y.Z available" below the version number; clicking it opens the
 release with all changes. Only the installed version number is sent.
 
 - Turn it on or off under **Settings → General → Updates**, which also has "Save and check now" and shows when the
-  last check happened. Nothing is updated automatically, that stays up to you (see below).
+  last check happened. You also set the **interval** there: enter a number and pick minutes or hours (5 minutes to
+  720 hours, default 1 hour). Nothing is updated automatically, that stays up to you (see below).
 - API/MCP: `GET /api/v1/update` (`get_update`), `POST /api/v1/update/check` (`check_update`),
-  `PATCH /api/v1/settings/update` with `{"update_check": false}` (`update_update_settings`); `/status` contains `update`.
+  `PATCH /api/v1/settings/update` with `{"update_check": false}` and/or `{"update_interval": 120}` (minutes)
+  (`update_update_settings`); `/status` contains `update` with `interval_minutes`.
 - Another repository (e.g. your own fork) can be set with `UPDATE_REPO=owner/repo`.
 
 ## Updating to a new version

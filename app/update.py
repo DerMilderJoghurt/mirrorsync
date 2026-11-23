@@ -11,7 +11,8 @@ import time
 import urllib.request
 
 REPO = os.environ.get("UPDATE_REPO", "DerMilderJoghurt/mirrorsync")
-INTERVAL = 6 * 3600
+INTERVAL = 3600          # Standard: einmal pro Stunde (einstellbar, update_interval in Minuten)
+MIN_MINUTES, MAX_MINUTES = 5, 30 * 24 * 60
 TIMEOUT = 10
 _db = None
 _version = "0"
@@ -66,14 +67,25 @@ def check():
     return st
 
 
-def due():
-    return int(time.time()) - int(_state().get("checked_ts") or 0) >= INTERVAL
+def minutes(value):
+    """Pruefabstand in Minuten aus der Einstellung; ungueltig -> Standard."""
+    try:
+        m = int(str(value).strip())
+    except (TypeError, ValueError):
+        return INTERVAL // 60
+    return m if MIN_MINUTES <= m <= MAX_MINUTES else INTERVAL // 60
 
 
-def status(enabled=True):
+def due(interval_minutes=None):
+    secs = minutes(interval_minutes) * 60 if interval_minutes is not None else INTERVAL
+    return int(time.time()) - int(_state().get("checked_ts") or 0) >= secs
+
+
+def status(enabled=True, interval_minutes=None):
     st = _state()
     latest = st.get("latest") or ""
     return {"enabled": bool(enabled), "current": _version, "latest": latest,
             "update_available": bool(enabled) and newer(latest, _version),
             "url": st.get("url") or f"https://github.com/{REPO}/releases", "published": st.get("published") or "",
-            "checked": st.get("checked") or "", "error": st.get("error") or "", "repo": REPO}
+            "checked": st.get("checked") or "", "error": st.get("error") or "", "repo": REPO,
+            "interval_minutes": minutes(interval_minutes) if interval_minutes is not None else INTERVAL // 60}

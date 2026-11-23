@@ -3,6 +3,20 @@
 Version numbers follow [SemVer](https://semver.org/): MAJOR.MINOR.PATCH
 (MAJOR = incompatible change, MINOR = new feature, PATCH = bug fix).
 
+## 1.35.0 – 2026-11-23
+- **Two-way sync creates missing folders:** if the folder of side A or side B does not exist yet on the first run,
+  it is created (previously the run stopped with "directory not found", except with "Also copy the source folder
+  itself"). The log lists every created folder, a dry run shows what would be created.
+- Protection on later runs: if a side that existed before is missing or empty (e.g. a drive is not mounted), still
+  nothing is created or distributed. The run stops and the log explains why and what to do next ("Merge again").
+  "Merge again" does not create the folder in that case either.
+- A dry run with a missing folder no longer requires "Merge again" afterwards.
+- **Configurable update check interval:** under Settings → General → Updates enter a number and pick minutes or
+  hours (5 minutes to 720 hours). The default is now 1 hour (previously a fixed 6 hours). API/MCP:
+  `update_interval` (in minutes) in `PATCH /settings/update` (`update_update_settings`), `interval_minutes` in
+  `GET /update`. Same permission as before ("general settings"), changes are recorded in the audit log.
+- New log hints in all 5 languages.
+
 ## 1.34.0 – 2026-11-23
 - **New version notice:** every 6 hours MirrorSync asks GitHub whether a newer version exists. If so, the bottom left
   shows "⬆ vX.Y.Z available" below the version number, linking to the release. Can be turned off under

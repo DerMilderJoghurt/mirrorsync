@@ -2010,7 +2010,6 @@
  "sonst": "altrimenti",
  "Updates": "Aggiornamenti",
  "Nach neuen Versionen suchen": "Cerca nuove versioni",
- "Fragt alle 6 Stunden bei GitHub nach, ob es eine neuere Version gibt, und zeigt sie unten links neben der Versionsnummer an. Übertragen wird dabei nur die eigene Versionsnummer.": "Chiede a GitHub ogni 6 ore se esiste una versione più recente e la mostra in basso a sinistra accanto al numero di versione. Viene inviato solo il numero di versione installato.",
  "Installiert:": "Installata:",
  "Neueste Version:": "Ultima versione:",
  "Neue Version verfügbar": "Nuova versione disponibile",
@@ -2024,5 +2023,13 @@
  "MirrorSync ist aktuell ({0}).": "MirrorSync è aggiornato ({0}).",
  "Prüfung auf eine neuere MirrorSync-Version: installierte (current) und neueste Version (latest), update_available, Link zum Release (url), Zeitpunkt der letzten Prüfung, enabled.": "Controllo di una versione più recente di MirrorSync: versione installata (current) e più recente (latest), update_available, link alla release (url), ora dell'ultimo controllo, enabled.",
  "Jetzt bei GitHub nach einer neueren Version fragen und das Ergebnis zurückgeben.": "Chiedere ora a GitHub se esiste una versione più recente e restituire il risultato.",
- "Automatische Prüfung auf neue Versionen ein- oder ausschalten (update_check).": "Attivare o disattivare il controllo automatico delle nuove versioni (update_check)."
+ "=== Ordner fehlte und wird angelegt: {0} ===": "=== La cartella mancava e viene creata: {0} ===",
+ "=== Ordner fehlt und würde angelegt: {0} ===": "=== La cartella manca e verrebbe creata: {0} ===",
+ "=== Eine Seite fehlt oder ist leer, z. B. weil ein Laufwerk nicht eingehängt ist. Zum Schutz wurde abgebrochen, angelegt oder gelöscht wurde nichts. Prüfe beide Seiten und klicke dann auf „Neu zusammenführen“. ===": "=== Un lato manca o è vuoto, ad esempio perché un disco non è montato. Per sicurezza l’esecuzione è stata interrotta; nulla è stato creato o eliminato. Controlla entrambi i lati, poi fai clic su «Riunisci di nuovo». ===",
+ "=== Testlauf: Ohne den Ordner kann rclone den Abgleich nicht durchspielen. Beim echten Lauf wird er angelegt. ===": "=== Esecuzione di prova: senza la cartella, rclone non può simulare la sincronizzazione. Un'esecuzione reale la creerà. ===",
+ "Prüfen alle": "Controlla ogni",
+ "Fragt im eingestellten Abstand bei GitHub nach, ob es eine neuere Version gibt, und zeigt sie unten links neben der Versionsnummer an. Übertragen wird dabei nur die eigene Versionsnummer. Erlaubt sind 5 Minuten bis 720 Stunden, Standard 1 Stunde.": "Chiede a GitHub all’intervallo impostato se esiste una versione più recente e la mostra in basso a sinistra accanto al numero di versione. Viene inviato solo il numero di versione installato. Consentito: da 5 minuti a 720 ore, predefinito 1 ora.",
+ "Automatische Prüfung auf neue Versionen ein- oder ausschalten (update_check) und den Abstand in Minuten festlegen (update_interval, 5–43200, Standard 60). Nicht angegebene Felder bleiben unverändert.": "Attivare o disattivare il controllo automatico di nuove versioni (update_check) e impostare l’intervallo in minuti (update_interval, 5–43200, predefinito 60). I campi non indicati restano invariati.",
+ "Abstand: 5 Minuten bis 720 Stunden (30 Tage).": "Intervallo: da 5 minuti a 720 ore (30 giorni).",
+ "Update-Prüfung alle (Minuten)": "Controllo aggiornamenti ogni (minuti)"
 }

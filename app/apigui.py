@@ -450,12 +450,15 @@ def a_check_update(a):
 
 
 @action("update_update_settings", "PATCH", "/settings/update", "system.settings", "Einstellungen",
-        "Automatische Prüfung auf neue Versionen ein- oder ausschalten (update_check).",
-        {"update_check": S(BOOL)}, ["update_check"])
+        "Automatische Prüfung auf neue Versionen ein- oder ausschalten (update_check) und den Abstand in Minuten "
+        "festlegen (update_interval, 5–43200, Standard 60). Nicht angegebene Felder bleiben unverändert.",
+        {"update_check": S(BOOL), "update_interval": S(INT)})
 def a_update_update_settings(a):
-    _check_keys(a, ("update_check",))
-    form = {"section": "update"}
-    if _bool(a["update_check"]):
+    _check_keys(a, ("update_check", "update_interval"))
+    cur = core.update_status()
+    form = {"section": "update", "update_interval_unit": "min",
+            "update_interval_value": str(a.get("update_interval", cur["interval_minutes"]))}
+    if _bool(a["update_check"]) if "update_check" in a else cur["enabled"]:
         form["update_check"] = "on"
     msg = done(gui("POST", "/settings/general", form=form))
     return {"ok": True, "message": msg, "update": core.update_status()}

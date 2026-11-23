@@ -2010,7 +2010,6 @@
  "sonst": "otherwise",
  "Updates": "Updates",
  "Nach neuen Versionen suchen": "Check for new versions",
- "Fragt alle 6 Stunden bei GitHub nach, ob es eine neuere Version gibt, und zeigt sie unten links neben der Versionsnummer an. Übertragen wird dabei nur die eigene Versionsnummer.": "Asks GitHub every 6 hours whether a newer version exists and shows it at the bottom left next to the version number. Only the installed version number is sent.",
  "Installiert:": "Installed:",
  "Neueste Version:": "Latest version:",
  "Neue Version verfügbar": "New version available",
@@ -2024,5 +2023,13 @@
  "MirrorSync ist aktuell ({0}).": "MirrorSync is up to date ({0}).",
  "Prüfung auf eine neuere MirrorSync-Version: installierte (current) und neueste Version (latest), update_available, Link zum Release (url), Zeitpunkt der letzten Prüfung, enabled.": "Check for a newer MirrorSync version: installed (current) and latest version (latest), update_available, link to the release (url), time of the last check, enabled.",
  "Jetzt bei GitHub nach einer neueren Version fragen und das Ergebnis zurückgeben.": "Ask GitHub for a newer version now and return the result.",
- "Automatische Prüfung auf neue Versionen ein- oder ausschalten (update_check).": "Turn the automatic check for new versions on or off (update_check)."
+ "=== Ordner fehlte und wird angelegt: {0} ===": "=== Folder was missing and is being created: {0} ===",
+ "=== Ordner fehlt und würde angelegt: {0} ===": "=== Folder is missing and would be created: {0} ===",
+ "=== Eine Seite fehlt oder ist leer, z. B. weil ein Laufwerk nicht eingehängt ist. Zum Schutz wurde abgebrochen, angelegt oder gelöscht wurde nichts. Prüfe beide Seiten und klicke dann auf „Neu zusammenführen“. ===": "=== One side is missing or empty, for example because a drive is not mounted. The run was stopped as a precaution; nothing was created or deleted. Check both sides, then click “Merge again”. ===",
+ "=== Testlauf: Ohne den Ordner kann rclone den Abgleich nicht durchspielen. Beim echten Lauf wird er angelegt. ===": "=== Test run: without the folder, rclone cannot simulate the sync. A real run will create it. ===",
+ "Prüfen alle": "Check every",
+ "Fragt im eingestellten Abstand bei GitHub nach, ob es eine neuere Version gibt, und zeigt sie unten links neben der Versionsnummer an. Übertragen wird dabei nur die eigene Versionsnummer. Erlaubt sind 5 Minuten bis 720 Stunden, Standard 1 Stunde.": "Asks GitHub at the set interval whether a newer version exists and shows it at the bottom left next to the version number. Only the installed version number is sent. Allowed: 5 minutes to 720 hours, default 1 hour.",
+ "Automatische Prüfung auf neue Versionen ein- oder ausschalten (update_check) und den Abstand in Minuten festlegen (update_interval, 5–43200, Standard 60). Nicht angegebene Felder bleiben unverändert.": "Turn the automatic check for new versions on or off (update_check) and set the interval in minutes (update_interval, 5–43200, default 60). Fields left out stay unchanged.",
+ "Abstand: 5 Minuten bis 720 Stunden (30 Tage).": "Interval: 5 minutes to 720 hours (30 days).",
+ "Update-Prüfung alle (Minuten)": "Update check every (minutes)"
 }

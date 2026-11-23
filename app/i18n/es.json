@@ -2010,7 +2010,6 @@
  "sonst": "si no",
  "Updates": "Actualizaciones",
  "Nach neuen Versionen suchen": "Buscar nuevas versiones",
- "Fragt alle 6 Stunden bei GitHub nach, ob es eine neuere Version gibt, und zeigt sie unten links neben der Versionsnummer an. Übertragen wird dabei nur die eigene Versionsnummer.": "Consulta GitHub cada 6 horas si hay una versión más reciente y la muestra abajo a la izquierda junto al número de versión. Solo se envía el número de versión instalado.",
  "Installiert:": "Instalada:",
  "Neueste Version:": "Última versión:",
  "Neue Version verfügbar": "Nueva versión disponible",
@@ -2024,5 +2023,13 @@
  "MirrorSync ist aktuell ({0}).": "MirrorSync está actualizado ({0}).",
  "Prüfung auf eine neuere MirrorSync-Version: installierte (current) und neueste Version (latest), update_available, Link zum Release (url), Zeitpunkt der letzten Prüfung, enabled.": "Comprobación de una versión más reciente de MirrorSync: versión instalada (current) y más reciente (latest), update_available, enlace a la versión (url), hora de la última comprobación, enabled.",
  "Jetzt bei GitHub nach einer neueren Version fragen und das Ergebnis zurückgeben.": "Consultar ahora a GitHub si hay una versión más reciente y devolver el resultado.",
- "Automatische Prüfung auf neue Versionen ein- oder ausschalten (update_check).": "Activar o desactivar la comprobación automática de nuevas versiones (update_check)."
+ "=== Ordner fehlte und wird angelegt: {0} ===": "=== La carpeta no existía y se está creando: {0} ===",
+ "=== Ordner fehlt und würde angelegt: {0} ===": "=== La carpeta no existe y se crearía: {0} ===",
+ "=== Eine Seite fehlt oder ist leer, z. B. weil ein Laufwerk nicht eingehängt ist. Zum Schutz wurde abgebrochen, angelegt oder gelöscht wurde nichts. Prüfe beide Seiten und klicke dann auf „Neu zusammenführen“. ===": "=== Falta un lado o está vacío, por ejemplo porque una unidad no está montada. Por precaución se ha detenido la ejecución; no se ha creado ni borrado nada. Comprueba ambos lados y pulsa «Volver a combinar». ===",
+ "=== Testlauf: Ohne den Ordner kann rclone den Abgleich nicht durchspielen. Beim echten Lauf wird er angelegt. ===": "=== Ejecución de prueba: sin la carpeta, rclone no puede simular la sincronización. Una ejecución real la creará. ===",
+ "Prüfen alle": "Comprobar cada",
+ "Fragt im eingestellten Abstand bei GitHub nach, ob es eine neuere Version gibt, und zeigt sie unten links neben der Versionsnummer an. Übertragen wird dabei nur die eigene Versionsnummer. Erlaubt sind 5 Minuten bis 720 Stunden, Standard 1 Stunde.": "Consulta GitHub con el intervalo configurado si hay una versión más reciente y la muestra abajo a la izquierda junto al número de versión. Solo se envía el número de versión instalado. Permitido: de 5 minutos a 720 horas, por defecto 1 hora.",
+ "Automatische Prüfung auf neue Versionen ein- oder ausschalten (update_check) und den Abstand in Minuten festlegen (update_interval, 5–43200, Standard 60). Nicht angegebene Felder bleiben unverändert.": "Activar o desactivar la comprobación automática de nuevas versiones (update_check) y fijar el intervalo en minutos (update_interval, 5–43200, por defecto 60). Los campos no indicados no cambian.",
+ "Abstand: 5 Minuten bis 720 Stunden (30 Tage).": "Intervalo: de 5 minutos a 720 horas (30 días).",
+ "Update-Prüfung alle (Minuten)": "Comprobar actualizaciones cada (minutos)"
 }

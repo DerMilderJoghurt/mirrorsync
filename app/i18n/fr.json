@@ -2010,7 +2010,6 @@
  "sonst": "sinon",
  "Updates": "Mises à jour",
  "Nach neuen Versionen suchen": "Rechercher de nouvelles versions",
- "Fragt alle 6 Stunden bei GitHub nach, ob es eine neuere Version gibt, und zeigt sie unten links neben der Versionsnummer an. Übertragen wird dabei nur die eigene Versionsnummer.": "Interroge GitHub toutes les 6 heures pour savoir s'il existe une version plus récente et l'affiche en bas à gauche à côté du numéro de version. Seul le numéro de version installé est transmis.",
  "Installiert:": "Installée :",
  "Neueste Version:": "Dernière version :",
  "Neue Version verfügbar": "Nouvelle version disponible",
@@ -2024,5 +2023,13 @@
  "MirrorSync ist aktuell ({0}).": "MirrorSync est à jour ({0}).",
  "Prüfung auf eine neuere MirrorSync-Version: installierte (current) und neueste Version (latest), update_available, Link zum Release (url), Zeitpunkt der letzten Prüfung, enabled.": "Vérification d'une version plus récente de MirrorSync : version installée (current) et la plus récente (latest), update_available, lien vers la version (url), heure de la dernière vérification, enabled.",
  "Jetzt bei GitHub nach einer neueren Version fragen und das Ergebnis zurückgeben.": "Demander maintenant à GitHub s'il existe une version plus récente et renvoyer le résultat.",
- "Automatische Prüfung auf neue Versionen ein- oder ausschalten (update_check).": "Activer ou désactiver la vérification automatique des nouvelles versions (update_check)."
+ "=== Ordner fehlte und wird angelegt: {0} ===": "=== Le dossier manquait et est en cours de création : {0} ===",
+ "=== Ordner fehlt und würde angelegt: {0} ===": "=== Le dossier manque et serait créé : {0} ===",
+ "=== Eine Seite fehlt oder ist leer, z. B. weil ein Laufwerk nicht eingehängt ist. Zum Schutz wurde abgebrochen, angelegt oder gelöscht wurde nichts. Prüfe beide Seiten und klicke dann auf „Neu zusammenführen“. ===": "=== Un côté est absent ou vide, par exemple parce qu’un disque n’est pas monté. L’exécution a été arrêtée par précaution ; rien n’a été créé ni supprimé. Vérifiez les deux côtés, puis cliquez sur « Fusionner à nouveau ». ===",
+ "=== Testlauf: Ohne den Ordner kann rclone den Abgleich nicht durchspielen. Beim echten Lauf wird er angelegt. ===": "=== Exécution de test : sans le dossier, rclone ne peut pas simuler la synchronisation. Une exécution réelle le créera. ===",
+ "Prüfen alle": "Vérifier toutes les",
+ "Fragt im eingestellten Abstand bei GitHub nach, ob es eine neuere Version gibt, und zeigt sie unten links neben der Versionsnummer an. Übertragen wird dabei nur die eigene Versionsnummer. Erlaubt sind 5 Minuten bis 720 Stunden, Standard 1 Stunde.": "Interroge GitHub à l’intervalle choisi pour savoir s’il existe une version plus récente et l’affiche en bas à gauche à côté du numéro de version. Seul le numéro de version installé est transmis. Autorisé : de 5 minutes à 720 heures, 1 heure par défaut.",
+ "Automatische Prüfung auf neue Versionen ein- oder ausschalten (update_check) und den Abstand in Minuten festlegen (update_interval, 5–43200, Standard 60). Nicht angegebene Felder bleiben unverändert.": "Activer ou désactiver la vérification automatique des nouvelles versions (update_check) et définir l’intervalle en minutes (update_interval, 5–43200, 60 par défaut). Les champs omis restent inchangés.",
+ "Abstand: 5 Minuten bis 720 Stunden (30 Tage).": "Intervalle : de 5 minutes à 720 heures (30 jours).",
+ "Update-Prüfung alle (Minuten)": "Vérification des mises à jour toutes les (minutes)"
 }

@@ -290,6 +290,19 @@ def bisync_max_delete(job):
         return 50
 
 
+def bisync_missing_sides(job):
+    """Seiten eines Zwei-Wege-Syncs, deren Ordner es (noch) nicht gibt. Der Wurzelordner eines Speicherorts gilt als vorhanden."""
+    missing = []
+    for side in (job["source"], effective_dest(job)):
+        side = side.strip()
+        if not side or side.endswith(":"):
+            continue
+        rc, out = rclone("lsjson", side, "--stat", timeout=30)
+        if rc != 0 and any(w in out.lower() for w in ("not found", "doesn't exist", "no such")):
+            missing.append(side)
+    return missing
+
+
 def build_bisync_cmd(job, job_id, dry_run, resync=False):
     """Zwei-Wege-Sync: rclone bisync zwischen Seite A (source) und Seite B (dest)."""
     stamp = datetime.datetime.now().strftime("%Y-%m-%d_%H%M%S")
@@ -369,7 +382,7 @@ SETTINGS_FILE = os.path.join(CONFIG_DIR, "settings.json")
 LOG_DEFAULTS = {"log_keep_runs": "50", "log_keep_days": "30", "trust_proxy": False, "geoip_auto": True, "geoip_days": "30",
                 "geoip_mode": "interval", "geoip_time": "03:00", "geoip_dow": "mon",
                 "lock_attempts": "5", "lock_minutes": "15", "lock_notify": True,
-                "fail_notify": "", "fail_notify_minutes": "15", "audit_keep_days": "365", "update_check": True}
+                "fail_notify": "", "fail_notify_minutes": "15", "audit_keep_days": "365", "update_check": True, "update_interval": "60"}
 RUN_ID_RE = re.compile(r"^[A-Za-z0-9_.-]{1,64}$")
 
 
@@ -386,7 +399,8 @@ def save_settings(data):
 
 def update_status():
     """Ergebnis der Pruefung auf eine neuere Version (siehe update.py)."""
-    return update.status(load_settings().get("update_check", True))
+    s = load_settings()
+    return update.status(s.get("update_check", True), s.get("update_interval", "60"))
 
 
 def _update_loop():
@@ -394,7 +408,8 @@ def _update_loop():
     time.sleep(30)
     while True:
         try:
-            if load_settings().get("update_check", True) and update.due():
+            s = load_settings()
+            if s.get("update_check", True) and update.due(s.get("update_interval", "60")):
                 st = update.check()
                 if st.get("error"):
                     print(f"Update-Prüfung: {st['error']}", flush=True)
@@ -402,7 +417,7 @@ def _update_loop():
                     print(f"Neue MirrorSync-Version {st['latest']} verfügbar: {st.get('url')}", flush=True)
         except Exception as e:  # noqa: BLE001
             print(f"Update-Prüfung: {e}", flush=True)
-        time.sleep(600)
+        time.sleep(60)   # der eingestellte Abstand kann bis 5 Minuten herunter gehen
 
 
 def keep_limits():
@@ -529,6 +544,16 @@ def _watch(job_id, job, proc, logf, started, dry, by, run_id, log_path, mode="fu
                 logf.write(line + "\n")
         except Exception as e:   # Aufraeumen darf den Lauf nicht scheitern lassen
             logf.write(f"Versionen aufräumen: {e}\n")
+    if is_bisync(job) and job.get("bisync_ready") and rc not in (0, -15, 143):
+        try:
+            with open(log_path, encoding="utf-8", errors="replace") as lf:
+                gone = re.search(r"directory not found|Empty current Path[12] listing", lf.read())
+        except OSError:
+            gone = None
+        if gone:
+            logf.write("\n=== Eine Seite fehlt oder ist leer, z. B. weil ein Laufwerk nicht eingehängt ist. Zum Schutz wurde "
+                       "abgebrochen, angelegt oder gelöscht wurde nichts. Prüfe beide Seiten und klicke dann auf "
+                       "„Neu zusammenführen“. ===\n")
     duration = int(time.time() - started)
     logf.write(f"\n=== Ende: {datetime.datetime.now():%Y-%m-%d %H:%M:%S}, Code {rc}, Dauer {duration}s ===\n")
     logf.close()
@@ -559,7 +584,7 @@ def _watch(job_id, job, proc, logf, started, dry, by, run_id, log_path, mode="fu
             if bisync and not dry and status == "ok":
                 j["bisync_ready"] = True
                 j.pop("bisync_need_resync", None)
-            elif bisync and need_resync:
+            elif bisync and need_resync and not dry:   # ein Testlauf ohne angelegten Ordner muss nicht neu abgleichen
                 j["bisync_need_resync"] = True
             if delta:
                 j["live_checked"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -632,8 +657,12 @@ def start_job(job_id, dry_run=False, by="Zeitplan", mode="full", manual=False, r
                         pass
             if first:
                 by += " (erster Zwei-Wege-Abgleich)"
-                if not (dry_run or job.get("dry_run")) and effective_dest(job) != job["dest"].strip():
-                    rclone("mkdir", effective_dest(job), timeout=30)   # bisync braucht beide Seiten, Seite B/<Ordner> gibt es noch nicht
+            # bisync braucht beide Seiten. Fehlende Ordner nur beim allerersten Abgleich anlegen; fehlt spaeter eine Seite,
+            # die schon einmal da war (z. B. Laufwerk nicht eingehaengt), bricht rclone ab, statt alles neu zu verteilen.
+            bisync_missing = bisync_missing_sides(job) if first and not job.get("bisync_ready") else []
+            if bisync_missing and not (dry_run or job.get("dry_run")):
+                for side in bisync_missing:
+                    rclone("mkdir", side, timeout=30)
         else:
             cmd = build_sync_cmd(job, dry_run, mode, max_age)
         os.makedirs(os.path.join(LOG_DIR, job_id), exist_ok=True)
@@ -647,6 +676,12 @@ def start_job(job_id, dry_run=False, by="Zeitplan", mode="full", manual=False, r
         dry = dry_run or bool(job.get("dry_run"))
         logf.write(f"=== Start: {datetime.datetime.now():%Y-%m-%d %H:%M:%S}, gestartet von {by}"
                    f"{'  (TESTLAUF, nichts wird verändert)' if dry else ''} ===\n")
+        for side in (bisync_missing if bisync else []):
+            logf.write(f"=== Ordner fehlte und wird angelegt: {side} ===\n" if not dry
+                       else f"=== Ordner fehlt und würde angelegt: {side} ===\n")
+        if bisync and bisync_missing and dry:
+            logf.write("=== Testlauf: Ohne den Ordner kann rclone den Abgleich nicht durchspielen. Beim echten Lauf wird er "
+                       "angelegt. ===\n")
         if bisync and first:
             logf.write("=== Zwei-Wege-Sync, erster Abgleich (--resync): Beide Seiten werden zusammengeführt, gelöscht wird "
                        "dabei nichts. Gibt es eine Datei auf beiden Seiten unterschiedlich, gewinnt die neuere. ===\n")
@@ -2713,9 +2748,20 @@ def general_settings():
             msg = "Standardsprache gespeichert."
     elif request.method == "POST" and request.form.get("section") == "update":
         s["update_check"] = "update_check" in request.form
-        save_settings(s)
-        msg = "Gespeichert."
-        if request.form.get("check_now"):
+        iv = (request.form.get("update_interval_value") or "").strip()
+        if iv:
+            try:
+                mins = int(iv) * (60 if request.form.get("update_interval_unit") == "h" else 1)
+            except ValueError:
+                mins = -1
+            if not update.MIN_MINUTES <= mins <= update.MAX_MINUTES:
+                err = "Abstand: 5 Minuten bis 720 Stunden (30 Tage)."
+            else:
+                s["update_interval"] = str(mins)
+        if not err:
+            save_settings(s)
+            msg = "Gespeichert."
+        if not err and request.form.get("check_now"):
             st = update.check()
             msg = (i18n.t("Prüfung fehlgeschlagen: {0}", st["error"]) if st.get("error") else
                    i18n.t("Neue Version {0} verfügbar.", st["latest"]) if update.newer(st.get("latest"), VERSION) else
