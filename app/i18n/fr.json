@@ -2018,7 +2018,6 @@
  "Neue Version {0} verfügbar.": "Nouvelle version {0} disponible.",
  "MirrorSync ist aktuell ({0}).": "MirrorSync est à jour ({0}).",
  "Prüfung auf eine neuere MirrorSync-Version: installierte (current) und neueste Version (latest), update_available, Link zum Release (url), Zeitpunkt der letzten Prüfung, enabled.": "Vérification d'une version plus récente de MirrorSync : version installée (current) et la plus récente (latest), update_available, lien vers la version (url), heure de la dernière vérification, enabled.",
- "Jetzt bei GitHub nach einer neueren Version fragen und das Ergebnis zurückgeben.": "Demander maintenant à GitHub s'il existe une version plus récente et renvoyer le résultat.",
  "=== Ordner fehlte und wird angelegt: {0} ===": "=== Le dossier manquait et est en cours de création : {0} ===",
  "=== Ordner fehlt und würde angelegt: {0} ===": "=== Le dossier manque et serait créé : {0} ===",
  "=== Eine Seite fehlt oder ist leer, z. B. weil ein Laufwerk nicht eingehängt ist. Zum Schutz wurde abgebrochen, angelegt oder gelöscht wurde nichts. Prüfe beide Seiten und klicke dann auf „Neu zusammenführen“. ===": "=== Un côté est absent ou vide, par exemple parce qu’un disque n’est pas monté. L’exécution a été arrêtée par précaution ; rien n’a été créé ni supprimé. Vérifiez les deux côtés, puis cliquez sur « Fusionner à nouveau ». ===",
@@ -2175,7 +2174,6 @@
  "Keine Änderungen in diesem Ordner.": "Aucune modification dans ce dossier.",
  "Ordner {0} gibt es in der Vorschau nicht.": "Le dossier {0} n'existe pas dans l'aperçu.",
  "Vorschau der Ordnerstruktur im Ziel ansehen und durchklicken (listet Dateien in Quelle und Ziel)": "Voir et parcourir l'aperçu de l'arborescence de la destination (liste les fichiers de la source et de la destination)",
- "Ordner im Ziel wie im Datei-Browser öffnen (relativ zum Ziel, z. B. Fotos/2024): liefert entries mit name, dir, status, size, modified und bei Ordnern counts; leer = oberste Ebene": "Ouvrir un dossier de la destination comme dans le navigateur de fichiers (relatif à la destination, p. ex. Photos/2024) : renvoie entries avec name, dir, status, size, modified et counts pour les dossiers ; vide = niveau supérieur",
  "nur Einträge zeigen, die sich ändern (neu, aktualisiert, gelöscht, nach A)": "afficher uniquement les entrées qui changent (nouvelles, mises à jour, supprimées, vers A)",
  "Vorschau: wie die Ordnerstruktur im Ziel nach dem nächsten Lauf aussieht, mit denselben Filtern wie der echte Lauf. Ändert nichts. Liefert summary (Dateien neu/aktualisiert/gelöscht/gleich) und text (Baum, + neu, ~ aktualisiert, - gelöscht, < nach Seite A). Mit path einen Ordner wie im Datei-Browser öffnen (entries), mit only_changes nur Änderungen, mit result das Ergebnis ohne Gelöschtes. Optional Felder überschreiben (z. B. anderes Ziel ausprobieren).": "Aperçu : à quoi ressemblera l'arborescence de la destination après la prochaine exécution, avec les mêmes filtres que l'exécution réelle. Ne modifie rien. Renvoie summary (fichiers nouveaux/mis à jour/supprimés/identiques) et text (arbre, + nouveau, ~ mis à jour, - supprimé, < vers le côté A). Avec path, ouvre un dossier comme dans le navigateur de fichiers (entries), avec only_changes seulement les modifications. Champs remplaçables en option (p. ex. essayer une autre destination). Avec result, le résultat sans les éléments supprimés.",
  "Vorschau ohne gespeicherte Aufgabe: Ordnerstruktur im Ziel, wenn source nach dest gespiegelt würde (optional selection, excludes, include_source_dir, direction, delete_excluded). Mit path einen Ordner wie im Datei-Browser öffnen, mit result das Ergebnis ohne Gelöschtes. Ändert nichts.": "Aperçu sans tâche enregistrée : arborescence de la destination si source était mis en miroir vers dest (en option selection, excludes, include_source_dir, direction, delete_excluded). Avec path, ouvre un dossier comme dans le navigateur de fichiers. Ne modifie rien. Avec result, le résultat sans les éléments supprimés.",
@@ -2205,5 +2203,13 @@
  "{titel}\nInstalliert ist {version}.\nVersionshinweise: {url}": "{titel}\nInstallée : {version}.\nNotes de version : {url}",
  "Neue Version melden": "Signaler une nouvelle version",
  "Neue Version: Kanäle": "Nouvelle version : canaux",
- "webhook, smtp, telegram, apprise": "webhook, smtp, telegram, apprise"
+ "webhook, smtp, telegram, apprise": "webhook, smtp, telegram, apprise",
+ "Ordner im Ziel wie im Datei-Browser öffnen (relativ zum Ziel, z. B. Fotos/2024): liefert entries mit name, dir, status, size, modified und bei Ordnern counts; leer = oberste Ebene. Mit ../ geht es über das Ziel hinaus bis zum Stammverzeichnis (echte Ordner, so wie sie jetzt sind, braucht remotes.browse)": "Ouvrir un dossier de la destination comme dans le navigateur de fichiers (relatif à la destination, p. ex. Photos/2024) : renvoie entries avec name, dir, status, size, modified et counts pour les dossiers ; vide = niveau supérieur. Avec ../ on remonte au-delà de la destination jusqu'au dossier racine (dossiers réels tels qu'ils sont, nécessite remotes.browse)",
+ "Jetzt bei GitHub nach einer neueren Version fragen und das Ergebnis zurückgeben (wie „Jetzt prüfen“ in den Einstellungen, ändert keine Einstellungen). Ist die Benachrichtigung bei neuen Versionen eingeschaltet, wird sie für eine neue Version einmal verschickt.": "Demander maintenant à GitHub s'il existe une version plus récente et renvoyer le résultat (comme « Vérifier maintenant » dans les réglages, ne modifie aucun réglage). Si la notification des nouvelles versions est activée, elle est envoyée une fois par nouvelle version.",
+ "Lade…": "Chargement…",
+ "Außerhalb des Ziels: so, wie es jetzt ist. Die Aufgabe ändert hier nichts.": "En dehors de la destination : tel quel. La tâche ne modifie rien ici.",
+ "🎯 Ziel der Aufgabe": "🎯 Destination de la tâche",
+ "→ zum Ziel": "→ vers la destination",
+ "Jetzt prüfen": "Vérifier maintenant",
+ "Höher als das Stammverzeichnis geht es nicht.": "Impossible de remonter au-delà du dossier racine."
 }

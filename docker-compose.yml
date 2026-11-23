@@ -8,7 +8,7 @@
 
 services:
   mirrorsync:
-    image: ghcr.io/dermilderjoghurt/mirrorsync:latest   # or a fixed version, e.g. :1.46.0
+    image: ghcr.io/dermilderjoghurt/mirrorsync:latest   # or a fixed version, e.g. :1.47.0
     # Build it yourself instead of pulling (Dockerfile and app/ in the same folder):
     # build: .
     container_name: mirrorsync

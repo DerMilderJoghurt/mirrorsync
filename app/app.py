@@ -3096,6 +3096,13 @@ def general_settings():
             s.update(selfupdate_auto="selfupdate_auto" in request.form, selfupdate_time=tm)
             save_settings(s)
             msg = "Gespeichert."
+    elif request.method == "POST" and request.form.get("section") == "update" and request.form.get("check_only"):
+        st = update.check()   # nur pruefen, Eingaben im Formular werden nicht gespeichert
+        if not st.get("error") and update.newer(st.get("latest"), VERSION):
+            threading.Thread(target=notify_update, args=(st,), daemon=True).start()
+        msg = (i18n.t("Prüfung fehlgeschlagen: {0}", st["error"]) if st.get("error") else
+               i18n.t("Neue Version {0} verfügbar.", st["latest"]) if update.newer(st.get("latest"), VERSION) else
+               i18n.t("MirrorSync ist aktuell ({0}).", VERSION))
     elif request.method == "POST" and request.form.get("section") == "update":
         s["update_check"] = "update_check" in request.form
         s["update_notify"] = "update_notify" in request.form

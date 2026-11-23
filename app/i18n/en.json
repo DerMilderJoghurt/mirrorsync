@@ -2018,7 +2018,6 @@
  "Neue Version {0} verfügbar.": "New version {0} available.",
  "MirrorSync ist aktuell ({0}).": "MirrorSync is up to date ({0}).",
  "Prüfung auf eine neuere MirrorSync-Version: installierte (current) und neueste Version (latest), update_available, Link zum Release (url), Zeitpunkt der letzten Prüfung, enabled.": "Check for a newer MirrorSync version: installed (current) and latest version (latest), update_available, link to the release (url), time of the last check, enabled.",
- "Jetzt bei GitHub nach einer neueren Version fragen und das Ergebnis zurückgeben.": "Ask GitHub for a newer version now and return the result.",
  "=== Ordner fehlte und wird angelegt: {0} ===": "=== Folder was missing and is being created: {0} ===",
  "=== Ordner fehlt und würde angelegt: {0} ===": "=== Folder is missing and would be created: {0} ===",
  "=== Eine Seite fehlt oder ist leer, z. B. weil ein Laufwerk nicht eingehängt ist. Zum Schutz wurde abgebrochen, angelegt oder gelöscht wurde nichts. Prüfe beide Seiten und klicke dann auf „Neu zusammenführen“. ===": "=== One side is missing or empty, for example because a drive is not mounted. The run was stopped as a precaution; nothing was created or deleted. Check both sides, then click “Merge again”. ===",
@@ -2175,7 +2174,6 @@
  "Keine Änderungen in diesem Ordner.": "No changes in this folder.",
  "Ordner {0} gibt es in der Vorschau nicht.": "Folder {0} does not exist in the preview.",
  "Vorschau der Ordnerstruktur im Ziel ansehen und durchklicken (listet Dateien in Quelle und Ziel)": "View and browse the folder structure preview of the destination (lists files in source and destination)",
- "Ordner im Ziel wie im Datei-Browser öffnen (relativ zum Ziel, z. B. Fotos/2024): liefert entries mit name, dir, status, size, modified und bei Ordnern counts; leer = oberste Ebene": "Open a folder in the destination like in the file browser (relative to the destination, e.g. Photos/2024): returns entries with name, dir, status, size, modified and counts for folders; empty = top level",
  "nur Einträge zeigen, die sich ändern (neu, aktualisiert, gelöscht, nach A)": "only show entries that change (new, updated, deleted, to A)",
  "Vorschau: wie die Ordnerstruktur im Ziel nach dem nächsten Lauf aussieht, mit denselben Filtern wie der echte Lauf. Ändert nichts. Liefert summary (Dateien neu/aktualisiert/gelöscht/gleich) und text (Baum, + neu, ~ aktualisiert, - gelöscht, < nach Seite A). Mit path einen Ordner wie im Datei-Browser öffnen (entries), mit only_changes nur Änderungen, mit result das Ergebnis ohne Gelöschtes. Optional Felder überschreiben (z. B. anderes Ziel ausprobieren).": "Preview: what the folder structure in the destination will look like after the next run, with the same filters as the real run. Changes nothing. Returns summary (files new/updated/deleted/same) and text (tree, + new, ~ updated, - deleted, < to side A). With path, open a folder like in the file browser (entries), with only_changes just the changes. Optionally override fields (e.g. try another destination). With result, the outcome without deleted items.",
  "Vorschau ohne gespeicherte Aufgabe: Ordnerstruktur im Ziel, wenn source nach dest gespiegelt würde (optional selection, excludes, include_source_dir, direction, delete_excluded). Mit path einen Ordner wie im Datei-Browser öffnen, mit result das Ergebnis ohne Gelöschtes. Ändert nichts.": "Preview without a saved job: folder structure in the destination if source were mirrored to dest (optional selection, excludes, include_source_dir, direction, delete_excluded). With path, open a folder like in the file browser. Changes nothing. With result, the outcome without deleted items.",
@@ -2205,5 +2203,13 @@
  "{titel}\nInstalliert ist {version}.\nVersionshinweise: {url}": "{titel}\nInstalled: {version}.\nRelease notes: {url}",
  "Neue Version melden": "Report new version",
  "Neue Version: Kanäle": "New version: channels",
- "webhook, smtp, telegram, apprise": "webhook, smtp, telegram, apprise"
+ "webhook, smtp, telegram, apprise": "webhook, smtp, telegram, apprise",
+ "Ordner im Ziel wie im Datei-Browser öffnen (relativ zum Ziel, z. B. Fotos/2024): liefert entries mit name, dir, status, size, modified und bei Ordnern counts; leer = oberste Ebene. Mit ../ geht es über das Ziel hinaus bis zum Stammverzeichnis (echte Ordner, so wie sie jetzt sind, braucht remotes.browse)": "Open a folder in the destination like in the file browser (relative to the destination, e.g. Photos/2024): returns entries with name, dir, status, size, modified and counts for folders; empty = top level. With ../ you go beyond the destination up to the root folder (real folders as they are now, needs remotes.browse)",
+ "Jetzt bei GitHub nach einer neueren Version fragen und das Ergebnis zurückgeben (wie „Jetzt prüfen“ in den Einstellungen, ändert keine Einstellungen). Ist die Benachrichtigung bei neuen Versionen eingeschaltet, wird sie für eine neue Version einmal verschickt.": "Ask GitHub now whether there is a newer version and return the result (like \"Check now\" in the settings, changes no settings). If the notification for new versions is on, it is sent once for a new version.",
+ "Lade…": "Loading…",
+ "Außerhalb des Ziels: so, wie es jetzt ist. Die Aufgabe ändert hier nichts.": "Outside the destination: as it is now. The job changes nothing here.",
+ "🎯 Ziel der Aufgabe": "🎯 Job destination",
+ "→ zum Ziel": "→ to destination",
+ "Jetzt prüfen": "Check now",
+ "Höher als das Stammverzeichnis geht es nicht.": "You cannot go higher than the root folder."
 }

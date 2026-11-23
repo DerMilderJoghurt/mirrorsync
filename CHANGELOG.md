@@ -3,6 +3,17 @@
 Version numbers follow [SemVer](https://semver.org/): MAJOR.MINOR.PATCH
 (MAJOR = incompatible change, MINOR = new feature, PATCH = bug fix).
 
+## 1.47.0 – 2026-11-23
+- **Preview: "Up" to the root folder.** In all preview browsers ("Result" and "Changes" window and the "Result in
+  browser" page), "Up" or "⬆ .." now goes beyond the destination up to the root folder of the storage location.
+  There you see the real folders as they are now; the way to the destination is marked ("→ to destination",
+  "🎯 Job destination", folders that don't exist yet "will be created"), clicking leads back into the preview. Also
+  needs the permission `remotes.browse`. API/MCP: `path` with `../` in `preview_job` and `preview_paths`
+  (`status: outside`, `target: way/dest`).
+- **Updates: "Save" and "Check now" separated.** "Save and check now" is gone; "Check now" checks right away without
+  saving your input and sends the notification for a new version (if turned on). API/MCP `check_update` does the
+  same and also returns `message`. Permission `system.settings`. All 5 languages.
+
 ## 1.46.0 – 2026-11-23
 - **Open result in browser:** New button next to "Preview folder structure" (and in the preview window). It opens a
   page in a new tab that looks like **Files** (path bar, "Up", name, size with file count, modified, permissions)

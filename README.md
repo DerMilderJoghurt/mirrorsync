@@ -4,7 +4,7 @@
 
 # MirrorSync – 1:1 mirroring with a web GUI and schedules
 
-Version **1.46.0** · Changes: [CHANGELOG.md](CHANGELOG.md) · [Deutsche Version](README.de.md)
+Version **1.47.0** · Changes: [CHANGELOG.md](CHANGELOG.md) · [Deutsche Version](README.de.md)
 
 A Docker container that **mirrors folders one-way, 1:1** (like FreeFileSync "Mirror"):
 the destination becomes an exact copy of the source, including deletions. The sync engine is
@@ -67,7 +67,7 @@ Changed files are transferred completely (no delta transfer like rsync).
 
 ## Installation
 The ready-made image is in the GitHub Container Registry: `ghcr.io/dermilderjoghurt/mirrorsync`
-(for amd64 and arm64, e.g. Raspberry Pi). Tags: `latest` (newest version), `1.46.0` (fixed version),
+(for amd64 and arm64, e.g. Raspberry Pi). Tags: `latest` (newest version), `1.47.0` (fixed version),
 `1.40` (newest patch of this version). The image is only published when the version number changes, so
 update checkers such as Dockhand or Watchtower only report an update when there really is a new version.
 
@@ -229,6 +229,12 @@ values currently in the form, so you don't have to save first.
   page of its own in a new tab that looks like **Files** (path bar, "Up", name, size with file count, modified,
   permissions) but shows the destination **after the run** and is view-only. Deleted items are missing there; with
   "Mark changes" you also see what is new, updated or deleted.
+- **"Up" to the root folder** (since 1.47.0, in all preview browsers): above the destination you see the real folders
+  of the storage location as they are now (the job changes nothing there). The way to the destination is marked
+  "→ to destination" and "🎯 Job destination", folders that don't exist yet "will be created". Clicking them leads
+  back into the preview. This also needs the permission `remotes.browse` ("Browse folders"); without it, the
+  destination is the top. API/MCP: `path` with `../` (e.g. `../..`) returns the real entries with
+  `status: outside`, the way to the destination has `target: way` or `dest`.
 - In both views click folders, go back via the path bar or "⬆ .." and search in the folder. **"🌳 Tree"** switches
   to the collapsible tree view, the browser remembers your choice.
 - Every entry is marked: **new**, **will be updated** (different
@@ -751,7 +757,7 @@ Regularly (by default once an hour) MirrorSync asks GitHub (`api.github.com`, re
 version exists. If so, the bottom left shows "⬆ vX.Y.Z available" below the version number; clicking it opens the
 release with all changes. Only the installed version number is sent.
 
-- Turn it on or off under **Settings → General → Updates**, which also has "Save and check now" and shows when the
+- Turn it on or off under **Settings → General → Updates**, which also has "Check now" (checks right away without saving your input; separate from "Save" since 1.47.0) and shows when the
   last check happened. You also set the **interval** there: enter a number and pick minutes or hours (5 minutes to
   720 hours, default 1 hour). Nothing is updated automatically unless you use the self-update (see below).
 - API/MCP: `GET /api/v1/update` (`get_update`), `POST /api/v1/update/check` (`check_update`),
@@ -791,7 +797,7 @@ MirrorSync can update itself if you mount the Docker socket into the container:
   previous one runs again. Result and steps are shown in the GUI, in the audit log ("Update started / completed /
   failed") and in `config/selfupdate.json`.
 - **Requirements:** the image has to come from a registry (`image: ghcr.io/dermilderjoghurt/mirrorsync:latest`).
-  MirrorSync cannot pull images built with `build: .`. With a fixed version tag (`:1.46.0`) only that tag is pulled
+  MirrorSync cannot pull images built with `build: .`. With a fixed version tag (`:1.47.0`) only that tag is pulled
   again. `/config` has to be a volume or bind mount (it is in the example compose file).
 - **Permission:** `system.update` ("Update MirrorSync", admins have it automatically). Changing the automatic
   update and its time needs `system.settings`.

@@ -4,7 +4,7 @@
 
 # MirrorSync – 1:1-Spiegelung mit Web-GUI und Zeitplänen
 
-Version **1.46.0** · Änderungen siehe [CHANGELOG.md](CHANGELOG.md) (englisch) · [English version](README.md)
+Version **1.47.0** · Änderungen siehe [CHANGELOG.md](CHANGELOG.md) (englisch) · [English version](README.md)
 
 Ein Docker-Container, der Ordner **einweg 1:1 spiegelt** (wie FreeFileSync „Spiegeln"):
 Das Ziel wird exakt wie die Quelle, inklusive Löschungen. Als Sync-Motor dient
@@ -68,7 +68,7 @@ Geänderte Dateien werden komplett neu übertragen (kein Delta wie bei rsync).
 
 ## Installation
 Das fertige Image liegt in der GitHub Container Registry: `ghcr.io/dermilderjoghurt/mirrorsync`
-(für amd64 und arm64, z. B. Raspberry Pi). Tags: `latest` (neueste Version), `1.46.0` (feste Version),
+(für amd64 und arm64, z. B. Raspberry Pi). Tags: `latest` (neueste Version), `1.47.0` (feste Version),
 `1.40` (neuester Patch dieser Version). Das Image wird nur veröffentlicht, wenn sich die Versionsnummer ändert.
 Update-Prüfer wie Dockhand oder Watchtower melden deshalb nur dann ein Update, wenn es wirklich eine neue Version gibt.
 
@@ -235,6 +235,12 @@ nimmt die Werte, die gerade im Formular stehen, du musst also nicht erst speiche
   einem neuen Tab eine eigene Seite, die aussieht wie **Dateien** (Pfadzeile, „Nach oben“, Name, Größe mit Anzahl
   Dateien, Geändert, Rechte), aber das Ziel **nach dem Lauf** zeigt und nur zum Ansehen ist. Gelöschtes fehlt dort;
   mit „Änderungen markieren“ siehst du zusätzlich, was neu ist, aktualisiert oder gelöscht wird.
+- **„Nach oben“ bis zum Stammverzeichnis** (seit 1.47.0, in allen Vorschau-Browsern): Oberhalb des Ziels siehst
+  du die echten Ordner des Speicherorts, so wie sie jetzt sind (die Aufgabe ändert dort nichts). Der Weg zum Ziel ist
+  mit „→ zum Ziel“ und „🎯 Ziel der Aufgabe“ markiert, Ordner, die es noch nicht gibt, mit „wird angelegt“. Ein Klick
+  darauf führt zurück in die Vorschau. Dafür braucht es zusätzlich das Recht `remotes.browse` („Ordner
+  durchsuchen“), ohne das Recht ist am Ziel Schluss. API/MCP: `path` mit `../` (z. B. `../..`) liefert die echten
+  Einträge mit `status: outside`, der Weg zum Ziel hat `target: way` bzw. `dest`.
 - In beiden Ansichten Ordner anklicken, über die Pfadleiste oder „⬆ ..“ zurück und im Ordner suchen. Mit
   **„🌳 Baum“** wechselst du zur aufklappbaren Baumansicht, die Wahl merkt sich der Browser.
 - Jeder Eintrag ist markiert: **neu**, **wird aktualisiert**
@@ -772,7 +778,7 @@ MirrorSync fragt regelmäßig (Standard: einmal pro Stunde) bei GitHub (`api.git
 neuere Version gibt. Wenn ja, steht unten links unter der Versionsnummer „⬆ vX.Y.Z verfügbar“, ein Klick öffnet das
 Release mit allen Änderungen. Übertragen wird dabei nur die eigene Versionsnummer.
 
-- Ein- und ausschalten unter **Einstellungen → Allgemein → Updates**, dort auch „Speichern und jetzt prüfen“ und
+- Ein- und ausschalten unter **Einstellungen → Allgemein → Updates**, dort auch „Jetzt prüfen“ (prüft sofort, ohne Eingaben zu speichern; seit 1.47.0 getrennt von „Speichern“) und
   wann zuletzt geprüft wurde. Den **Abstand** stellst du dort ebenfalls ein: Zahl eingeben, Minuten oder Stunden
   wählen (5 Minuten bis 720 Stunden, Standard 1 Stunde). Aktualisiert wird nur, wenn du das Selbst-Update nutzt (siehe unten), sonst bleibt das bei dir.
 - API/MCP: `GET /api/v1/update` (`get_update`), `POST /api/v1/update/check` (`check_update`),
@@ -814,7 +820,7 @@ MirrorSync kann sich selbst aktualisieren, wenn du den Docker-Socket in den Cont
   sie entfernt und die bisherige läuft wieder. Ergebnis und Ablauf stehen in der GUI, im Audit-Log
   („Update gestartet / abgeschlossen / fehlgeschlagen“) und in `config/selfupdate.json`.
 - **Voraussetzungen:** Das Image muss aus einem Registry kommen (`image: ghcr.io/dermilderjoghurt/mirrorsync:latest`).
-  Mit `build: .` gebaute Images kann MirrorSync nicht neu holen. Mit festem Versions-Tag (`:1.46.0`) wird nur dieser
+  Mit `build: .` gebaute Images kann MirrorSync nicht neu holen. Mit festem Versions-Tag (`:1.47.0`) wird nur dieser
   Tag neu geholt. `/config` muss als Volume oder Ordner eingebunden sein (ist es in der Beispiel-Compose).
 - **Recht:** `system.update` („MirrorSync aktualisieren“, Admins haben es automatisch). Automatik und Uhrzeit
   ändern braucht `system.settings`.

@@ -2018,7 +2018,6 @@
  "Neue Version {0} verfügbar.": "Nueva versión {0} disponible.",
  "MirrorSync ist aktuell ({0}).": "MirrorSync está actualizado ({0}).",
  "Prüfung auf eine neuere MirrorSync-Version: installierte (current) und neueste Version (latest), update_available, Link zum Release (url), Zeitpunkt der letzten Prüfung, enabled.": "Comprobación de una versión más reciente de MirrorSync: versión instalada (current) y más reciente (latest), update_available, enlace a la versión (url), hora de la última comprobación, enabled.",
- "Jetzt bei GitHub nach einer neueren Version fragen und das Ergebnis zurückgeben.": "Consultar ahora a GitHub si hay una versión más reciente y devolver el resultado.",
  "=== Ordner fehlte und wird angelegt: {0} ===": "=== La carpeta no existía y se está creando: {0} ===",
  "=== Ordner fehlt und würde angelegt: {0} ===": "=== La carpeta no existe y se crearía: {0} ===",
  "=== Eine Seite fehlt oder ist leer, z. B. weil ein Laufwerk nicht eingehängt ist. Zum Schutz wurde abgebrochen, angelegt oder gelöscht wurde nichts. Prüfe beide Seiten und klicke dann auf „Neu zusammenführen“. ===": "=== Falta un lado o está vacío, por ejemplo porque una unidad no está montada. Por precaución se ha detenido la ejecución; no se ha creado ni borrado nada. Comprueba ambos lados y pulsa «Volver a combinar». ===",
@@ -2175,7 +2174,6 @@
  "Keine Änderungen in diesem Ordner.": "No hay cambios en esta carpeta.",
  "Ordner {0} gibt es in der Vorschau nicht.": "La carpeta {0} no existe en la vista previa.",
  "Vorschau der Ordnerstruktur im Ziel ansehen und durchklicken (listet Dateien in Quelle und Ziel)": "Ver y navegar la vista previa de la estructura de carpetas del destino (lista archivos en origen y destino)",
- "Ordner im Ziel wie im Datei-Browser öffnen (relativ zum Ziel, z. B. Fotos/2024): liefert entries mit name, dir, status, size, modified und bei Ordnern counts; leer = oberste Ebene": "Abrir una carpeta del destino como en el explorador de archivos (relativa al destino, p. ej. Fotos/2024): devuelve entries con name, dir, status, size, modified y counts en carpetas; vacío = nivel superior",
  "nur Einträge zeigen, die sich ändern (neu, aktualisiert, gelöscht, nach A)": "mostrar solo entradas que cambian (nuevas, actualizadas, borradas, hacia A)",
  "Vorschau: wie die Ordnerstruktur im Ziel nach dem nächsten Lauf aussieht, mit denselben Filtern wie der echte Lauf. Ändert nichts. Liefert summary (Dateien neu/aktualisiert/gelöscht/gleich) und text (Baum, + neu, ~ aktualisiert, - gelöscht, < nach Seite A). Mit path einen Ordner wie im Datei-Browser öffnen (entries), mit only_changes nur Änderungen, mit result das Ergebnis ohne Gelöschtes. Optional Felder überschreiben (z. B. anderes Ziel ausprobieren).": "Vista previa: cómo quedará la estructura de carpetas del destino tras la próxima ejecución, con los mismos filtros que la ejecución real. No cambia nada. Devuelve summary (archivos nuevos/actualizados/borrados/iguales) y text (árbol, + nuevo, ~ actualizado, - borrado, < al lado A). Con path abre una carpeta como en el explorador de archivos (entries), con only_changes solo los cambios. Opcionalmente sustituye campos (p. ej. probar otro destino). Con result, el resultado sin lo borrado.",
  "Vorschau ohne gespeicherte Aufgabe: Ordnerstruktur im Ziel, wenn source nach dest gespiegelt würde (optional selection, excludes, include_source_dir, direction, delete_excluded). Mit path einen Ordner wie im Datei-Browser öffnen, mit result das Ergebnis ohne Gelöschtes. Ändert nichts.": "Vista previa sin tarea guardada: estructura de carpetas del destino si source se reflejara en dest (opcional selection, excludes, include_source_dir, direction, delete_excluded). Con path abre una carpeta como en el explorador de archivos. No cambia nada. Con result, el resultado sin lo borrado.",
@@ -2205,5 +2203,13 @@
  "{titel}\nInstalliert ist {version}.\nVersionshinweise: {url}": "{titel}\nInstalada: {version}.\nNotas de la versión: {url}",
  "Neue Version melden": "Avisar de nueva versión",
  "Neue Version: Kanäle": "Nueva versión: canales",
- "webhook, smtp, telegram, apprise": "webhook, smtp, telegram, apprise"
+ "webhook, smtp, telegram, apprise": "webhook, smtp, telegram, apprise",
+ "Ordner im Ziel wie im Datei-Browser öffnen (relativ zum Ziel, z. B. Fotos/2024): liefert entries mit name, dir, status, size, modified und bei Ordnern counts; leer = oberste Ebene. Mit ../ geht es über das Ziel hinaus bis zum Stammverzeichnis (echte Ordner, so wie sie jetzt sind, braucht remotes.browse)": "Abrir una carpeta del destino como en el explorador de archivos (relativa al destino, p. ej. Fotos/2024): devuelve entries con name, dir, status, size, modified y counts en carpetas; vacío = nivel superior. Con ../ se sube más allá del destino hasta la carpeta raíz (carpetas reales tal como están ahora, requiere remotes.browse)",
+ "Jetzt bei GitHub nach einer neueren Version fragen und das Ergebnis zurückgeben (wie „Jetzt prüfen“ in den Einstellungen, ändert keine Einstellungen). Ist die Benachrichtigung bei neuen Versionen eingeschaltet, wird sie für eine neue Version einmal verschickt.": "Preguntar ahora a GitHub si hay una versión más nueva y devolver el resultado (como «Comprobar ahora» en los ajustes, no cambia ningún ajuste). Si la notificación de versiones nuevas está activada, se envía una vez por versión nueva.",
+ "Lade…": "Cargando…",
+ "Außerhalb des Ziels: so, wie es jetzt ist. Die Aufgabe ändert hier nichts.": "Fuera del destino: tal como está ahora. La tarea no cambia nada aquí.",
+ "🎯 Ziel der Aufgabe": "🎯 Destino de la tarea",
+ "→ zum Ziel": "→ hacia el destino",
+ "Jetzt prüfen": "Comprobar ahora",
+ "Höher als das Stammverzeichnis geht es nicht.": "No se puede subir más allá de la carpeta raíz."
 }

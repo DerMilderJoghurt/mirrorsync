@@ -500,10 +500,61 @@ PREVIEW_PROPS = {
     "direction": S(STR, "mirror oder bisync", enum=["mirror", "bisync"]), "delete_excluded": S(BOOL, "Ausgeschlossenes im Ziel löschen"),
     "tree": S(BOOL, "zusätzlich den Baum als JSON liefern (sonst nur Text und Zusammenfassung)"),
     "path": S(STR, "Ordner im Ziel wie im Datei-Browser öffnen (relativ zum Ziel, z. B. Fotos/2024): liefert entries mit "
-                   "name, dir, status, size, modified und bei Ordnern counts; leer = oberste Ebene"),
+                   "name, dir, status, size, modified und bei Ordnern counts; leer = oberste Ebene. Mit ../ geht es über "
+                   "das Ziel hinaus bis zum Stammverzeichnis (echte Ordner, so wie sie jetzt sind, braucht remotes.browse)"),
     "only_changes": S(BOOL, "nur Einträge zeigen, die sich ändern (neu, aktualisiert, gelöscht, nach A)"),
     "result": S(BOOL, "Ergebnis-Ansicht: das Ziel so, wie es nach dem Lauf aussieht, Gelöschtes fehlt (gilt für text, entries und tree)"),
 }
+
+
+def _pv_split(dest):
+    """'NAS:a/b' -> ('NAS:', ['a', 'b']); '/data/x' -> ('/', ['data', 'x'])."""
+    dest = (dest or "").rstrip("/")
+    if dest.startswith("/"):
+        base, rest = "/", dest[1:]
+    else:
+        i = dest.find(":")
+        base = dest[:i + 1] + ("/" if dest[i + 1:].startswith("/") else "")
+        rest = dest[len(base):]
+    return base, [x for x in rest.split("/") if x]
+
+
+def _pv_resolve(dest, path):
+    """Pfad relativ zum Ziel (auch mit ..) -> (base, absolute Teile, innerhalb des Ziels?)."""
+    base, segs = _pv_split(dest)
+    cur = list(segs)
+    for part in (path or "").strip("/").split("/"):
+        if part in ("", "."):
+            continue
+        if part == "..":
+            if not cur:
+                raise ApiError(400, _t("Höher als das Stammverzeichnis geht es nicht."))
+            cur.pop()
+        else:
+            cur.append(part)
+    return base, cur, cur[:len(segs)] == segs
+
+
+def _pv_outside(dest, base, cur):
+    """Echter Ordner oberhalb/neben dem Ziel (nur lesen), der Weg zum Ziel ist markiert."""
+    from urllib.parse import urlencode
+    r = gui("GET", "/browse/list?" + urlencode({"path": base + "/".join(cur)}))
+    d = r["resp"].get_json(silent=True) or {}
+    _, segs = _pv_split(dest)
+    if r["status"] == 200 and d.get("ok") is False and cur == segs[:len(cur)]:
+        d = {"entries": []}   # Ordner auf dem Weg zum Ziel gibt es noch nicht, er wird beim Lauf angelegt
+    elif r["status"] >= 400 or d.get("ok") is False:
+        raise ApiError(r["status"] if r["status"] >= 400 else 400, _t(d.get("error") or "Fehler"))
+    out = [{"name": e["name"], "dir": e["dir"], "status": "outside", "size": e.get("size"), "modified": e.get("mod") or None}
+           for e in d.get("entries", [])]
+    if cur == segs[:len(cur)] and len(cur) < len(segs):
+        nxt = segs[len(cur)]
+        hit = next((e for e in out if e["dir"] and e["name"] == nxt), None)
+        if hit is None:
+            hit = {"name": nxt, "dir": True, "status": "missing", "size": None, "modified": None}
+            out.append(hit)
+        hit["target"] = "dest" if len(cur) == len(segs) - 1 else "way"
+    return out
 
 
 def _pv_folder(root, path, only):
@@ -559,6 +610,15 @@ def _preview(path, a):
     out["view"] = "result" if res else "changes"
     out["text"] = core.preview.as_text(tree)
     out["legend"] = _t("+ neu, ~ wird aktualisiert, - wird gelöscht, < kommt nach Seite A (Zwei-Wege)")
+    if folder is not None and ".." in (folder or "").replace("\\", "/").split("/"):
+        base, cur, inside = _pv_resolve(body.get("dest"), folder)
+        if inside:
+            folder = "/".join(cur[len(_pv_split(body.get("dest"))[1]):])
+        else:
+            out["path"], out["outside"] = base + "/".join(cur), True
+            out["entries"] = _pv_outside(body.get("dest"), base, cur)
+            folder = None
+            only = False
     if folder is not None or only:
         out["path"], out["entries"] = _pv_folder(tree, folder, only)
     if _bool(a.get("tree", False)):
@@ -609,10 +669,12 @@ def a_get_update(a):
 
 
 @action("check_update", "POST", "/update/check", "system.settings", "System",
-        "Jetzt bei GitHub nach einer neueren Version fragen und das Ergebnis zurückgeben.")
+        "Jetzt bei GitHub nach einer neueren Version fragen und das Ergebnis zurückgeben (wie „Jetzt prüfen“ in den "
+        "Einstellungen, ändert keine Einstellungen). Ist die Benachrichtigung bei neuen Versionen eingeschaltet, wird "
+        "sie für eine neue Version einmal verschickt.")
 def a_check_update(a):
-    core.update.check()
-    return core.update_status()
+    r = gui("POST", "/settings/general", form={"section": "update", "check_only": "1"})
+    return dict(core.update_status(), message=done(r))
 
 
 @action("get_self_update", "GET", "/update/self", "system.update", "System",

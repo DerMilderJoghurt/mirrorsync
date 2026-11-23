@@ -2018,7 +2018,6 @@
  "Neue Version {0} verfügbar.": "Nuova versione {0} disponibile.",
  "MirrorSync ist aktuell ({0}).": "MirrorSync è aggiornato ({0}).",
  "Prüfung auf eine neuere MirrorSync-Version: installierte (current) und neueste Version (latest), update_available, Link zum Release (url), Zeitpunkt der letzten Prüfung, enabled.": "Controllo di una versione più recente di MirrorSync: versione installata (current) e più recente (latest), update_available, link alla release (url), ora dell'ultimo controllo, enabled.",
- "Jetzt bei GitHub nach einer neueren Version fragen und das Ergebnis zurückgeben.": "Chiedere ora a GitHub se esiste una versione più recente e restituire il risultato.",
  "=== Ordner fehlte und wird angelegt: {0} ===": "=== La cartella mancava e viene creata: {0} ===",
  "=== Ordner fehlt und würde angelegt: {0} ===": "=== La cartella manca e verrebbe creata: {0} ===",
  "=== Eine Seite fehlt oder ist leer, z. B. weil ein Laufwerk nicht eingehängt ist. Zum Schutz wurde abgebrochen, angelegt oder gelöscht wurde nichts. Prüfe beide Seiten und klicke dann auf „Neu zusammenführen“. ===": "=== Un lato manca o è vuoto, ad esempio perché un disco non è montato. Per sicurezza l’esecuzione è stata interrotta; nulla è stato creato o eliminato. Controlla entrambi i lati, poi fai clic su «Riunisci di nuovo». ===",
@@ -2175,7 +2174,6 @@
  "Keine Änderungen in diesem Ordner.": "Nessuna modifica in questa cartella.",
  "Ordner {0} gibt es in der Vorschau nicht.": "La cartella {0} non esiste nell'anteprima.",
  "Vorschau der Ordnerstruktur im Ziel ansehen und durchklicken (listet Dateien in Quelle und Ziel)": "Vedere e sfogliare l'anteprima della struttura delle cartelle nella destinazione (elenca i file di origine e destinazione)",
- "Ordner im Ziel wie im Datei-Browser öffnen (relativ zum Ziel, z. B. Fotos/2024): liefert entries mit name, dir, status, size, modified und bei Ordnern counts; leer = oberste Ebene": "Aprire una cartella della destinazione come nel browser dei file (relativa alla destinazione, ad es. Foto/2024): restituisce entries con name, dir, status, size, modified e counts per le cartelle; vuoto = livello superiore",
  "nur Einträge zeigen, die sich ändern (neu, aktualisiert, gelöscht, nach A)": "mostrare solo le voci che cambiano (nuove, aggiornate, eliminate, verso A)",
  "Vorschau: wie die Ordnerstruktur im Ziel nach dem nächsten Lauf aussieht, mit denselben Filtern wie der echte Lauf. Ändert nichts. Liefert summary (Dateien neu/aktualisiert/gelöscht/gleich) und text (Baum, + neu, ~ aktualisiert, - gelöscht, < nach Seite A). Mit path einen Ordner wie im Datei-Browser öffnen (entries), mit only_changes nur Änderungen, mit result das Ergebnis ohne Gelöschtes. Optional Felder überschreiben (z. B. anderes Ziel ausprobieren).": "Anteprima: come sarà la struttura delle cartelle nella destinazione dopo la prossima esecuzione, con gli stessi filtri dell'esecuzione reale. Non cambia nulla. Restituisce summary (file nuovi/aggiornati/eliminati/uguali) e text (albero, + nuovo, ~ aggiornato, - eliminato, < verso il lato A). Con path apre una cartella come nel browser dei file (entries), con only_changes solo le modifiche. Campi sostituibili a scelta (ad es. provare un'altra destinazione). Con result, il risultato senza gli elementi eliminati.",
  "Vorschau ohne gespeicherte Aufgabe: Ordnerstruktur im Ziel, wenn source nach dest gespiegelt würde (optional selection, excludes, include_source_dir, direction, delete_excluded). Mit path einen Ordner wie im Datei-Browser öffnen, mit result das Ergebnis ohne Gelöschtes. Ändert nichts.": "Anteprima senza attività salvata: struttura delle cartelle nella destinazione se source venisse rispecchiata su dest (opzionali selection, excludes, include_source_dir, direction, delete_excluded). Con path apre una cartella come nel browser dei file. Non cambia nulla. Con result, il risultato senza gli elementi eliminati.",
@@ -2205,5 +2203,13 @@
  "{titel}\nInstalliert ist {version}.\nVersionshinweise: {url}": "{titel}\nInstallata: {version}.\nNote di rilascio: {url}",
  "Neue Version melden": "Segnala nuova versione",
  "Neue Version: Kanäle": "Nuova versione: canali",
- "webhook, smtp, telegram, apprise": "webhook, smtp, telegram, apprise"
+ "webhook, smtp, telegram, apprise": "webhook, smtp, telegram, apprise",
+ "Ordner im Ziel wie im Datei-Browser öffnen (relativ zum Ziel, z. B. Fotos/2024): liefert entries mit name, dir, status, size, modified und bei Ordnern counts; leer = oberste Ebene. Mit ../ geht es über das Ziel hinaus bis zum Stammverzeichnis (echte Ordner, so wie sie jetzt sind, braucht remotes.browse)": "Aprire una cartella della destinazione come nel browser dei file (relativa alla destinazione, ad es. Foto/2024): restituisce entries con name, dir, status, size, modified e counts per le cartelle; vuoto = livello superiore. Con ../ si sale oltre la destinazione fino alla cartella radice (cartelle reali come sono ora, richiede remotes.browse)",
+ "Jetzt bei GitHub nach einer neueren Version fragen und das Ergebnis zurückgeben (wie „Jetzt prüfen“ in den Einstellungen, ändert keine Einstellungen). Ist die Benachrichtigung bei neuen Versionen eingeschaltet, wird sie für eine neue Version einmal verschickt.": "Chiedere ora a GitHub se c'è una versione più recente e restituire il risultato (come «Controlla ora» nelle impostazioni, non modifica alcuna impostazione). Se la notifica delle nuove versioni è attiva, viene inviata una volta per ogni nuova versione.",
+ "Lade…": "Caricamento…",
+ "Außerhalb des Ziels: so, wie es jetzt ist. Die Aufgabe ändert hier nichts.": "Fuori dalla destinazione: com'è adesso. L'attività qui non cambia nulla.",
+ "🎯 Ziel der Aufgabe": "🎯 Destinazione dell'attività",
+ "→ zum Ziel": "→ verso la destinazione",
+ "Jetzt prüfen": "Controlla ora",
+ "Höher als das Stammverzeichnis geht es nicht.": "Non si può salire oltre la cartella radice."
 }

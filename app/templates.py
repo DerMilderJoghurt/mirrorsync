@@ -341,7 +341,7 @@ Vorhanden: {% for r in remotes %}<code>{{ r.name }}:</code> ({{ r.type }}) {% el
 .pvb .st{font-size:12px;white-space:nowrap}.pvb .st.s-new{color:var(--ok)}.pvb .st.s-update{color:var(--run,#2563eb)}.pvb .st.s-delete{color:var(--err)}.pvb .st.s-to_a{color:var(--warn,#d97706)}
 .pvb tr.s-new td:first-child{box-shadow:inset 3px 0 0 var(--ok)}.pvb tr.s-update td:first-child{box-shadow:inset 3px 0 0 var(--run,#2563eb)}.pvb tr.s-delete td:first-child{box-shadow:inset 3px 0 0 var(--err)}.pvb tr.s-to_a td:first-child{box-shadow:inset 3px 0 0 var(--warn,#d97706)}
 .pvb .cnt{font-size:12px;color:var(--mut);margin-left:6px}@media(max-width:700px){.pvb .hide-sm{display:none}}</style>
-<script>
+{% include "pv_up.html" %}<script>
 function pvEsc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
 function pvSize(b){const u=['B','KB','MB','GB','TB'];let i=0;while(b>=1024&&i<4){b/=1024;i++}return (i?b.toFixed(1):b)+' '+u[i]}
 const PV_LABEL={new:'neu',update:'wird aktualisiert',delete:'wird gelöscht',to_a:'kommt nach A',same:''};
@@ -359,7 +359,7 @@ async function pvOpen(){const d=document.getElementById('pvdlg'),b=document.getE
   h+='<p class="pvleg" style="margin:0 0 10px"><span class="s-new">+ '+f.new+' '+'neu'+' ('+pvSize(y.new)+')</span><span class="s-update">~ '+f.update+' '+'werden aktualisiert'+'</span><span class="s-delete">− '+f.delete+' '+'werden gelöscht'+'</span>'+(j.mode==='bisync'?'<span class="s-to_a">← '+f.to_a+' '+'kommen nach A'+'</span>':'')+'<span class="mut">'+f.same+' '+'bleiben gleich'+'</span></p>';
   if(j.mode==='bisync')h+='<div class="hint" style="margin-bottom:8px">'+'Zwei-Wege: So sehen danach beide Seiten aus. Gezeigt ist der Stand ohne Löschungen, die seit dem letzten Lauf auf einer Seite passiert sind.'+'</div>';
   if(j.truncated)h+='<div class="hint" style="margin-bottom:8px">'+'Sehr viele Dateien: Einzeln gezeigt werden nur die ersten Dateien, die Zähler an den Ordnern stimmen trotzdem.'+'</div>';
-  PV.data=j;PV.path=[];
+  PV.data=j;PV.path=[];PV.up=null;PV.ds=PVUP.split(j.dest);
   if(!(j.tree.ch||[]).length){b.innerHTML=h+'<p class="mut">'+'Nach dem Lauf ist das Ziel leer.'+'</p>';return}
   h+='<div class="pvbar"><span class="pvseg"><button type="button" data-v="result" onclick="pvSetView(\'result\')" title="'+'So sieht das Ziel nach dem Lauf aus. Was gelöscht wird, ist nicht mehr zu sehen.'+'">'+'✅ Ergebnis'+'</button><button type="button" data-v="browse" onclick="pvSetView(\'browse\')" title="'+'Zeigt, was sich ändert: neu, wird aktualisiert, wird gelöscht.'+'">'+'📂 Änderungen'+'</button><button type="button" data-v="tree" onclick="pvSetView(\'tree\')">'+'🌳 Baum'+'</button></span>'+
    '<label class="check" id="pvonlyl" style="margin:0"><input type="checkbox" id="pvonly" onchange="pvRender()"> '+'Nur Änderungen zeigen'+'</label><span style="flex:1"></span>'+
@@ -372,20 +372,35 @@ function pvSetView(v){PV.view=v;try{localStorage.setItem('pvView',v)}catch(e){}p
 function pvChanged(n){return n.s!=='same'||(n.d&&(n.c.new+n.c.update+n.c.delete+n.c.to_a)>0)}
 function pvPrune(n){if(!n.d)return n;return Object.assign({},n,{ch:n.ch.filter(pvChanged).map(pvPrune)})}
 function pvDate(s){return s?s.slice(8,10)+'.'+s.slice(5,7)+'.'+s.slice(0,4)+' '+s.slice(11,16):''}
-function pvGo(i){PV.path=PV.path.slice(0,i);document.getElementById('pvq').value='';pvRender()}
-function pvInto(name){PV.path.push(name);document.getElementById('pvq').value='';pvRender()}
+function pvAbs(){return PV.up!==null?PV.up:PV.ds.segs.concat(PV.path)}
+function pvSet(abs){const d=PV.ds.segs;if(PVUP.isPrefix(d,abs)){PV.up=null;PV.path=abs.slice(d.length)}else PV.up=abs;document.getElementById('pvq').value='';pvRender()}
+function pvGo(i){pvSet(pvAbs().slice(0,i))}
+function pvUp(){const a=pvAbs();if(a.length&&(PV.up!==null||PV.path.length||PVUP.can))pvSet(a.slice(0,-1))}
+async function pvRenderUp(v,res){const up=PV.up,my=PV.req=(PV.req||0)+1;v.innerHTML='<div class="pvb">'+pvCrumb()+'<div class="hint" style="padding:10px">'+'Lade…'+'</div></div>';
+ const r=await PVUP.list(PVUP.join(PV.ds.base,up));if(my!==PV.req)return;const r2=PVUP.onWay(r,up,PV.ds.segs);
+ if(r2.ok===false){v.innerHTML='<div class="pvb">'+pvCrumb()+'<div class="msg err">'+pvEsc(r.error||'Fehler')+'</div></div>';return}
+ const f=document.getElementById('pvq').value.trim().toLowerCase(),rows=PVUP.rows(r2,up,PV.ds.segs).filter(k=>!f||k.n.toLowerCase().includes(f));
+ let t='<div class="hint" style="margin:0 0 6px">'+PVUP.note+'</div><div class="fbtable"><table><thead><tr><th>'+'Name'+'</th>'+(res?'':'<th>'+'Änderung'+'</th>')+'<th class="num hide-sm">'+'Größe'+'</th><th class="hide-sm">'+'Geändert'+'</th></tr></thead><tbody>';
+ if(up.length)t+='<tr class="fdir"><td colspan="4"><a href="#" onclick="pvUp();return false">⬆ ..</a></td></tr>';
+ rows.forEach((k,i)=>{t+='<tr class="'+(k.d?'fdir':'ffile')+'"><td>'+(k.d?'<a href="#" data-i="'+i+'">📁 '+pvEsc(k.n)+'</a>':'📄 '+pvEsc(k.n))+PVUP.tag(k)+'</td>'+(res?'':'<td></td>')+'<td class="num hide-sm">'+(k.d||k.size==null?'':pvSize(k.size))+'</td><td class="hide-sm"><small>'+pvEsc(k.mod?pvDate(k.mod.replace(' ','T')):'')+'</small></td></tr>'});
+ if(!rows.length)t+='<tr><td colspan="4" class="mut" style="padding:14px">'+'Ordner ist leer.'+'</td></tr>';
+ v.innerHTML='<div class="pvb">'+pvCrumb()+t+'</tbody></table></div></div>';
+ v.querySelectorAll('a[data-i]').forEach(a=>a.onclick=e=>{e.preventDefault();pvSet(up.concat([rows[+a.dataset.i].n]))})}
+function pvCrumb(){const a=pvAbs(),dl=PV.ds.segs.length;let c='<div class="fbcrumbs"><a href="#" onclick="pvGo(0);return false">'+pvEsc(PV.ds.base)+'</a>';
+ a.forEach((p,i)=>{c+=(i?'<span class="sep">›</span>':'')+(i===a.length-1?'<b>'+pvEsc(p)+'</b>':'<a href="#" onclick="pvGo('+(i+1)+');return false">'+pvEsc(p)+'</a>')+(i===dl-1?' 🎯':'')});return c+'</div>'}
+function pvInto(name){pvSet(pvAbs().concat([name]))}
 function pvRender(){const v=document.getElementById('pvview');if(!v||!PV.data)return;
  document.querySelectorAll('.pvseg button').forEach(x=>x.classList.toggle('on',x.dataset.v===PV.view));
  const res=PV.view==='result',q=document.getElementById('pvq');document.getElementById('pvonlyl').style.display=res?'none':'';
  const only=!res&&document.getElementById('pvonly').checked;q.style.display=PV.view!=='tree'?'':'none';
  const root=res?pvResult(PV.data.tree):only?pvPrune(PV.data.tree):PV.data.tree;
  if(PV.view==='tree'){const kids=root.ch||[];v.innerHTML=kids.length?'<div class="pvt"><ul>'+kids.map(k=>pvNode(k,0)).join('')+'</ul></div>':'<p class="mut">'+'Keine Änderungen.'+'</p>';return}
+ if(PV.up!==null){pvRenderUp(v,res);return}
  let node=root,ok=[];for(const p of PV.path){const k=(node.ch||[]).find(x=>x.d&&x.n===p);if(!k)break;node=k;ok.push(p)}PV.path=ok;
- let c='<div class="fbcrumbs"><a href="#" onclick="pvGo(0);return false">🎯 '+pvEsc(PV.data.dest)+'</a>';
- PV.path.forEach((p,i)=>{c+='<span class="sep">›</span>'+(i===PV.path.length-1?'<b>'+pvEsc(p)+'</b>':'<a href="#" onclick="pvGo('+(i+1)+');return false">'+pvEsc(p)+'</a>')});c+='</div>';
+ const c=pvCrumb();
  const f=q.value.trim().toLowerCase();const rows=(node.ch||[]).filter(k=>!f||k.n.toLowerCase().includes(f));
  let t='<div class="fbtable"><table><thead><tr><th>'+'Name'+'</th>'+(res?'':'<th>'+'Änderung'+'</th>')+'<th class="num hide-sm">'+'Größe'+'</th><th class="hide-sm">'+'Geändert'+'</th></tr></thead><tbody>';
- if(PV.path.length)t+='<tr class="fdir"><td colspan="4"><a href="#" onclick="pvGo('+(PV.path.length-1)+');return false">⬆ ..</a></td></tr>';
+ if(PV.path.length||(PVUP.can&&PV.ds.segs.length))t+='<tr class="fdir"><td colspan="4"><a href="#" onclick="pvUp();return false">⬆ ..</a></td></tr>';
  if(res){rows.forEach((k,i)=>{if(k.d){const b=k.b,sz=b.new+b.update+b.same+b.to_a;t+='<tr class="fdir"><td><a href="#" data-i="'+i+'">📁 '+pvEsc(k.n)+'</a></td><td class="num hide-sm">'+(sz?pvSize(sz):'')+'</td><td class="hide-sm"></td></tr>'}
   else t+='<tr class="ffile"><td>📄 '+pvEsc(k.n)+'</td><td class="num hide-sm">'+pvSize(k.size||0)+'</td><td class="hide-sm"><small>'+pvDate(k.m)+'</small></td></tr>'});
   if(!rows.length)t+='<tr><td colspan="3" class="mut" style="padding:14px">'+'Ordner ist leer.'+'</td></tr>'}else{
@@ -834,35 +849,71 @@ Lokale Ordner brauchen keinen Eintrag: Sie werden in der docker-compose.yml unte
 <div class="fm-sum mut" style="font-size:13px"><span>{{ data.summary.files.new }} <span>neu</span></span><span>{{ data.summary.files["update"] }} <span>werden aktualisiert</span></span><span>{{ data.summary.files.delete }} <span>werden gelöscht</span></span>{% if data.mode == "bisync" %}<span>{{ data.summary.files.to_a }} <span>kommen nach A</span></span>{% endif %}<span>{{ data.summary.files.same }} <span>bleiben gleich</span></span></div>
 {% if data.truncated %}<div class="hint">Sehr viele Dateien: Einzeln gezeigt werden nur die ersten Dateien, die Zähler an den Ordnern stimmen trotzdem.</div>{% endif %}
 <div class="fm-crumb"></div>
-<div class="fm-tools"><button type="button" class="btn sm" onclick="R.up()">Nach oben</button><input type="text" id="q" placeholder="Im Ordner suchen" autocomplete="off" oninput="R.render()"></div>
+<div class="fm-tools"><button type="button" class="btn sm" id="upbtn" onclick="R.up_()">Nach oben</button><input type="text" id="q" placeholder="Im Ordner suchen" autocomplete="off" oninput="R.render()"></div>
+<div class="hint" id="outnote" style="display:none;margin:0 0 6px">Außerhalb des Ziels: so, wie es jetzt ist. Die Aufgabe ändert hier nichts.</div>
 <div class="fm-scroll"><table><thead><tr><th>Name</th><th class="nw">Größe</th><th class="hide-sm nw">Geändert</th><th class="hide-sm nw">Rechte</th></tr></thead><tbody></tbody></table></div>
 <p class="hint" style="margin:8px 0 0">Ordner anklicken zum Öffnen. Ohne „Änderungen markieren“ siehst du das Ziel genau so, wie es nach dem Lauf aussieht: Was gelöscht wird, fehlt.</p>
 </div>
-<script>
-const I_DIR={{ ICON.folder|tojson }},TREE={{ data.tree|tojson }},DEST={{ data.dest|tojson }};
+{% include "pv_up.html" %}<script>
+const I_DIR={{ ICON.folder|tojson }},TREE={{ data.tree|tojson }},DEST={{ data.dest|tojson }},DS=PVUP.split(DEST);
 const LBL={new:'neu',update:'wird aktualisiert',delete:'wird gelöscht',to_a:'kommt nach A',same:''};
 function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
 function fmt(b){const u=['B','KB','MB','GB','TB'];let i=0;while(b>=1024&&i<4){b/=1024;i++}return (i?b.toFixed(b<10?1:0):b)+' '+u[i]}
 function dt(s){return s?s.slice(0,10)+' '+s.slice(11,16):''}
 function strip(n){if(!n.d)return n;const c=Object.assign({},n.c,{delete:0}),b=Object.assign({},n.b,{delete:0});return Object.assign({},n,{c,b,ch:n.ch.filter(k=>k.s!=='delete').map(strip)})}
-const R={path:[],
+const R={path:[],up:null,
  root(){return document.getElementById('mark').checked?TREE:strip(TREE)},
  node(){let n=this.root(),ok=[];for(const p of this.path){const k=n.ch.find(x=>x.d&&x.n===p);if(!k)break;n=k;ok.push(p)}this.path=ok;return n},
- up(){if(this.path.length){this.path.pop();document.getElementById('q').value='';this.render()}},
- go(i){this.path=this.path.slice(0,i);document.getElementById('q').value='';this.render()},
- render(){const mark=document.getElementById('mark').checked,n=this.node(),q=document.getElementById('q').value.trim().toLowerCase();
-  let h='<a data-i="0">'+esc(DEST.replace(/\/+$/,''))+'/</a>';this.path.forEach((p,i)=>{h+='<a data-i="'+(i+1)+'">'+esc(p)+'</a>/'});
-  const c=document.querySelector('.fm-crumb');c.innerHTML=h;c.querySelectorAll('a').forEach(a=>a.onclick=()=>this.go(+a.dataset.i));
+ abs(){return this.up!==null?this.up:DS.segs.concat(this.path)},
+ set(a){if(PVUP.isPrefix(DS.segs,a)){this.up=null;this.path=a.slice(DS.segs.length)}else this.up=a;document.getElementById('q').value='';this.render()},
+ up_(){const a=this.abs();if(a.length&&(this.up!==null||this.path.length||PVUP.can))this.set(a.slice(0,-1))},
+ go(i){this.set(this.abs().slice(0,i))},
+ crumb(){const a=this.abs(),dl=DS.segs.length;let h='<a data-i="0">'+esc(DS.base)+'</a>';
+  a.forEach((p,i)=>{h+=(i?'/':'')+'<a data-i="'+(i+1)+'">'+esc(p)+'</a>'+(i===dl-1?' 🎯':'')});
+  const c=document.querySelector('.fm-crumb');c.innerHTML=h;c.querySelectorAll('a').forEach(x=>x.onclick=()=>this.go(+x.dataset.i));
+  document.getElementById('upbtn').disabled=!(a.length&&(this.up!==null||this.path.length||PVUP.can));
+  document.getElementById('outnote').style.display=this.up!==null?'':'none'},
+ async renderUp(){const up=this.up,my=this.req=(this.req||0)+1,tb=document.querySelector('#fm tbody');this.crumb();
+  tb.innerHTML='<tr><td colspan="4" class="mut">'+'Lade…'+'</td></tr>';
+  const r0=await PVUP.list(PVUP.join(DS.base,up));if(my!==this.req)return;const r=PVUP.onWay(r0,up,DS.segs);
+  if(r.ok===false){tb.innerHTML='<tr><td colspan="4"><div class="msg err" style="margin:0">'+esc(r.error||'Fehler')+'</div></td></tr>';return}
+  const q=document.getElementById('q').value.trim().toLowerCase(),rows=PVUP.rows(r,up,DS.segs).filter(k=>!q||k.n.toLowerCase().includes(q));
+  if(!rows.length){tb.innerHTML='<tr><td colspan="4" class="mut">'+'Ordner ist leer.'+'</td></tr>';return}
+  tb.innerHTML=rows.map((k,i)=>'<tr class="'+(k.d?'d':'')+'" data-i="'+i+'"><td class="nm"><span class="ico">'+(k.d?I_DIR:'')+'</span>'+esc(k.n)+PVUP.tag(k)+'</td><td class="nw">'+(k.d||k.size==null?'<span class="mut">–</span>':fmt(k.size))+'</td><td class="hide-sm nw"><small>'+(k.mod?esc(k.mod.slice(0,16)):'<span class="mut">–</span>')+'</small></td><td class="hide-sm nw"><small><span class="mut">–</span></small></td></tr>').join('');
+  tb.querySelectorAll('tr.d').forEach(tr=>tr.querySelector('.nm').onclick=()=>this.set(up.concat([rows[+tr.dataset.i].n])))},
+ render(){if(this.up!==null){this.renderUp();return}const mark=document.getElementById('mark').checked,n=this.node(),q=document.getElementById('q').value.trim().toLowerCase();
+  this.crumb();
   const rows=n.ch.filter(k=>!q||k.n.toLowerCase().includes(q)),tb=document.querySelector('#fm tbody');
   if(!rows.length){tb.innerHTML='<tr><td colspan="4" class="mut">'+'Ordner ist leer.'+'</td></tr>';return}
   tb.innerHTML=rows.map((k,i)=>{const st=mark&&LBL[k.s]?'<span class="st s-'+k.s+'">'+LBL[k.s]+'</span>':'';
    if(k.d){const b=k.b,c=k.c,sz=b.new+b.update+b.same+b.to_a+(mark?b.delete:0),cnt=c.new+c.update+c.same+c.to_a+(mark?c.delete:0);
     return '<tr class="d s-'+(mark?k.s:'same')+'" data-i="'+i+'"><td class="nm"><span class="ico">'+I_DIR+'</span>'+esc(k.n)+st+'</td><td class="nw">'+fmt(sz)+'<br><small class="mut">'+cnt+' '+'Dateien'+'</small></td><td class="hide-sm nw"><span class="mut">–</span></td><td class="hide-sm nw"><span class="mut">–</span></td></tr>'}
    return '<tr class="s-'+(mark?k.s:'same')+'"><td class="nm"><span class="ico"></span>'+esc(k.n)+st+'</td><td class="nw">'+fmt(k.size||0)+'</td><td class="hide-sm nw"><small>'+(k.m?esc(dt(k.m)):'<span class="mut">–</span>')+'</small></td><td class="hide-sm nw"><small><span class="mut" title="'+'Die Vorschau kennt keine Berechtigungen.'+'">–</span></small></td></tr>'}).join('');
-  tb.querySelectorAll('tr.d').forEach(tr=>tr.querySelector('.nm').onclick=()=>{this.path.push(rows[+tr.dataset.i].n);document.getElementById('q').value='';this.render()})}};
+  tb.querySelectorAll('tr.d').forEach(tr=>tr.querySelector('.nm').onclick=()=>this.set(this.abs().concat([rows[+tr.dataset.i].n])))}};
 R.render();
 </script>{% endif %}
 {% endblock %}""",
+
+"pv_up.html": r"""{# Vorschau: oberhalb des Ziels bis zum Stammverzeichnis gehen (echte Ordner, nur lesen) #}
+<script>
+const PVUP={can:{{ can("remotes.browse")|tojson }},cache:{},
+ split(dest){dest=(dest||'').replace(/\/+$/,'');let base,rest;
+  if(dest.startsWith('/')){base='/';rest=dest.slice(1)}else{const i=dest.indexOf(':');base=dest.slice(0,i+1)+(dest.slice(i+1).startsWith('/')?'/':'');rest=dest.slice(base.length)}
+  return {base,segs:rest.split('/').filter(Boolean)}},
+ join(base,segs){return base+segs.join('/')},
+ isPrefix(a,b){return a.length<=b.length&&a.every((x,i)=>x===b[i])},
+ async list(path){if(this.cache[path])return this.cache[path];
+  try{const r=await (await fetch('/browse/list?path='+encodeURIComponent(path),{headers:{Accept:'application/json'}})).json();if(r.ok!==false)this.cache[path]=r;return r}
+  catch(e){return {ok:false,error:'Keine Verbindung zum Server.'}}},
+ /* Zeilen fuer einen Ordner oberhalb/neben dem Ziel: echte Eintraege, der Weg zum Ziel markiert */
+ rows(r,up,destSegs){const out=(r.entries||[]).map(e=>({n:e.name,d:e.dir,size:e.size,mod:e.mod}));
+  if(this.isPrefix(up,destSegs)&&up.length<destSegs.length){const nx=destSegs[up.length];let t=out.find(x=>x.d&&x.n===nx);
+   if(!t){t={n:nx,d:true,size:null,mod:'',missing:true};out.push(t)}t.goal=up.length===destSegs.length-1?'dest':'way'}
+  out.sort((a,b)=>a.d!==b.d?(a.d?-1:1):a.n.localeCompare(b.n,'de',{numeric:true,sensitivity:'base'}));return out},
+ onWay(r,up,segs){return r.ok===false&&this.isPrefix(up,segs)?{ok:true,entries:[]}:r},
+ tag(x){return x.goal==='dest'?' <span class="tag ok">'+'🎯 Ziel der Aufgabe'+'</span>'+(x.missing?' <span class="tag">'+'wird angelegt'+'</span>':''):x.goal==='way'?' <span class="tag">'+'→ zum Ziel'+'</span>'+(x.missing?' <span class="tag">'+'wird angelegt'+'</span>':''):''},
+ note:'Außerhalb des Ziels: so, wie es jetzt ist. Die Aufgabe ändert hier nichts.'};
+</script>""",
 
 "files.html": r"""{% extends "base.html" %}{% block title %}Dateien{% endblock %}
 {% block subtitle %}<p>In einem oder zwei Speicherorten browsen, bearbeiten, kopieren und verschieben.</p>{% endblock %}
@@ -1926,7 +1977,7 @@ scope();
 <p style="margin:10px 0 0"><span class="mut">Installiert:</span> <b>v{{ upd.current }}</b>{% if upd.latest %} &nbsp;·&nbsp; <span class="mut">Neueste Version:</span> <a href="{{ upd.url }}" target="_blank" rel="noopener">v{{ upd.latest }}</a>{% if upd.update_available %} <span class="tag ok">Neue Version verfügbar</span>{% elif upd.enabled %} <span class="tag">aktuell</span>{% endif %}{% endif %}</p>
 {% if upd.checked %}<p class="mut" style="margin:4px 0 0"><small>Zuletzt geprüft: {{ upd.checked }}</small></p>{% endif %}
 {% if upd.error %}<p style="margin:4px 0 0;color:var(--err)"><small>Fehler bei der letzten Prüfung: {{ upd.error }}</small></p>{% endif %}
-<p style="margin-top:12px"><button class="btn pri">Speichern</button> <button class="btn" name="check_now" value="1">Speichern und jetzt prüfen</button></p></form>
+<p style="margin-top:12px"><button class="btn pri">Speichern</button> <button class="btn" name="check_only" value="1" formnovalidate>Jetzt prüfen</button></p></form>
 {% if selfupd %}{% set su = selfupd %}{% set sst = su.state or {} %}<div class="card" id="selfupdate"><h2>Selbst aktualisieren</h2>
 {% if not su.available %}<p class="mut" style="margin-top:-4px">Ausgeschaltet. MirrorSync kann sich selbst aktualisieren, wenn der Docker-Socket in den Container eingebunden ist (in der Compose-Datei unter <code>volumes:</code> die Zeile <code>- /var/run/docker.sock:/var/run/docker.sock</code>). Achtung: Wer den Socket hat, hat volle Kontrolle über alle Container auf dem Host. Ohne Socket aktualisierst du wie bisher über Dockhand, Portainer oder <code>docker compose pull &amp;&amp; docker compose up -d</code>.</p>{% if su.reason and su.reason != "socket" %}<p class="hint fehler"><span>Socket gefunden, aber Docker antwortet nicht:</span> <code>{{ su.reason }}</code></p>{% endif %}
 {% else %}<p class="mut" style="margin-top:-4px">Holt das Image neu und legt den Container mit genau denselben Einstellungen neu an (Name, Ports, Volumes, Umgebungsvariablen, Netzwerke mit fester IP, Neustart-Regel, Labels von Docker Compose). Startet die neue Version nicht, läuft automatisch wieder die bisherige.</p>
