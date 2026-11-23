@@ -13,6 +13,10 @@ def ks = new Properties()
 def ksFile = rootProject.file("keystore.properties")
 if (ksFile.exists()) ksFile.withInputStream { ks.load(it) }
 def ksPath = ks.getProperty("storeFile") ?: System.getenv("MS_KEYSTORE")
+// trim(): copy and paste into GitHub secrets often adds a trailing line break
+def ksStorePass = ((ks.getProperty("storePassword") ?: System.getenv("MS_KEYSTORE_PASSWORD")) ?: "").trim()
+def ksAlias = ((ks.getProperty("keyAlias") ?: System.getenv("MS_KEY_ALIAS")) ?: "").trim() ?: "mirrorsync"
+def ksKeyPass = ((ks.getProperty("keyPassword") ?: System.getenv("MS_KEY_PASSWORD")) ?: "").trim() ?: ksStorePass
 
 android {
     namespace "io.github.dermilderjoghurt.mirrorsync"
@@ -30,10 +34,9 @@ android {
         if (ksPath) {
             release {
                 storeFile file(ksPath)
-                // trim(): copy and paste into GitHub secrets often adds a trailing line break
-                storePassword ((ks.getProperty("storePassword") ?: System.getenv("MS_KEYSTORE_PASSWORD")) ?: "").trim()
-                keyAlias ((ks.getProperty("keyAlias") ?: System.getenv("MS_KEY_ALIAS")) ?: "").trim() ?: "mirrorsync"
-                keyPassword ((ks.getProperty("keyPassword") ?: System.getenv("MS_KEY_PASSWORD") ?: System.getenv("MS_KEYSTORE_PASSWORD")) ?: "").trim()
+                storePassword = ksStorePass
+                keyAlias = ksAlias
+                keyPassword = ksKeyPass
             }
         }
     }
