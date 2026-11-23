@@ -3,6 +3,11 @@
 Version numbers follow [SemVer](https://semver.org/): MAJOR.MINOR.PATCH
 (MAJOR = incompatible change, MINOR = new feature, PATCH = bug fix).
 
+## 1.37.1 – 2026-11-23
+- First Trivy scan: 5 findings (severity high), all in old copies of urllib3, msgpack and setuptools bundled with
+  pip itself. MirrorSync does not use them, pip is only needed for the build. pip and setuptools are now removed
+  from the image after the installation, which clears these findings. Operating system and rclone: no findings.
+
 ## 1.37.0 – 2026-11-23
 - **Dependencies updated:** rclone 1.68 → 1.76, Python 3.12 → 3.14 (Alpine), Flask 3.0.3 → 3.1.3,
   APScheduler 3.10.4 → 3.11.3, tzdata 2024.2 → 2026.6, segno 1.6.1 → 1.6.6. Waitress, Apprise, webauthn and

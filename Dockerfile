@@ -16,9 +16,14 @@ RUN for i in 1 2 3; do \
     done; \
     echo "ERROR: Python packages could not be downloaded from PyPI. Check the Docker host's internet connection/DNS."; \
     exit 1
+# pip/setuptools are only needed for the build. They bundle their own older copies of urllib3 and msgpack that
+# vulnerability scanners report, so they are removed from the final image (MirrorSync does not need them at runtime).
+RUN pip uninstall -y pip setuptools wheel >/dev/null 2>&1; \
+    rm -rf /usr/local/lib/python3*/ensurepip /usr/local/lib/python3*/site-packages/setuptools* \
+           /usr/local/lib/python3*/site-packages/pip* /usr/local/bin/pip*
 COPY app/ .
 
-ARG VERSION=1.37.0
+ARG VERSION=1.37.1
 LABEL org.opencontainers.image.title="MirrorSync" org.opencontainers.image.version=$VERSION
 ENV TZ=Europe/Berlin CONFIG_DIR=/config LOG_DIR=/logs PORT=8080 PYTHONUNBUFFERED=1
 VOLUME ["/config", "/logs"]
