@@ -1,35 +1,33 @@
 # MirrorSync – Docker Compose
 #
-# Das fertige Image kommt aus der GitHub Container Registry, nichts muss gebaut werden.
-# Diese Datei allein reicht, z. B. auch direkt als Stack in Portainer.
+# The ready-made image comes from the GitHub Container Registry, nothing needs to be built.
+# This file is all you need, e.g. directly as a stack in Portainer.
 #
-# Starten:      docker compose up -d
-# Aktualisieren: docker compose pull && docker compose up -d
+# Start:   docker compose up -d
+# Update:  docker compose pull && docker compose up -d
 
 services:
   mirrorsync:
-    image: ghcr.io/dermilderjoghurt/mirrorsync:latest   # oder feste Version, z. B. :1.33.1
-    # Selbst bauen statt herunterladen (Dockerfile und app/ im selben Ordner):
+    image: ghcr.io/dermilderjoghurt/mirrorsync:latest   # or a fixed version, e.g. :1.33.2
+    # Build it yourself instead of pulling (Dockerfile and app/ in the same folder):
     # build: .
     container_name: mirrorsync
     restart: unless-stopped
     environment:
       - TZ=Europe/Berlin
-      # Kein Benutzer/Passwort hier noetig: Beim ersten Aufruf der Web-GUI legst du den Admin an.
-      # Den Einrichtungs-Code dafuer zeigt:  docker logs mirrorsync
-      # - PUBLIC_URL=https://sync.example.de   # optional, Adresse fuer Passkeys (sonst in der GUI einstellbar)
-      # Notfall, falls du dich ausgesperrt hast (danach wieder auskommentieren):
+      # No user/password needed here: you create the admin when you first open the web GUI.
+      # The setup code for that is shown by:  docker logs mirrorsync
+      # - PUBLIC_URL=https://sync.example.com   # optional, address for passkeys (can also be set in the GUI)
+      # Emergency, if you locked yourself out (comment out again afterwards):
       # - WEB_USER=admin
-      # - WEB_PASS=neues-passwort
-      # - ADMIN_RESET=true      # setzt Passwort+2FA von WEB_USER auf WEB_PASS zurueck
-      # - IPGUARD_RESET=true    # Notfall: entfernt alle IP- und Ländersperren,
-      #                         # danach wieder auskommentieren
-      - PORT=8080               # Port der Web-GUI im Container
+      # - WEB_PASS=new-password
+      # - ADMIN_RESET=true      # resets password + 2FA of WEB_USER to WEB_PASS
+      # - IPGUARD_RESET=true    # removes all IP and country blocks
+      - PORT=8080               # port of the web GUI inside the container
     volumes:
-      - ./config:/config        # Aufgaben, Speicherorte, Benachrichtigungen, SSH-Schluessel
+      - ./config:/config        # jobs, storage locations, notifications, SSH keys
       - ./logs:/logs
-      # Nur noetig, wenn auch Ordner DIESES Docker-Hosts gespiegelt werden sollen:
-      # - /srv/daten:/data/daten:ro
-
+      # Only needed if folders of THIS Docker host should be mirrored too:
+      # - /srv/data:/data/data:ro
     ports:
-      - "8080:8080"             # Host-Port 8080 -> PORT im Container (linke Zahl frei waehlbar)
+      - "8080:8080"             # host port 8080 -> PORT in the container (left number is up to you)

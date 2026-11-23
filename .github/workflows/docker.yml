@@ -1,9 +1,9 @@
-name: Image und Release
+name: Image and release
 
-# Baut das Image und legt es in der GitHub Container Registry ab:
-#   ghcr.io/dermilderjoghurt/mirrorsync:latest       (jeder Push auf main)
-#   ghcr.io/dermilderjoghurt/mirrorsync:<version>    (Version aus app/VERSION, z. B. 1.33.1)
-#   ghcr.io/dermilderjoghurt/mirrorsync:1.33         (Minor-Version, immer die neueste 1.33.x)
+# Builds the image and pushes it to the GitHub Container Registry:
+#   ghcr.io/dermilderjoghurt/mirrorsync:latest       (every push to main)
+#   ghcr.io/dermilderjoghurt/mirrorsync:<version>    (version from app/VERSION, e.g. 1.33.2)
+#   ghcr.io/dermilderjoghurt/mirrorsync:1.33         (minor version, always the newest 1.33.x)
 on:
   push:
     branches: [main]
@@ -11,8 +11,8 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write   # Tag und Release anlegen
-  packages: write   # Image nach ghcr.io
+  contents: write   # create tag and release
+  packages: write   # push image to ghcr.io
 
 jobs:
   build:
@@ -20,7 +20,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Version aus app/VERSION lesen
+      - name: Read version from app/VERSION
         id: ver
         run: |
           v=$(tr -d ' \n\r' < app/VERSION)
@@ -60,8 +60,8 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  # Legt bei neuer Version in app/VERSION automatisch Tag vX.Y.Z und ein GitHub-Release an
-  # (Text aus dem passenden CHANGELOG-Abschnitt, ZIP des Repos als Anhang).
+  # On a new version in app/VERSION, automatically creates tag vX.Y.Z and a GitHub release
+  # (text from the matching CHANGELOG section, ZIP of the repo attached).
   release:
     needs: build
     if: github.ref == 'refs/heads/main'
@@ -69,12 +69,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Release anlegen oder Text aktualisieren
+      - name: Create release or update its text
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           V=$(tr -d ' \n\r' < app/VERSION)
-          # CHANGELOG-Abschnitt "## <Version> – Datum" bis zur naechsten "## "-Zeile
+          # CHANGELOG section "## <version> – date" up to the next "## " line
           awk -v v="$V" '
             /^## / { if (p) exit; if (index($0, "## " v " ") == 1) { p = 1; next } }
             p' CHANGELOG.md > notes.md
@@ -86,7 +86,7 @@ jobs:
             echo '```'
           } >> notes.md
           if gh release view "v$V" >/dev/null 2>&1; then
-            echo "Release v$V gibt es schon, nur der Text wird aus dem CHANGELOG aktualisiert."
+            echo "Release v$V already exists, only updating its text from the CHANGELOG."
             gh release edit "v$V" --notes-file notes.md
           else
             git archive --format=zip --prefix=mirrorsync/ -o "mirrorsync-$V.zip" HEAD

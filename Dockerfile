@@ -1,24 +1,24 @@
-# rclone-Binary aus dem offiziellen Image uebernehmen
+# Take the rclone binary from the official image
 FROM rclone/rclone:1.68 AS rclone
 
 FROM python:3.12-alpine
-# Zeitzonen-Daten kommen per pip (tzdata), daher kein apk noetig
+# Time zone data comes via pip (tzdata), so no apk needed
 COPY --from=rclone /usr/local/bin/rclone /usr/local/bin/rclone
 
 WORKDIR /app
 COPY app/requirements.txt .
-# Robust gegen langsame oder wackelige Verbindungen zu PyPI: laengeres Timeout, mehr Wiederholungen
-# und bis zu 3 komplette Versuche mit Pause dazwischen.
+# Robust against slow or flaky connections to PyPI: longer timeout, more retries
+# and up to 3 complete attempts with a pause in between.
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1 PIP_DEFAULT_TIMEOUT=60 PIP_RETRIES=10
 RUN for i in 1 2 3; do \
       pip install --no-cache-dir -r requirements.txt && exit 0; \
-      echo "pip install fehlgeschlagen (Versuch $i von 3), neuer Versuch in 15 Sekunden ..."; sleep 15; \
+      echo "pip install failed (attempt $i of 3), retrying in 15 seconds ..."; sleep 15; \
     done; \
-    echo "FEHLER: Python-Pakete konnten nicht von PyPI geladen werden. Internetverbindung/DNS des Docker-Hosts pruefen."; \
+    echo "ERROR: Python packages could not be downloaded from PyPI. Check the Docker host's internet connection/DNS."; \
     exit 1
 COPY app/ .
 
-ARG VERSION=1.33.1
+ARG VERSION=1.33.2
 LABEL org.opencontainers.image.title="MirrorSync" org.opencontainers.image.version=$VERSION
 ENV TZ=Europe/Berlin CONFIG_DIR=/config LOG_DIR=/logs PORT=8080 PYTHONUNBUFFERED=1
 VOLUME ["/config", "/logs"]
