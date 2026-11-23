@@ -3,6 +3,16 @@
 Version numbers follow [SemVer](https://semver.org/): MAJOR.MINOR.PATCH
 (MAJOR = incompatible change, MINOR = new feature, PATCH = bug fix).
 
+## 1.40.1 – 2026-11-23
+- **Fixed: update checkers kept reporting a pending update.** Until now every push to main rebuilt the image and
+  pushed it as `:latest`, also for changes that do not affect the image (README, workflows, Android app,
+  Dependabot). Each build also had a new build time and extra attestation data, so the image digest changed every
+  time. Dockhand and similar tools compare that digest and therefore showed "update pending" although the version
+  was the same. Now the image is only pushed when `app/VERSION` contains a version that is not in the registry
+  yet, and builds are reproducible (build time = commit time, no provenance/SBOM manifests). A manual run of the
+  workflow with "force" still rebuilds the current version.
+- Base image is now `python:3.15-alpine` (Dependabot update).
+
 ## 1.40.0 – 2026-11-23
 - **Android app** (new, folder `android/`): MirrorSync as an app on the phone. A thin wrapper around the web
   interface without browser bar, so every new feature is in the app right away. The APK is attached to each

@@ -4,7 +4,7 @@
 
 # MirrorSync – 1:1 mirroring with a web GUI and schedules
 
-Version **1.39.0** · Changes: [CHANGELOG.md](CHANGELOG.md) · [Deutsche Version](README.de.md)
+Version **1.40.1** · Changes: [CHANGELOG.md](CHANGELOG.md) · [Deutsche Version](README.de.md)
 
 A Docker container that **mirrors folders one-way, 1:1** (like FreeFileSync "Mirror"):
 the destination becomes an exact copy of the source, including deletions. The sync engine is
@@ -67,8 +67,9 @@ Changed files are transferred completely (no delta transfer like rsync).
 
 ## Installation
 The ready-made image is in the GitHub Container Registry: `ghcr.io/dermilderjoghurt/mirrorsync`
-(for amd64 and arm64, e.g. Raspberry Pi). Tags: `latest` (newest version), `1.40.0` (fixed version),
-`1.34` (newest patch of this version).
+(for amd64 and arm64, e.g. Raspberry Pi). Tags: `latest` (newest version), `1.40.1` (fixed version),
+`1.40` (newest patch of this version). The image is only published when the version number changes, so
+update checkers such as Dockhand or Watchtower only report an update when there really is a new version.
 
 ### With Docker Compose (recommended)
 1. Create a folder and put the [`docker-compose.yml`](docker-compose.yml) into it, e.g. `/opt/mirrorsync/`.
@@ -759,7 +760,7 @@ GUI and under `/health`.
 - When editing, leave password fields empty to keep the stored password.
 - Data lives in `./config` (database `mirrorsync.db`, storage locations `rclone.conf`) and `./logs` (run logs).
 - Run the GUI only in your home network or behind a reverse proxy with HTTPS.
-- The image contains only Alpine Linux with Python 3.14, rclone 1.76 and a few Python packages
+- The image contains only Alpine Linux with Python 3.15, rclone 1.76 and a few Python packages
   (`app/requirements.txt`), no PHP and no Node.js. On GitHub, Dependabot checks for new versions every week and
   Trivy scans every image for known vulnerabilities (results under "Security" in the repository).
 

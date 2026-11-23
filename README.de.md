@@ -4,7 +4,7 @@
 
 # MirrorSync – 1:1-Spiegelung mit Web-GUI und Zeitplänen
 
-Version **1.39.0** · Änderungen siehe [CHANGELOG.md](CHANGELOG.md) (englisch) · [English version](README.md)
+Version **1.40.1** · Änderungen siehe [CHANGELOG.md](CHANGELOG.md) (englisch) · [English version](README.md)
 
 Ein Docker-Container, der Ordner **einweg 1:1 spiegelt** (wie FreeFileSync „Spiegeln"):
 Das Ziel wird exakt wie die Quelle, inklusive Löschungen. Als Sync-Motor dient
@@ -68,8 +68,9 @@ Geänderte Dateien werden komplett neu übertragen (kein Delta wie bei rsync).
 
 ## Installation
 Das fertige Image liegt in der GitHub Container Registry: `ghcr.io/dermilderjoghurt/mirrorsync`
-(für amd64 und arm64, z. B. Raspberry Pi). Tags: `latest` (neueste Version), `1.40.0` (feste Version),
-`1.34` (neuester Patch dieser Version).
+(für amd64 und arm64, z. B. Raspberry Pi). Tags: `latest` (neueste Version), `1.40.1` (feste Version),
+`1.40` (neuester Patch dieser Version). Das Image wird nur veröffentlicht, wenn sich die Versionsnummer ändert.
+Update-Prüfer wie Dockhand oder Watchtower melden deshalb nur dann ein Update, wenn es wirklich eine neue Version gibt.
 
 ### Mit Docker Compose (empfohlen)
 1. Ordner anlegen und die [`docker-compose.yml`](docker-compose.yml) hineinlegen, z. B. nach `/opt/mirrorsync/`.
@@ -780,6 +781,6 @@ GUI und unter `/health`.
 - Beim Bearbeiten Passwortfelder leer lassen, dann bleibt das gespeicherte Passwort erhalten.
 - Daten liegen in `./config` (Datenbank `mirrorsync.db`, Speicherorte `rclone.conf`) und `./logs` (Lauf-Logs).
 - Die GUI nur im Heimnetz betreiben oder hinter einen Reverse-Proxy mit HTTPS stellen.
-- Enthalten sind nur Alpine Linux mit Python 3.14, rclone 1.76 und wenige Python-Pakete (`app/requirements.txt`),
+- Enthalten sind nur Alpine Linux mit Python 3.15, rclone 1.76 und wenige Python-Pakete (`app/requirements.txt`),
   kein PHP und kein Node.js. Auf GitHub prüft Dependabot jede Woche auf neue Versionen, und Trivy scannt jedes
   Image auf bekannte Schwachstellen (Ergebnisse unter „Security“ im Repo).

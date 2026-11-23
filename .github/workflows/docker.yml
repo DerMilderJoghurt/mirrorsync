@@ -1,7 +1,10 @@
 name: Image and release
 
-# Builds the image and pushes it to the GitHub Container Registry:
-#   ghcr.io/dermilderjoghurt/mirrorsync:latest       (every push to main)
+# Builds the image and pushes it to the GitHub Container Registry, but only when app/VERSION contains a version
+# that is not in the registry yet (or when started by hand with "force"). Pushes that only touch docs, workflows
+# or the Android app therefore leave :latest unchanged, so update checkers (Dockhand, Watchtower, ...) only report
+# a real new version.
+#   ghcr.io/dermilderjoghurt/mirrorsync:latest       (newest version)
 #   ghcr.io/dermilderjoghurt/mirrorsync:<version>    (version from app/VERSION, e.g. 1.33.2)
 #   ghcr.io/dermilderjoghurt/mirrorsync:1.33         (minor version, always the newest 1.33.x)
 on:
@@ -9,6 +12,11 @@ on:
     branches: [main]
     tags: ["v*"]
   workflow_dispatch:
+    inputs:
+      force:
+        description: "Build and push the image even if this version already exists"
+        type: boolean
+        default: false
 
 permissions:
   contents: write   # create tag and release
@@ -17,6 +25,8 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    outputs:
+      publish: ${{ steps.check.outputs.publish }}
     steps:
       - uses: actions/checkout@v7
 
@@ -26,17 +36,36 @@ jobs:
           v=$(tr -d ' \n\r' < app/VERSION)
           echo "version=$v" >> "$GITHUB_OUTPUT"
           echo "minor=${v%.*}" >> "$GITHUB_OUTPUT"
+          # Commit time as build time: the same commit always gives the same image (reproducible build)
+          echo "epoch=$(git log -1 --format=%ct)" >> "$GITHUB_OUTPUT"
+          echo "created=$(git log -1 --format=%cI)" >> "$GITHUB_OUTPUT"
 
-      - uses: docker/setup-qemu-action@v4
-      - uses: docker/setup-buildx-action@v4
+      - name: Is this version already published?
+        id: check
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.force }}" = "true" ]; then
+            echo "Forced build."; echo "publish=true" >> "$GITHUB_OUTPUT"
+          elif docker buildx imagetools inspect "ghcr.io/dermilderjoghurt/mirrorsync:${{ steps.ver.outputs.version }}" >/dev/null 2>&1; then
+            echo "Version ${{ steps.ver.outputs.version }} is already in the registry, nothing to push."
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "New version ${{ steps.ver.outputs.version }}."; echo "publish=true" >> "$GITHUB_OUTPUT"
+          fi
 
-      - uses: docker/login-action@v4
+      - if: steps.check.outputs.publish == 'true'
+        uses: docker/setup-qemu-action@v4
+      - if: steps.check.outputs.publish == 'true'
+        uses: docker/setup-buildx-action@v4
+
+      - if: steps.check.outputs.publish == 'true'
+        uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - id: meta
+        if: steps.check.outputs.publish == 'true'
         uses: docker/metadata-action@v6
         with:
           images: ghcr.io/dermilderjoghurt/mirrorsync
@@ -48,8 +77,12 @@ jobs:
             org.opencontainers.image.title=MirrorSync
             org.opencontainers.image.version=${{ steps.ver.outputs.version }}
             org.opencontainers.image.licenses=MIT
+            org.opencontainers.image.created=${{ steps.ver.outputs.created }}
 
-      - uses: docker/build-push-action@v7
+      - if: steps.check.outputs.publish == 'true'
+        uses: docker/build-push-action@v7
+        env:
+          SOURCE_DATE_EPOCH: ${{ steps.ver.outputs.epoch }}
         with:
           context: .
           platforms: linux/amd64,linux/arm64
@@ -59,11 +92,16 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          # no extra attestation manifests and fixed timestamps: the digest only changes with the content
+          provenance: false
+          sbom: false
+          outputs: type=image,push=true,rewrite-timestamp=true
 
   # Vulnerability scan of the freshly built image with Trivy. Results appear under Security → Code scanning
   # and in the job log. Does not block the release; new findings show up there and as Dependabot PRs.
   scan:
     needs: build
+    if: needs.build.outputs.publish == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
