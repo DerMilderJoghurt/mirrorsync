@@ -30,9 +30,10 @@ android {
         if (ksPath) {
             release {
                 storeFile file(ksPath)
-                storePassword ks.getProperty("storePassword") ?: System.getenv("MS_KEYSTORE_PASSWORD")
-                keyAlias ks.getProperty("keyAlias") ?: System.getenv("MS_KEY_ALIAS") ?: "mirrorsync"
-                keyPassword ks.getProperty("keyPassword") ?: System.getenv("MS_KEY_PASSWORD") ?: System.getenv("MS_KEYSTORE_PASSWORD")
+                // trim(): copy and paste into GitHub secrets often adds a trailing line break
+                storePassword ((ks.getProperty("storePassword") ?: System.getenv("MS_KEYSTORE_PASSWORD")) ?: "").trim()
+                keyAlias ((ks.getProperty("keyAlias") ?: System.getenv("MS_KEY_ALIAS")) ?: "").trim() ?: "mirrorsync"
+                keyPassword ((ks.getProperty("keyPassword") ?: System.getenv("MS_KEY_PASSWORD") ?: System.getenv("MS_KEYSTORE_PASSWORD")) ?: "").trim()
             }
         }
     }
