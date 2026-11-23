@@ -361,11 +361,12 @@ async function pvOpen(){const d=document.getElementById('pvdlg'),b=document.getE
   if(j.truncated)h+='<div class="hint" style="margin-bottom:8px">'+'Sehr viele Dateien: Einzeln gezeigt werden nur die ersten Dateien, die Zähler an den Ordnern stimmen trotzdem.'+'</div>';
   PV.data=j;PV.path=[];
   if(!(j.tree.ch||[]).length){b.innerHTML=h+'<p class="mut">'+'Nach dem Lauf ist das Ziel leer.'+'</p>';return}
-  h+='<div class="pvbar"><span class="pvseg"><button type="button" data-v="browse" onclick="pvSetView(\'browse\')">'+'📂 Durchklicken'+'</button><button type="button" data-v="tree" onclick="pvSetView(\'tree\')">'+'🌳 Baum'+'</button></span>'+
-   '<label class="check" style="margin:0"><input type="checkbox" id="pvonly" onchange="pvRender()"> '+'Nur Änderungen zeigen'+'</label><span style="flex:1"></span>'+
+  h+='<div class="pvbar"><span class="pvseg"><button type="button" data-v="result" onclick="pvSetView(\'result\')" title="'+'So sieht das Ziel nach dem Lauf aus. Was gelöscht wird, ist nicht mehr zu sehen.'+'">'+'✅ Ergebnis'+'</button><button type="button" data-v="browse" onclick="pvSetView(\'browse\')" title="'+'Zeigt, was sich ändert: neu, wird aktualisiert, wird gelöscht.'+'">'+'📂 Änderungen'+'</button><button type="button" data-v="tree" onclick="pvSetView(\'tree\')">'+'🌳 Baum'+'</button></span>'+
+   '<label class="check" id="pvonlyl" style="margin:0"><input type="checkbox" id="pvonly" onchange="pvRender()"> '+'Nur Änderungen zeigen'+'</label><span style="flex:1"></span>'+
    '<input type="text" id="pvq" placeholder="'+'Im Ordner suchen'+'" autocomplete="off" oninput="pvRender()"></div><div id="pvview"></div>';
   b.innerHTML=h;pvRender()}catch(e){b.innerHTML='<div class="msg err">'+pvEsc(e.message||e)+'</div>'}}
-const PV={data:null,path:[],view:'browse'};try{PV.view=localStorage.getItem('pvView')||'browse'}catch(e){}
+const PV={data:null,path:[],view:'result'};try{PV.view=localStorage.getItem('pvView')||'result'}catch(e){}
+function pvResult(n){if(!n.d)return n;const c=Object.assign({},n.c),b=Object.assign({},n.b);c.delete=0;b.delete=0;return Object.assign({},n,{c,b,ch:n.ch.filter(k=>k.s!=='delete').map(pvResult)})}
 function pvSetView(v){PV.view=v;try{localStorage.setItem('pvView',v)}catch(e){}pvRender()}
 function pvChanged(n){return n.s!=='same'||(n.d&&(n.c.new+n.c.update+n.c.delete+n.c.to_a)>0)}
 function pvPrune(n){if(!n.d)return n;return Object.assign({},n,{ch:n.ch.filter(pvChanged).map(pvPrune)})}
@@ -374,20 +375,24 @@ function pvGo(i){PV.path=PV.path.slice(0,i);document.getElementById('pvq').value
 function pvInto(name){PV.path.push(name);document.getElementById('pvq').value='';pvRender()}
 function pvRender(){const v=document.getElementById('pvview');if(!v||!PV.data)return;
  document.querySelectorAll('.pvseg button').forEach(x=>x.classList.toggle('on',x.dataset.v===PV.view));
- const only=document.getElementById('pvonly').checked,q=document.getElementById('pvq');q.style.display=PV.view==='browse'?'':'none';
- const root=only?pvPrune(PV.data.tree):PV.data.tree;
+ const res=PV.view==='result',q=document.getElementById('pvq');document.getElementById('pvonlyl').style.display=res?'none':'';
+ const only=!res&&document.getElementById('pvonly').checked;q.style.display=PV.view!=='tree'?'':'none';
+ const root=res?pvResult(PV.data.tree):only?pvPrune(PV.data.tree):PV.data.tree;
  if(PV.view==='tree'){const kids=root.ch||[];v.innerHTML=kids.length?'<div class="pvt"><ul>'+kids.map(k=>pvNode(k,0)).join('')+'</ul></div>':'<p class="mut">'+'Keine Änderungen.'+'</p>';return}
  let node=root,ok=[];for(const p of PV.path){const k=(node.ch||[]).find(x=>x.d&&x.n===p);if(!k)break;node=k;ok.push(p)}PV.path=ok;
  let c='<div class="fbcrumbs"><a href="#" onclick="pvGo(0);return false">🎯 '+pvEsc(PV.data.dest)+'</a>';
  PV.path.forEach((p,i)=>{c+='<span class="sep">›</span>'+(i===PV.path.length-1?'<b>'+pvEsc(p)+'</b>':'<a href="#" onclick="pvGo('+(i+1)+');return false">'+pvEsc(p)+'</a>')});c+='</div>';
  const f=q.value.trim().toLowerCase();const rows=(node.ch||[]).filter(k=>!f||k.n.toLowerCase().includes(f));
- let t='<div class="fbtable"><table><thead><tr><th>'+'Name'+'</th><th>'+'Änderung'+'</th><th class="num hide-sm">'+'Größe'+'</th><th class="hide-sm">'+'Geändert'+'</th></tr></thead><tbody>';
+ let t='<div class="fbtable"><table><thead><tr><th>'+'Name'+'</th>'+(res?'':'<th>'+'Änderung'+'</th>')+'<th class="num hide-sm">'+'Größe'+'</th><th class="hide-sm">'+'Geändert'+'</th></tr></thead><tbody>';
  if(PV.path.length)t+='<tr class="fdir"><td colspan="4"><a href="#" onclick="pvGo('+(PV.path.length-1)+');return false">⬆ ..</a></td></tr>';
+ if(res){rows.forEach((k,i)=>{if(k.d){const b=k.b,sz=b.new+b.update+b.same+b.to_a;t+='<tr class="fdir"><td><a href="#" data-i="'+i+'">📁 '+pvEsc(k.n)+'</a></td><td class="num hide-sm">'+(sz?pvSize(sz):'')+'</td><td class="hide-sm"></td></tr>'}
+  else t+='<tr class="ffile"><td>📄 '+pvEsc(k.n)+'</td><td class="num hide-sm">'+pvSize(k.size||0)+'</td><td class="hide-sm"><small>'+pvDate(k.m)+'</small></td></tr>'});
+  if(!rows.length)t+='<tr><td colspan="3" class="mut" style="padding:14px">'+'Ordner ist leer.'+'</td></tr>'}else{
  rows.forEach((k,i)=>{const lab=PV_LABEL[k.s]?'<span class="st s-'+k.s+'">'+PV_LABEL[k.s]+'</span>':'';
   if(k.d){const b=k.b,sz=b.new+b.update+b.same+b.to_a;
    t+='<tr class="fdir s-'+k.s+'"><td><a href="#" data-i="'+i+'">📁 '+pvEsc(k.n)+'</a></td><td>'+(k.s!=='same'?lab:'')+pvCnt(k.c)+'</td><td class="num hide-sm">'+(sz?pvSize(sz):'')+'</td><td class="hide-sm"></td></tr>'}
   else t+='<tr class="ffile s-'+k.s+'"><td>📄 '+pvEsc(k.n)+'</td><td>'+lab+'</td><td class="num hide-sm">'+pvSize(k.size||0)+'</td><td class="hide-sm"><small>'+pvDate(k.m)+'</small></td></tr>'});
- if(!rows.length)t+='<tr><td colspan="4" class="mut" style="padding:14px">'+(only?'Keine Änderungen in diesem Ordner.':'Ordner ist leer.')+'</td></tr>';
+ if(!rows.length)t+='<tr><td colspan="4" class="mut" style="padding:14px">'+(only?'Keine Änderungen in diesem Ordner.':'Ordner ist leer.')+'</td></tr>'}
  v.innerHTML='<div class="pvb">'+c+t+'</tbody></table></div></div>';
  v.querySelectorAll('a[data-i]').forEach(a=>a.onclick=e=>{e.preventDefault();pvInto(rows[+a.dataset.i].n)})}
 </script>{% endif %}

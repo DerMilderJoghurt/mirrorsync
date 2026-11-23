@@ -502,6 +502,7 @@ PREVIEW_PROPS = {
     "path": S(STR, "Ordner im Ziel wie im Datei-Browser öffnen (relativ zum Ziel, z. B. Fotos/2024): liefert entries mit "
                    "name, dir, status, size, modified und bei Ordnern counts; leer = oberste Ebene"),
     "only_changes": S(BOOL, "nur Einträge zeigen, die sich ändern (neu, aktualisiert, gelöscht, nach A)"),
+    "result": S(BOOL, "Ergebnis-Ansicht: das Ziel so, wie es nach dem Lauf aussieht, Gelöschtes fehlt (gilt für text, entries und tree)"),
 }
 
 
@@ -515,7 +516,7 @@ def _pv_folder(root, path, only):
         node = nxt
 
     def changed(k):
-        return k["s"] != "same" or (k["d"] and any(k["c"][x] for x in ("new", "update", "delete", "to_a")))
+        return k["s"] != "same" or (k["d"] and any(k["c"].get(x) for x in ("new", "update", "delete", "to_a")))
     out = []
     for k in node.get("ch", []):
         if only and not changed(k):
@@ -535,6 +536,7 @@ def _preview(path, a):
     _check_keys(a, set(PREVIEW_PROPS) | {"job_id"})
     a = dict(a)
     folder, only = a.pop("path", None), _bool(a.pop("only_changes", False))
+    res = _bool(a.pop("result", False))
     form = None
     if "source" in a or "dest" in a:
         if "job_id" in a:
@@ -553,12 +555,14 @@ def _preview(path, a):
         raise ApiError(r["status"], _t(body["error"]))
     done(r)
     out = {k: body.get(k) for k in ("source", "dest", "mode", "dest_missing", "selection", "summary", "truncated")}
-    out["text"] = core.preview.as_text(body["tree"])
+    tree = core.preview.result_tree(body["tree"]) if res else body["tree"]
+    out["view"] = "result" if res else "changes"
+    out["text"] = core.preview.as_text(tree)
     out["legend"] = _t("+ neu, ~ wird aktualisiert, - wird gelöscht, < kommt nach Seite A (Zwei-Wege)")
     if folder is not None or only:
-        out["path"], out["entries"] = _pv_folder(body["tree"], folder, only)
+        out["path"], out["entries"] = _pv_folder(tree, folder, only)
     if _bool(a.get("tree", False)):
-        out["tree"] = body["tree"]
+        out["tree"] = tree
     return dict(out, ok=True)
 
 
@@ -566,7 +570,7 @@ def _preview(path, a):
         "Vorschau: wie die Ordnerstruktur im Ziel nach dem nächsten Lauf aussieht, mit denselben Filtern wie der echte Lauf. "
         "Ändert nichts. Liefert summary (Dateien neu/aktualisiert/gelöscht/gleich) und text (Baum, + neu, ~ aktualisiert, "
         "- gelöscht, < nach Seite A). Mit path einen Ordner wie im Datei-Browser öffnen (entries), mit only_changes nur "
-        "Änderungen. Optional Felder überschreiben (z. B. anderes Ziel ausprobieren).",
+        "Änderungen, mit result das Ergebnis ohne Gelöschtes. Optional Felder überschreiben (z. B. anderes Ziel ausprobieren).",
         dict({"job_id": S(STR)}, **PREVIEW_PROPS), ["job_id"], ro=True)
 def a_preview_job(a):
     return _preview(f"/job/{a['job_id']}/preview", a)
@@ -575,7 +579,7 @@ def a_preview_job(a):
 @action("preview_paths", "POST", "/jobs/preview", "jobs.preview", "Aufgaben",
         "Vorschau ohne gespeicherte Aufgabe: Ordnerstruktur im Ziel, wenn source nach dest gespiegelt würde "
         "(optional selection, excludes, include_source_dir, direction, delete_excluded). Mit path einen Ordner wie im "
-        "Datei-Browser öffnen. Ändert nichts.",
+        "Datei-Browser öffnen, mit result das Ergebnis ohne Gelöschtes. Ändert nichts.",
         PREVIEW_PROPS, ["source", "dest"], ro=True)
 def a_preview_paths(a):
     return _preview("/job/preview", a)

@@ -4,7 +4,7 @@
 
 # MirrorSync – 1:1-Spiegelung mit Web-GUI und Zeitplänen
 
-Version **1.44.0** · Änderungen siehe [CHANGELOG.md](CHANGELOG.md) (englisch) · [English version](README.md)
+Version **1.45.0** · Änderungen siehe [CHANGELOG.md](CHANGELOG.md) (englisch) · [English version](README.md)
 
 Ein Docker-Container, der Ordner **einweg 1:1 spiegelt** (wie FreeFileSync „Spiegeln"):
 Das Ziel wird exakt wie die Quelle, inklusive Löschungen. Als Sync-Motor dient
@@ -68,7 +68,7 @@ Geänderte Dateien werden komplett neu übertragen (kein Delta wie bei rsync).
 
 ## Installation
 Das fertige Image liegt in der GitHub Container Registry: `ghcr.io/dermilderjoghurt/mirrorsync`
-(für amd64 und arm64, z. B. Raspberry Pi). Tags: `latest` (neueste Version), `1.44.0` (feste Version),
+(für amd64 und arm64, z. B. Raspberry Pi). Tags: `latest` (neueste Version), `1.45.0` (feste Version),
 `1.40` (neuester Patch dieser Version). Das Image wird nur veröffentlicht, wenn sich die Versionsnummer ändert.
 Update-Prüfer wie Dockhand oder Watchtower melden deshalb nur dann ein Update, wenn es wirklich eine neue Version gibt.
 
@@ -227,8 +227,11 @@ In einer Aufgabe zeigt der Knopf **„🗂 Vorschau der Ordnerstruktur“** (unt
 nächsten Lauf aussieht. Es werden nur Quelle und Ziel gelesen, nichts wird kopiert oder gelöscht. Die Vorschau
 nimmt die Werte, die gerade im Formular stehen, du musst also nicht erst speichern.
 
-- **Durchklicken wie im Datei-Browser** (seit 1.44.0, Standard): Ordner anklicken, über die Pfadleiste oder „⬆ ..“
-  zurück, Spalten Name, Änderung, Größe und Geändert, Suche im Ordner und **„Nur Änderungen zeigen“**. Mit
+- **„✅ Ergebnis“** (seit 1.45.0, Standard): das Ziel genau so, wie es nach dem Lauf aussieht, fast wie der
+  Datei-Browser (Name, Größe, Geändert). Was gelöscht wird, ist hier nicht mehr zu sehen.
+- **„📂 Änderungen“** (seit 1.44.0): dieselbe Ansicht zum Durchklicken, aber mit Spalte Änderung, auch mit dem, was
+  gelöscht wird, und **„Nur Änderungen zeigen“**.
+- In beiden Ansichten Ordner anklicken, über die Pfadleiste oder „⬆ ..“ zurück und im Ordner suchen. Mit
   **„🌳 Baum“** wechselst du zur aufklappbaren Baumansicht, die Wahl merkt sich der Browser.
 - Jeder Eintrag ist markiert: **neu**, **wird aktualisiert**
   (Größe oder Änderungszeit anders), **wird gelöscht** (gibt es in der Quelle nicht mehr) oder unverändert. Ordner
@@ -246,7 +249,7 @@ nimmt die Werte, die gerade im Formular stehen, du musst also nicht erst speiche
   `summary` (Zähler) und `text` (Baum mit `+` neu, `~` aktualisiert, `-` gelöscht, `<` nach Seite A), mit
   `tree: true` auch als JSON. Mit `path` (z. B. `Fotos/2024`) wird ein Ordner wie im Datei-Browser geöffnet
   (`entries` mit `name`, `dir`, `status`, `size`, `modified`, bei Ordnern `counts`), mit `only_changes: true` nur
-  Einträge, die sich ändern.
+  Einträge, die sich ändern, mit `result: true` das Ergebnis ohne Gelöschtes (für `text`, `entries` und `tree`).
 
 ## Nur einzelne Dateien und Ordner
 Im Feld **Nur diese Dateien und Ordner** stehen Einträge relativ zur Quelle, einer pro Zeile, Ordner mit `/` am
@@ -802,7 +805,7 @@ MirrorSync kann sich selbst aktualisieren, wenn du den Docker-Socket in den Cont
   sie entfernt und die bisherige läuft wieder. Ergebnis und Ablauf stehen in der GUI, im Audit-Log
   („Update gestartet / abgeschlossen / fehlgeschlagen“) und in `config/selfupdate.json`.
 - **Voraussetzungen:** Das Image muss aus einem Registry kommen (`image: ghcr.io/dermilderjoghurt/mirrorsync:latest`).
-  Mit `build: .` gebaute Images kann MirrorSync nicht neu holen. Mit festem Versions-Tag (`:1.44.0`) wird nur dieser
+  Mit `build: .` gebaute Images kann MirrorSync nicht neu holen. Mit festem Versions-Tag (`:1.45.0`) wird nur dieser
   Tag neu geholt. `/config` muss als Volume oder Ordner eingebunden sein (ist es in der Beispiel-Compose).
 - **Recht:** `system.update` („MirrorSync aktualisieren“, Admins haben es automatisch). Automatik und Uhrzeit
   ändern braucht `system.settings`.

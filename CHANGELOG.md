@@ -3,6 +3,13 @@
 Version numbers follow [SemVer](https://semver.org/): MAJOR.MINOR.PATCH
 (MAJOR = incompatible change, MINOR = new feature, PATCH = bug fix).
 
+## 1.45.0 – 2026-11-23
+- **Preview "✅ Result":** shows the destination exactly as it will look after the run, almost like the file
+  browser (browsable folders, name, size, modified). Anything that gets deleted is no longer shown there. This is
+  now the default view. The view with all markers is called "📂 Changes", the tree stays. API/MCP: `preview_job` and
+  `preview_paths` with `result: true` (text, entries and tree without deleted items). Permission `jobs.preview` as
+  before. All 5 languages.
+
 ## 1.44.0 – 2026-11-23
 - **Browse the preview like in the file browser.** The folder structure preview now opens a view like the file
   browser: click folders, path bar and "⬆ .." to go back, columns name, change (new, will be updated, will be

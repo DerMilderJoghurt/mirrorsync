@@ -138,6 +138,15 @@ def summary(entries):
     return s
 
 
+def result_tree(node):
+    """Ziel nach dem Lauf: Geloeschtes faellt weg, Ordner bleiben nur, wenn sie selbst bleiben."""
+    if not node.get("d"):
+        return node
+    kids = [result_tree(k) for k in node.get("ch", []) if k["s"] != "delete"]
+    return dict(node, ch=kids, c={k: v for k, v in node["c"].items() if k != "delete"},
+                b={k: v for k, v in node["b"].items() if k != "delete"})
+
+
 MARK = {"new": "+", "update": "~", "same": " ", "delete": "-", "to_a": "<"}
 
 
