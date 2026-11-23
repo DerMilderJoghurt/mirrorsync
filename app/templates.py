@@ -181,6 +181,18 @@ const esc=t=>String(t??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&g
 const op=async(name,body)=>{try{const r=await fetch('/files/op/'+name,{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify(body||{})});return await r.json()}catch(e){return {ok:false}}};
 const COL={'läuft':'var(--acc)','ok':'var(--ok)','fehler':'var(--err)','abgebrochen':'var(--mut)'};
 const STT={'läuft':'läuft','ok':'fertig','fehler':'Fehler','abgebrochen':'abgebrochen'};
+const msF=(x,...a)=>a.reduce((y,v,i)=>y.split('{'+i+'}').join(v),x);
+const msB=window.msB=n=>{const u=['B','KB','MB','GB','TB'];let i=0;n=+n||0;while(n>=1024&&i<4){n/=1024;i++}return (i?n.toFixed(n<10?1:0):n)+' '+u[i]};
+const msT=s=>{s=Math.round(+s||0);return s>=3600?Math.floor(s/3600)+' h '+Math.round(s%3600/60)+' min':s>=60?Math.floor(s/60)+' min '+(s%60)+' s':s+' s'};
+/* Gesamtfortschritt eines Kopier-/Verschiebe-Auftrags als Text: Dateien x von y, Bytes, Tempo, Restzeit */
+window.msTaskLine=t=>{const p=[];const run=t.state==='läuft';
+  if(t.items>1&&run)p.push(msF('Eintrag {0} von {1}',t.item||1,t.items));
+  if(t.files_total!=null)p.push(msF('{0} von {1} Dateien',t.files_done||0,t.files_total));else if(t.files_done)p.push(msF('{0} Dateien',t.files_done));
+  if(t.bytes_total!=null)p.push(msB(t.bytes_done)+' '+'von'+' '+msB(t.bytes_total));else if(t.bytes_done)p.push(msB(t.bytes_done));
+  if(run&&t.speed)p.push(msB(t.speed)+'/s');
+  if(run&&t.eta!=null&&t.speed)p.push(msF('noch ca. {0}',msT(t.eta)));
+  if(run&&t.bytes_total==null)p.push('Gesamtgröße wird ermittelt …');
+  return p.join(' · ')};
 async function jobsPoll(){if(!CAN_JOBS)return 0;let d;try{d=await (await fetch('/jobs/running',{headers:{'Accept':'application/json'}})).json()}catch(e){return 0}
   const el=document.getElementById('jobrun');if(!el||!d.ok)return 0;const L=d.jobs;
   el.innerHTML='<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px"><b>'+'Laufende Aufgaben'+'</b><span style="flex:1"></span>'+'<button type="button" class="btn sm" onclick="msTasksToggle()" title="'+'Schließen'+'">✕</button>'+'</div>'+
@@ -195,13 +207,14 @@ async function poll(){clearTimeout(TT);const jr=await jobsPoll();
   document.getElementById('taskbtn').classList.toggle('pri',run+jr>0);
   if(!CAN_FILES){TT=setTimeout(poll,jr?2000:(open?3000:10000));return}
   document.getElementById('tasks').innerHTML=d.tasks.length?d.tasks.map(t=>{const lab=t.op==='move'?'Verschieben':'Kopieren';const pc=t.state==='ok'?100:(t.progress||0);
-    return '<div class="fm-task"><div style="flex:1;min-width:0"><b>'+esc(lab)+'</b> '+esc(t.label)+'<br><small class="mut">'+esc(t.started)+(t.stats&&t.state==='läuft'?' · '+esc(t.stats):'')+'</small>'+(t.error?'<br><small style="color:var(--err)">'+esc(t.error)+'</small>':'')+'</div>'+
+    return '<div class="fm-task"><div style="flex:1;min-width:0"><b>'+esc(lab)+'</b> '+esc(t.label)+'<br><small class="mut">'+esc(t.started)+(msTaskLine(t)?' · '+esc(msTaskLine(t)):(t.stats&&t.state==='läuft'?' · '+esc(t.stats):''))+'</small>'+(t.error?'<br><small style="color:var(--err)">'+esc(t.error)+'</small>':'')+'</div>'+
       '<span class="tag" style="color:'+COL[t.state]+';white-space:nowrap">'+esc(STT[t.state]||t.state)+' · '+pc+' %</span>'+
       '<div class="fm-bar" title="'+pc+' %"><i style="width:'+pc+'%;background:'+COL[t.state]+'"></i></div>'+
       (CAN_EDIT?(t.state==='läuft'?'<button type="button" class="btn sm" data-c="'+t.id+'">'+'Abbrechen'+'</button>':'<button type="button" class="btn sm" data-r="'+t.id+'">'+'Entfernen'+'</button>'):'')+'</div>'}).join(''):'<div class="mut">'+'Keine Aufträge.'+'</div>';
   document.querySelectorAll('#tasks [data-c]').forEach(x=>x.onclick=async()=>{await op('cancel',{task_id:x.dataset.c});poll()});
   document.querySelectorAll('#tasks [data-r]').forEach(x=>x.onclick=async()=>{await op('remove_tasks',{task_id:x.dataset.r});poll()});
   const cb=document.getElementById('clrtasks');if(cb)cb.style.display=d.tasks.some(t=>t.state!=='läuft')?'':'none';
+  if(window.onTasksUpdate)window.onTasksUpdate(d.tasks);
   if(wasRun&&!run&&window.onTasksDone)window.onTasksDone();wasRun=run>0;
   TT=setTimeout(poll,run?800:(jr?2000:(open?3000:10000)));}
 window.msPoll=()=>{wasRun=true;poll()};
@@ -928,6 +941,10 @@ const PVUP={can:{{ can("remotes.browse")|tojson }},cache:{},
 .fm .nm{cursor:pointer;overflow-wrap:anywhere;min-width:140px}.fm td.nw,.fm th.nw{white-space:nowrap}.fm .nm:hover{color:var(--acc)}.fm .ico{display:inline-block;width:18px;vertical-align:-3px;margin-right:4px}
 .fm .ico svg{width:16px;height:16px}.fm .acts{white-space:nowrap;text-align:right;width:1%}.fmmenu{position:relative;display:inline-block}.fmmenu>summary{list-style:none;cursor:pointer;padding:2px 10px;border:1px solid var(--bd2);border-radius:6px;font-weight:700}.fmmenu>summary::-webkit-details-marker{display:none}.fmmenu>div{position:absolute;right:0;top:calc(100% + 4px);z-index:30;background:var(--card);border:1px solid var(--bd);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.18);padding:4px;min-width:170px;display:flex;flex-direction:column}.fmmenu>div>*{text-align:left;background:none;border:0;padding:7px 10px;border-radius:6px;color:var(--fg);cursor:pointer;font:inherit;text-decoration:none}.fmmenu>div>*:hover{background:var(--acc-soft)}.fmmenu>div>div.mut:hover{background:none}.fmmenu>div>hr{border:0;border-top:1px solid var(--bd);margin:4px 2px;padding:0;border-radius:0}
 .fm-scroll{overflow:auto;min-height:220px;border:1px solid var(--bd);border-radius:8px}
+.fmprog{padding:10px 14px}.fmprow{display:flex;gap:12px;align-items:center;padding:6px 0;border-bottom:1px solid var(--bd)}.fmprow:last-child{border-bottom:0}
+.fmpt{flex:1;min-width:0;overflow-wrap:anywhere}.fmpc{white-space:nowrap;min-width:56px;text-align:right}.fmpbar{flex:0 0 min(320px,30vw);height:10px;background:var(--bd);border-radius:5px;overflow:hidden}
+.fmpbar i{display:block;height:100%;background:var(--acc);transition:width .4s}.fmprow.tot{border-bottom:2px solid var(--bd2)}
+@media(max-width:700px){.fmprow{flex-wrap:wrap}.fmpbar{flex:1 1 100%}}
 .fm-dlg{border:1px solid var(--bd);border-radius:12px;background:var(--card);color:var(--fg);padding:18px;width:min(560px,94vw)}
 .fm-dlg.big{width:min(1100px,96vw)}.fm-dlg::backdrop{background:rgba(0,0,0,.45)}
 .fm-dlg textarea{width:100%;min-height:55vh;font-family:var(--mono,monospace);font-size:13px}
@@ -935,6 +952,7 @@ const PVUP={can:{{ can("remotes.browse")|tojson }},cache:{},
 </style>
 {% if not locations %}<div class="card"><div class="empty">Keine Speicherorte, die du sehen darfst. Unter <a href="/remotes">Speicherorte</a> anlegen.</div></div>{% else %}
 <div class="card" style="padding:12px 14px"><label class="check" style="margin:0"><input type="checkbox" id="dualchk" onchange="setDual(this.checked)"> Zwei Speicherorte nebeneinander (Kopieren und Verschieben zwischen beiden)</label></div>
+<div class="card fmprog" id="fmprog" hidden></div>
 <div class="fm-wrap" id="fmwrap">
 {% for side in ["a", "b"] %}<div class="card fm" id="fm_{{ side }}" {{ 'style=display:none' if side == "b" }}>
 <div class="fm-head"><b>{{ "Links" if side == "a" else "Rechts" }}</b><select class="loc" onchange="P.{{ side }}.open(this.value,'')">{% for l in locations %}<option value="{{ l.id }}">{{ l.label }} ({{ l.type }})</option>{% endfor %}</select>
@@ -1136,6 +1154,20 @@ function setDual(on){DUAL=on;document.getElementById('fm_b').style.display=on?''
   if(on&&!P.b.entries.length)P.b.open(P.b.loc,P.b.path);P.a.tools();P.b.tools();saveState();fitPanes();}
 function saveState(){const q=new URLSearchParams({a:P.a.loc,ap:P.a.path});if(DUAL){q.set('b',P.b.loc);q.set('bp',P.b.path)}history.replaceState(null,'','/files?'+q)}
 window.onTasksDone=()=>{P.a.reload();if(DUAL)P.b.reload()};
+/* Gesamtfortschritt laufender (und gerade fertiger) Kopier- und Verschiebe-Auftraege direkt auf der Seite */
+const PROG_SEEN={};
+window.onTasksUpdate=tasks=>{const box=document.getElementById('fmprog');const now=Date.now();
+  const show=tasks.filter(t=>{if(t.state==='läuft'){PROG_SEEN[t.id]=now;return true}return PROG_SEEN[t.id]&&now-PROG_SEEN[t.id]<8000});
+  if(!show.length){box.hidden=true;return}box.hidden=false;
+  const run=show.filter(t=>t.state==='läuft');let h='';
+  if(run.length>1){const bt=run.every(t=>t.bytes_total!=null)?run.reduce((a,t)=>a+t.bytes_total,0):null,bd=run.reduce((a,t)=>a+(t.bytes_done||0),0);
+    const pc=bt?Math.min(99,Math.floor(bd*100/bt)):Math.round(run.reduce((a,t)=>a+(t.progress||0),0)/run.length);
+    h+='<div class="fmprow tot"><div class="fmpt"><b>'+'Gesamt'+'</b> <span class="mut">'+fill('{0} Aufträge',run.length)+'</span><br><small class="mut">'+(bt!=null?esc(msB(bd)+' '+'von'+' '+msB(bt)):'')+'</small></div><b class="fmpc">'+pc+' %</b><div class="fmpbar"><i style="width:'+pc+'%"></i></div></div>'}
+  h+=show.map(t=>{const pc=t.state==='ok'?100:(t.progress||0),col={'läuft':'var(--acc)','ok':'var(--ok)','fehler':'var(--err)','abgebrochen':'var(--mut)'}[t.state];
+    return '<div class="fmprow"><div class="fmpt"><b>'+(t.op==='move'?'Verschieben':'Kopieren')+'</b> '+esc(t.label)+'<br><small class="mut">'+esc(msTaskLine(t)||t.stats||'')+'</small>'+(t.error?'<br><small style="color:var(--err)">'+esc(t.error)+'</small>':'')+'</div>'+
+      '<b class="fmpc" style="color:'+col+'">'+(t.state==='läuft'?pc+' %':({'ok':'fertig','fehler':'Fehler','abgebrochen':'abgebrochen'}[t.state]))+'</b><div class="fmpbar"><i style="width:'+pc+'%;background:'+col+'"></i></div>'+
+      (t.state==='läuft'&&CAN_EDIT?'<button type="button" class="btn sm" data-pc="'+esc(t.id)+'">'+'Abbrechen'+'</button>':'')+'</div>'}).join('');
+  box.innerHTML=h;box.querySelectorAll('[data-pc]').forEach(x=>x.onclick=async()=>{await op('cancel',{task_id:x.dataset.pc});window.msPoll&&window.msPoll()})};
 function fitPanes(){document.querySelectorAll('.fm-scroll').forEach(sc=>{if(!sc.offsetParent)return;const card=sc.closest('.fm');
   const bottom=card.getBoundingClientRect().bottom+window.scrollY, h=sc.getBoundingClientRect().height;
   sc.style.height=Math.max(220,Math.round(h-(bottom-(window.innerHeight-16))))+'px'})}

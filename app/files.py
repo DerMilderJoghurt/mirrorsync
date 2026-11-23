@@ -401,14 +401,17 @@ def _transfer(a, move):
             raise FileError(400, "Ein Ordner kann nicht in sich selbst kopiert oder verschoben werden.")
         if _stat(dfull):
             conflicts.append(name)
-        jobs.append((sfull, sdisp, dfull, ddisp, bool(it.get("IsDir"))))
+        jobs.append((sfull, sdisp, dfull, ddisp, bool(it.get("IsDir")), int(it.get("Size") or 0)))
     if conflicts and not _yes(a.get("overwrite")):
         raise FileError(409, "Im Ziel gibt es schon: {0}. Überschreiben?", exists=True, name=", ".join(conflicts))
     tid = secrets.token_hex(4)
     t = {"id": tid, "op": "move" if move else "copy", "user": g.user, "items": [(j[1], j[3]) for j in jobs],
          "label": (jobs[0][1] if len(jobs) == 1 else f"{len(jobs)} Einträge") + " → " + resolve(dst_loc, dst_dir)[2],
          "state": "läuft", "progress": 0, "stats": "", "error": "", "started": time.strftime("%Y-%m-%d %H:%M:%S"),
-         "ended": "", "detail": "", "proc": None, "cancel": False, "overwrite": bool(conflicts)}
+         "ended": "", "detail": "", "proc": None, "cancel": False, "overwrite": bool(conflicts),
+         # Gesamtfortschritt ueber alle Eintraege (Bytes und Dateien), Tempo in Bytes/s, Restzeit in Sekunden
+         "phase": "", "bytes_done": 0, "bytes_total": None, "files_done": 0, "files_total": None,
+         "speed": 0, "eta": None, "item": 0, "items": len(jobs), "current": ""}
     with _tlock:
         _tasks[tid] = t
         for old in sorted(_tasks, key=lambda k: _tasks[k]["started"])[:-TASKS_KEEP]:
@@ -422,12 +425,60 @@ def _transfer(a, move):
 STATS_RE = re.compile(r"(\d+)%")
 
 
+def _count(jobs, t):
+    """Im Hintergrund zaehlen: Groesse und Anzahl Dateien je Eintrag (Ordner per rclone size), danach die Summe.
+    Das Kopieren startet sofort, die Summe kommt dazu, sobald sie feststeht."""
+    sizes = []
+    for sfull, _sd, _df, _dd, is_dir, size in jobs:
+        if t["cancel"] or t["state"] != "läuft":
+            return
+        if not is_dir:
+            sizes.append((size, 1))
+        else:
+            try:
+                rc, out, _e = _rc("size", "--json", sfull, timeout=900)
+                d = json.loads(out) if rc == 0 else None
+            except (FileError, ValueError):
+                d = None
+            sizes.append((int(d.get("bytes") or 0), int(d.get("count") or 0)) if d else (None, None))
+        t["_sizes"] = list(sizes)
+    if all(b is not None for b, _ in sizes):
+        t["bytes_total"] = sum(b for b, _ in sizes)
+        t["files_total"] = sum(n for _, n in sizes)
+
+
+def _update(t, base_b, base_f, item_b, item_f, st):
+    """Stand eines rclone-Laufs (stats aus --use-json-log) in den Gesamtfortschritt umrechnen."""
+    b = int(st.get("bytes") or 0)
+    f = int(st.get("transfers") or 0) + int(st.get("checks") or 0)
+    if item_b is not None:
+        b = min(b, item_b)
+    if item_f is not None:
+        f = min(f, item_f)
+    t["bytes_done"], t["files_done"] = base_b + b, base_f + f
+    t["speed"] = int(st.get("speed") or 0)
+    if t["bytes_total"]:
+        t["progress"] = min(99, int(t["bytes_done"] * 100 / t["bytes_total"]))
+        left = t["bytes_total"] - t["bytes_done"]
+        t["eta"] = int(left / t["speed"]) if t["speed"] > 0 else None
+    elif st.get("totalBytes"):
+        t["progress"] = min(99, int(int(st.get("bytes") or 0) * 100 / int(st["totalBytes"])))
+        t["eta"] = st.get("eta")
+
+
 def _run_task(t, jobs, move, ip):
-    for sfull, sdisp, dfull, ddisp, is_dir in jobs:
+    threading.Thread(target=_count, args=(jobs, t), daemon=True).start()
+    t["phase"] = "move" if move else "copy"
+    base_b = base_f = 0
+    for idx, (sfull, sdisp, dfull, ddisp, is_dir, _size) in enumerate(jobs):
         if t["cancel"]:
             break
+        sizes = t.get("_sizes") or []
+        item_b, item_f = sizes[idx] if idx < len(sizes) else ((_size, 1) if not is_dir else (None, None))
+        last = {}
+        t["item"], t["current"] = idx + 1, sdisp
         verb = ("move" if move else "copy") if is_dir else ("moveto" if move else "copyto")
-        cmd = ["rclone", "--config", core.RCLONE_CONF, verb, sfull, dfull,
+        cmd = ["rclone", "--config", core.RCLONE_CONF, verb, sfull, dfull, "--use-json-log",
                "--stats", "1s", "--stats-one-line", "--stats-log-level", "NOTICE"]
         if move and is_dir:
             cmd.append("--delete-empty-src-dirs")
@@ -435,19 +486,31 @@ def _run_task(t, jobs, move, ip):
         t["proc"] = p
         tail = []
         for line in p.stderr:
-            line = re.sub(r"^\d{4}/\d\d/\d\d \d\d:\d\d:\d\d\s+", "", line.strip())
+            line = line.strip()
             if not line:
                 continue
-            if line.startswith("NOTICE:") and "%" in line:
-                t["stats"] = line[7:].strip()
-                m = STATS_RE.search(line)
-                if m:
-                    t["progress"] = int(m.group(1))
-            else:
-                tail = (tail + [line])[-5:]
+            try:
+                ev = json.loads(line)
+            except ValueError:
+                ev = {"msg": re.sub(r"^\d{4}/\d\d/\d\d \d\d:\d\d:\d\d\s+", "", line)}
+            msg = str(ev.get("msg") or "").strip()
+            if isinstance(ev.get("stats"), dict):
+                t["stats"] = msg
+                last = ev["stats"]
+                _update(t, base_b, base_f, item_b, item_f, last)
+            elif msg:
+                tail = (tail + [msg])[-5:]
         rc = p.wait()
         if rc == 0 and move and is_dir:
             subprocess.run(["rclone", "--config", core.RCLONE_CONF, "rmdirs", sfull], capture_output=True, timeout=300)
+        if rc == 0:   # Eintrag fertig: ganz zaehlen (auch uebersprungene, schon gleiche Dateien)
+            sizes = t.get("_sizes") or []
+            item_b, item_f = sizes[idx] if idx < len(sizes) else (item_b, item_f)
+            base_b += item_b if item_b is not None else int(last.get("bytes") or 0)
+            base_f += item_f if item_f is not None else int(last.get("transfers") or 0) + int(last.get("checks") or 0)
+            t["bytes_done"], t["files_done"] = max(t["bytes_done"], base_b), max(t["files_done"], base_f)
+            if t["bytes_total"]:
+                t["progress"] = min(99, int(t["bytes_done"] * 100 / t["bytes_total"])) if idx + 1 < len(jobs) else t["progress"]
         if t["cancel"]:
             t["state"], t["error"] = "abgebrochen", ""
         elif rc != 0:
@@ -469,13 +532,16 @@ def _run_task(t, jobs, move, ip):
         if t["state"] != "läuft":
             break
     if t["state"] == "läuft":
-        t["state"], t["progress"] = "ok", 100
+        t["state"], t["progress"], t["eta"], t["speed"] = "ok", 100, 0, 0
+        if t["bytes_total"] is not None:
+            t["bytes_done"], t["files_done"] = t["bytes_total"], t["files_total"]
+    t["phase"] = ""
     t["ended"] = time.strftime("%Y-%m-%d %H:%M:%S")
     t["proc"] = None
 
 
 def _task_view(t):
-    return {k: v for k, v in t.items() if k not in ("proc", "cancel")}
+    return {k: v for k, v in t.items() if k not in ("proc", "cancel") and not k.startswith("_")}
 
 
 def _mine(t):

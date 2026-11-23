@@ -916,7 +916,6 @@
  "Konto sperren nach so vielen Fehlversuchen": "Bloquear la cuenta tras estos intentos fallidos",
  "Konto {0}": "Cuenta {0}",
  "Kopier- und Verschiebe-Aufträge des Dateimanagers": "Tareas de copia y movimiento del gestor de archivos",
- "Kopier- und Verschiebe-Aufträge mit Status (läuft, ok, fehler, abgebrochen) und Fortschritt in Prozent.": "Tareas de copia y movimiento con estado (läuft = en curso, ok, fehler = error, abgebrochen = cancelada) y progreso en porcentaje.",
  "Kopieren": "Copiar",
  "Kopieren abgebrochen": "Copia cancelada",
  "Kopieren fehlgeschlagen": "Copia fallida",
@@ -2212,5 +2211,12 @@
  "Jetzt prüfen": "Comprobar ahora",
  "Höher als das Stammverzeichnis geht es nicht.": "No se puede subir más allá de la carpeta raíz.",
  "Verbindung eines Speicherorts testen (listet die Ordner der obersten Ebene, bei SFTP und FTP das Stammverzeichnis /).": "Probar la conexión de una ubicación (lista las carpetas del nivel superior, en SFTP y FTP la carpeta raíz /).",
- "Verbindung zu '{0}' OK. Ordner in „{1}“:\n{2}": "Conexión con «{0}» correcta. Carpetas en «{1}»:\n{2}"
+ "Verbindung zu '{0}' OK. Ordner in „{1}“:\n{2}": "Conexión con «{0}» correcta. Carpetas en «{1}»:\n{2}",
+ "noch ca. {0}": "quedan aprox. {0}",
+ "Gesamtgröße wird ermittelt …": "Calculando el tamaño total …",
+ "Gesamt": "Total",
+ "{0} Aufträge": "{0} trabajos",
+ "Kopier- und Verschiebe-Aufträge mit Status (läuft, ok, fehler, abgebrochen) und Gesamtfortschritt über alle Einträge: progress (Prozent), bytes_done/bytes_total, files_done/files_total (total ist null, solange noch gezählt wird), speed (Bytes/s), eta (Sekunden), item/items (aktueller Eintrag) und current.": "Trabajos de copiar y mover con estado (läuft, ok, fehler, abgebrochen) y progreso total de todas las entradas: progress (porcentaje), bytes_done/bytes_total, files_done/files_total (total es null mientras se cuenta), speed (bytes/s), eta (segundos), item/items (entrada actual) y current.",
+ "Eintrag {0} von {1}": "Entrada {0} de {1}",
+ "{0} von {1} Dateien": "{0} de {1} archivos"
 }

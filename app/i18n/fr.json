@@ -916,7 +916,6 @@
  "Konto sperren nach so vielen Fehlversuchen": "Verrouiller le compte après ce nombre d’échecs",
  "Konto {0}": "Compte {0}",
  "Kopier- und Verschiebe-Aufträge des Dateimanagers": "Tâches de copie et de déplacement du gestionnaire de fichiers",
- "Kopier- und Verschiebe-Aufträge mit Status (läuft, ok, fehler, abgebrochen) und Fortschritt in Prozent.": "Tâches de copie et de déplacement avec état (läuft = en cours, ok, fehler = erreur, abgebrochen = annulée) et progression en pourcentage.",
  "Kopieren": "Copier",
  "Kopieren abgebrochen": "Copie annulée",
  "Kopieren fehlgeschlagen": "Échec de la copie",
@@ -2212,5 +2211,12 @@
  "Jetzt prüfen": "Vérifier maintenant",
  "Höher als das Stammverzeichnis geht es nicht.": "Impossible de remonter au-delà du dossier racine.",
  "Verbindung eines Speicherorts testen (listet die Ordner der obersten Ebene, bei SFTP und FTP das Stammverzeichnis /).": "Tester la connexion d'un emplacement (liste les dossiers du premier niveau, pour SFTP et FTP le dossier racine /).",
- "Verbindung zu '{0}' OK. Ordner in „{1}“:\n{2}": "Connexion à « {0} » OK. Dossiers dans « {1} » :\n{2}"
+ "Verbindung zu '{0}' OK. Ordner in „{1}“:\n{2}": "Connexion à « {0} » OK. Dossiers dans « {1} » :\n{2}",
+ "noch ca. {0}": "encore env. {0}",
+ "Gesamtgröße wird ermittelt …": "Calcul de la taille totale …",
+ "Gesamt": "Total",
+ "{0} Aufträge": "{0} transferts",
+ "Kopier- und Verschiebe-Aufträge mit Status (läuft, ok, fehler, abgebrochen) und Gesamtfortschritt über alle Einträge: progress (Prozent), bytes_done/bytes_total, files_done/files_total (total ist null, solange noch gezählt wird), speed (Bytes/s), eta (Sekunden), item/items (aktueller Eintrag) und current.": "Transferts de copie et de déplacement avec statut (läuft, ok, fehler, abgebrochen) et progression totale sur toutes les entrées : progress (pourcentage), bytes_done/bytes_total, files_done/files_total (total vaut null pendant le comptage), speed (octets/s), eta (secondes), item/items (entrée en cours) et current.",
+ "Eintrag {0} von {1}": "Entrée {0} sur {1}",
+ "{0} von {1} Dateien": "{0} fichiers sur {1}"
 }

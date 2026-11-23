@@ -4,7 +4,7 @@
 
 # MirrorSync – 1:1-Spiegelung mit Web-GUI und Zeitplänen
 
-Version **1.48.0** · Änderungen siehe [CHANGELOG.md](CHANGELOG.md) (englisch) · [English version](README.md)
+Version **1.49.0** · Änderungen siehe [CHANGELOG.md](CHANGELOG.md) (englisch) · [English version](README.md)
 
 Ein Docker-Container, der Ordner **einweg 1:1 spiegelt** (wie FreeFileSync „Spiegeln"):
 Das Ziel wird exakt wie die Quelle, inklusive Löschungen. Als Sync-Motor dient
@@ -68,7 +68,7 @@ Geänderte Dateien werden komplett neu übertragen (kein Delta wie bei rsync).
 
 ## Installation
 Das fertige Image liegt in der GitHub Container Registry: `ghcr.io/dermilderjoghurt/mirrorsync`
-(für amd64 und arm64, z. B. Raspberry Pi). Tags: `latest` (neueste Version), `1.48.0` (feste Version),
+(für amd64 und arm64, z. B. Raspberry Pi). Tags: `latest` (neueste Version), `1.49.0` (feste Version),
 `1.40` (neuester Patch dieser Version). Das Image wird nur veröffentlicht, wenn sich die Versionsnummer ändert.
 Update-Prüfer wie Dockhand oder Watchtower melden deshalb nur dann ein Update, wenn es wirklich eine neue Version gibt.
 
@@ -525,6 +525,10 @@ Speicherort (oder `/data`). Mit **„Zwei Speicherorte nebeneinander“** kommt 
   sind (seit 1.31.0, Recht „Aufgaben ansehen“). Darunter alle Aufträge des Dateimanagers: Status, Prozent und Balken (blau = läuft, grün = fertig,
   rot = Fehler). Laufende lassen sich abbrechen, fertige einzeln oder mit „Alle fertigen entfernen“ entfernen.
   Klick daneben oder Esc schließt es. Man kann die Seite währenddessen verlassen.
+- **Gesamtfortschritt auf der Seite Dateien (seit 1.49.0):** Während kopiert oder verschoben wird, steht über den
+  Listen eine Karte mit dem Fortschritt über alle Einträge des Auftrags: Prozent und Balken, Bytes „x von y“,
+  Dateien „x von y“, Geschwindigkeit, Restzeit und welcher Eintrag gerade dran ist. Zu Beginn wird kurz die
+  Gesamtgröße ermittelt. Laufen mehrere Aufträge, kommt eine Zeile „Gesamt“ dazu. Abbrechen geht direkt dort.
 - **Rückfragen:** Löschen fragt immer nach. Gibt es im Ziel schon eine Datei oder einen Ordner mit dem Namen,
   fragt MirrorSync vor dem Überschreiben (beim Hochladen, Anlegen, Kopieren, Verschieben).
 - **Rechte:** „ansehen“ (durchsuchen, Größen, Berechtigungen, herunterladen), „bearbeiten“ (hochladen,
@@ -822,7 +826,7 @@ MirrorSync kann sich selbst aktualisieren, wenn du den Docker-Socket in den Cont
   sie entfernt und die bisherige läuft wieder. Ergebnis und Ablauf stehen in der GUI, im Audit-Log
   („Update gestartet / abgeschlossen / fehlgeschlagen“) und in `config/selfupdate.json`.
 - **Voraussetzungen:** Das Image muss aus einem Registry kommen (`image: ghcr.io/dermilderjoghurt/mirrorsync:latest`).
-  Mit `build: .` gebaute Images kann MirrorSync nicht neu holen. Mit festem Versions-Tag (`:1.48.0`) wird nur dieser
+  Mit `build: .` gebaute Images kann MirrorSync nicht neu holen. Mit festem Versions-Tag (`:1.49.0`) wird nur dieser
   Tag neu geholt. `/config` muss als Volume oder Ordner eingebunden sein (ist es in der Beispiel-Compose).
 - **Recht:** `system.update` („MirrorSync aktualisieren“, Admins haben es automatisch). Automatik und Uhrzeit
   ändern braucht `system.settings`.

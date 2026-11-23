@@ -4,7 +4,7 @@
 
 # MirrorSync – 1:1 mirroring with a web GUI and schedules
 
-Version **1.48.0** · Changes: [CHANGELOG.md](CHANGELOG.md) · [Deutsche Version](README.de.md)
+Version **1.49.0** · Changes: [CHANGELOG.md](CHANGELOG.md) · [Deutsche Version](README.de.md)
 
 A Docker container that **mirrors folders one-way, 1:1** (like FreeFileSync "Mirror"):
 the destination becomes an exact copy of the source, including deletions. The sync engine is
@@ -67,7 +67,7 @@ Changed files are transferred completely (no delta transfer like rsync).
 
 ## Installation
 The ready-made image is in the GitHub Container Registry: `ghcr.io/dermilderjoghurt/mirrorsync`
-(for amd64 and arm64, e.g. Raspberry Pi). Tags: `latest` (newest version), `1.48.0` (fixed version),
+(for amd64 and arm64, e.g. Raspberry Pi). Tags: `latest` (newest version), `1.49.0` (fixed version),
 `1.40` (newest patch of this version). The image is only published when the version number changes, so
 update checkers such as Dockhand or Watchtower only report an update when there really is a new version.
 
@@ -512,6 +512,10 @@ at the top left. With **"Two storage locations side by side"** a second one is a
   "View jobs"). Below are all file manager tasks: status, percentage and bar (blue = running, green = done,
   red = error). Running tasks can be cancelled, finished ones removed individually or with "Remove all
   finished". Clicking outside or Esc closes it. You can leave the page meanwhile.
+- **Overall progress on the Files page (since 1.49.0):** while copying or moving, a card above the lists shows
+  the progress across all entries of the transfer: percent and bar, bytes "x of y", files "x of y", speed, time
+  left and which entry is being worked on. At the start the total size is determined briefly. With several
+  transfers running, a "Total" row is added. You can cancel right there.
 - **Confirmations:** deleting always asks. If a file or folder with that name already exists in the destination,
   MirrorSync asks before overwriting (when uploading, creating, copying, moving).
 - **Permissions:** "view" (browse, sizes, permissions, download), "edit" (upload, edit, rename, create folders,
@@ -799,7 +803,7 @@ MirrorSync can update itself if you mount the Docker socket into the container:
   previous one runs again. Result and steps are shown in the GUI, in the audit log ("Update started / completed /
   failed") and in `config/selfupdate.json`.
 - **Requirements:** the image has to come from a registry (`image: ghcr.io/dermilderjoghurt/mirrorsync:latest`).
-  MirrorSync cannot pull images built with `build: .`. With a fixed version tag (`:1.48.0`) only that tag is pulled
+  MirrorSync cannot pull images built with `build: .`. With a fixed version tag (`:1.49.0`) only that tag is pulled
   again. `/config` has to be a volume or bind mount (it is in the example compose file).
 - **Permission:** `system.update` ("Update MirrorSync", admins have it automatically). Changing the automatic
   update and its time needs `system.settings`.

@@ -1657,7 +1657,9 @@ def a_running(a):
 
 
 @action("list_file_tasks", "GET", "/files/tasks", "files.view", "Dateien",
-        "Kopier- und Verschiebe-Aufträge mit Status (läuft, ok, fehler, abgebrochen) und Fortschritt in Prozent.", ro=True)
+        "Kopier- und Verschiebe-Aufträge mit Status (läuft, ok, fehler, abgebrochen) und Gesamtfortschritt über alle "
+        "Einträge: progress (Prozent), bytes_done/bytes_total, files_done/files_total (total ist null, solange noch "
+        "gezählt wird), speed (Bytes/s), eta (Sekunden), item/items (aktueller Eintrag) und current.", ro=True)
 def a_ftasks(a):
     return _fop("tasks", {})
 

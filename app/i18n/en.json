@@ -916,7 +916,6 @@
  "Konto sperren nach so vielen Fehlversuchen": "Lock account after this many failed attempts",
  "Konto {0}": "Account {0}",
  "Kopier- und Verschiebe-Aufträge des Dateimanagers": "Copy and move tasks of the file manager",
- "Kopier- und Verschiebe-Aufträge mit Status (läuft, ok, fehler, abgebrochen) und Fortschritt in Prozent.": "Copy and move tasks with status (läuft = running, ok, fehler = error, abgebrochen = cancelled) and progress in percent.",
  "Kopieren": "Copy",
  "Kopieren abgebrochen": "Copy cancelled",
  "Kopieren fehlgeschlagen": "Copy failed",
@@ -2212,5 +2211,12 @@
  "Jetzt prüfen": "Check now",
  "Höher als das Stammverzeichnis geht es nicht.": "You cannot go higher than the root folder.",
  "Verbindung eines Speicherorts testen (listet die Ordner der obersten Ebene, bei SFTP und FTP das Stammverzeichnis /).": "Test the connection of a storage location (lists the top-level folders, for SFTP and FTP the root folder /).",
- "Verbindung zu '{0}' OK. Ordner in „{1}“:\n{2}": "Connection to “{0}” OK. Folders in “{1}”:\n{2}"
+ "Verbindung zu '{0}' OK. Ordner in „{1}“:\n{2}": "Connection to “{0}” OK. Folders in “{1}”:\n{2}",
+ "noch ca. {0}": "about {0} left",
+ "Gesamtgröße wird ermittelt …": "Determining total size …",
+ "Gesamt": "Total",
+ "{0} Aufträge": "{0} transfers",
+ "Kopier- und Verschiebe-Aufträge mit Status (läuft, ok, fehler, abgebrochen) und Gesamtfortschritt über alle Einträge: progress (Prozent), bytes_done/bytes_total, files_done/files_total (total ist null, solange noch gezählt wird), speed (Bytes/s), eta (Sekunden), item/items (aktueller Eintrag) und current.": "Copy and move transfers with status (läuft, ok, fehler, abgebrochen) and overall progress across all entries: progress (percent), bytes_done/bytes_total, files_done/files_total (total is null while still counting), speed (bytes/s), eta (seconds), item/items (current entry) and current.",
+ "Eintrag {0} von {1}": "Entry {0} of {1}",
+ "{0} von {1} Dateien": "{0} of {1} files"
 }

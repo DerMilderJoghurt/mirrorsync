@@ -3,6 +3,16 @@
 Version numbers follow [SemVer](https://semver.org/): MAJOR.MINOR.PATCH
 (MAJOR = incompatible change, MINOR = new feature, PATCH = bug fix).
 
+## 1.49.0 – 2026-11-23
+- **Files: overall progress for copy and move.** While a transfer runs, a card above the lists shows the progress
+  across all entries: percent and bar, bytes "x of y", files "x of y", speed, time left and the current entry
+  ("Entry 2 of 5"). The total size is determined first, until then it says "Determining total size …". With
+  several transfers there is an extra "Total" row. The tasks window shows the same details. Before, the percentage
+  only counted per entry.
+- API/MCP `list_file_tasks` now returns `bytes_done`, `bytes_total`, `files_done`, `files_total`, `speed`, `eta`,
+  `item`, `items` and `current`; `progress` is now the overall value. Permissions unchanged (`files.view` to view,
+  `files.edit` or `files.delete` for transfers). All 5 languages.
+
 ## 1.48.0 – 2026-11-23
 - **Test storage location: SFTP and FTP show the root folder.** "Test" now lists the folders in `/` for SFTP and FTP
   instead of the user's home folder (for `root` that only showed `.local` and `.ssh`). The message names the listed

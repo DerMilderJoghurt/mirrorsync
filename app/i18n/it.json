@@ -916,7 +916,6 @@
  "Konto sperren nach so vielen Fehlversuchen": "Blocca l’account dopo questi tentativi falliti",
  "Konto {0}": "Account {0}",
  "Kopier- und Verschiebe-Aufträge des Dateimanagers": "Operazioni di copia e spostamento della gestione file",
- "Kopier- und Verschiebe-Aufträge mit Status (läuft, ok, fehler, abgebrochen) und Fortschritt in Prozent.": "Operazioni di copia e spostamento con stato (läuft = in corso, ok, fehler = errore, abgebrochen = annullata) e avanzamento in percentuale.",
  "Kopieren": "Copia",
  "Kopieren abgebrochen": "Copia annullata",
  "Kopieren fehlgeschlagen": "Copia non riuscita",
@@ -2212,5 +2211,12 @@
  "Jetzt prüfen": "Controlla ora",
  "Höher als das Stammverzeichnis geht es nicht.": "Non si può salire oltre la cartella radice.",
  "Verbindung eines Speicherorts testen (listet die Ordner der obersten Ebene, bei SFTP und FTP das Stammverzeichnis /).": "Testare la connessione di una posizione (elenca le cartelle del livello superiore, per SFTP e FTP la cartella radice /).",
- "Verbindung zu '{0}' OK. Ordner in „{1}“:\n{2}": "Connessione a «{0}» OK. Cartelle in «{1}»:\n{2}"
+ "Verbindung zu '{0}' OK. Ordner in „{1}“:\n{2}": "Connessione a «{0}» OK. Cartelle in «{1}»:\n{2}",
+ "noch ca. {0}": "ancora circa {0}",
+ "Gesamtgröße wird ermittelt …": "Calcolo della dimensione totale …",
+ "Gesamt": "Totale",
+ "{0} Aufträge": "{0} trasferimenti",
+ "Kopier- und Verschiebe-Aufträge mit Status (läuft, ok, fehler, abgebrochen) und Gesamtfortschritt über alle Einträge: progress (Prozent), bytes_done/bytes_total, files_done/files_total (total ist null, solange noch gezählt wird), speed (Bytes/s), eta (Sekunden), item/items (aktueller Eintrag) und current.": "Trasferimenti di copia e spostamento con stato (läuft, ok, fehler, abgebrochen) e avanzamento totale su tutte le voci: progress (percentuale), bytes_done/bytes_total, files_done/files_total (total è null finché si conta), speed (byte/s), eta (secondi), item/items (voce attuale) e current.",
+ "Eintrag {0} von {1}": "Voce {0} di {1}",
+ "{0} von {1} Dateien": "{0} di {1} file"
 }
