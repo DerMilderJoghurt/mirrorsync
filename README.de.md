@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/logo.png" alt="MirrorSync" width="480">
+</p>
+
 # MirrorSync – 1:1-Spiegelung mit Web-GUI und Zeitplänen
 
 Version **1.35.0** · Änderungen siehe [CHANGELOG.md](CHANGELOG.md) (englisch) · [English version](README.md)

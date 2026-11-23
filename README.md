@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/logo.png" alt="MirrorSync" width="480">
+</p>
+
 # MirrorSync – 1:1 mirroring with a web GUI and schedules
 
 Version **1.35.0** · Changes: [CHANGELOG.md](CHANGELOG.md) · [Deutsche Version](README.de.md)
