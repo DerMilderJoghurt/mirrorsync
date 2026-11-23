@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="settings"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_settings"
+        android:shortcutShortLabel="@string/settings_title"
+        android:shortcutLongLabel="@string/settings_title">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="io.github.dermilderjoghurt.mirrorsync"
+            android:targetClass="io.github.dermilderjoghurt.mirrorsync.SettingsActivity" />
+    </shortcut>
+</shortcuts>

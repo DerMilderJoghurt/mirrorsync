@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- MirrorSync often runs in the home network without HTTPS (http://192.168.x.x:8080), so plain HTTP is allowed.
+     User-installed CA certificates are trusted as well (self-hosted reverse proxies with an own CA). -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="user" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

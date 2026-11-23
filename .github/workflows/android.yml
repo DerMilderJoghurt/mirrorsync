@@ -1,0 +1,68 @@
+name: Android app
+
+# Builds the Android app (android/, a thin wrapper around the web interface) as APK.
+#  - on pushes that touch android/ (any branch except main) and manually: APK as workflow artifact
+#  - from "Image and release" on main: the same build, the release job attaches the APK to the GitHub release
+#
+# Signing: with the repository secrets ANDROID_KEYSTORE_B64 (base64 of the .jks file) and ANDROID_KEYSTORE_PASSWORD
+# (optional ANDROID_KEY_ALIAS, default "mirrorsync"; ANDROID_KEY_PASSWORD, default = keystore password)
+# the APK is signed and named mirrorsync-<version>.apk. Without them it stays unsigned (mirrorsync-<version>-unsigned.apk)
+# and is not attached to releases.
+on:
+  push:
+    branches-ignore: [main]
+    paths: ["android/**", ".github/workflows/android.yml"]
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Keystore from secrets
+        id: ks
+        env:
+          KS: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+        run: |
+          if [ -n "$KS" ]; then
+            echo "$KS" | base64 -d > "$RUNNER_TEMP/release.jks"
+            echo "path=$RUNNER_TEMP/release.jks" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build APK
+        working-directory: android
+        env:
+          MS_KEYSTORE: ${{ steps.ks.outputs.path }}
+          MS_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          MS_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          MS_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: ./gradlew --no-daemon assembleRelease
+
+      - name: Name the APK
+        run: |
+          V=$(tr -d ' \n\r' < app/VERSION)
+          mkdir -p out
+          if [ -f android/app/build/outputs/apk/release/app-release.apk ]; then
+            cp android/app/build/outputs/apk/release/app-release.apk "out/mirrorsync-$V.apk"
+          else
+            cp android/app/build/outputs/apk/release/app-release-unsigned.apk "out/mirrorsync-$V-unsigned.apk"
+          fi
+          ls -l out
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mirrorsync-apk
+          path: out/*.apk
+          if-no-files-found: error
