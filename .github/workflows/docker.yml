@@ -1,4 +1,4 @@
-name: Docker-Image bauen
+name: Image und Release
 
 # Baut das Image und legt es in der GitHub Container Registry ab:
 #   ghcr.io/dermilderjoghurt/mirrorsync:latest       (jeder Push auf main)
@@ -11,8 +11,8 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
-  packages: write
+  contents: write   # Tag und Release anlegen
+  packages: write   # Image nach ghcr.io
 
 jobs:
   build:
@@ -59,3 +59,47 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  # Legt bei neuer Version in app/VERSION automatisch Tag vX.Y.Z und ein GitHub-Release an
+  # (Text aus dem passenden CHANGELOG-Abschnitt, ZIP des Repos als Anhang).
+  release:
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Neue Version?
+        id: chk
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          v=$(tr -d ' \n\r' < app/VERSION)
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          if gh release view "v$v" >/dev/null 2>&1; then
+            echo "Release v$v gibt es schon, nichts zu tun."
+            echo "new=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "new=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Release anlegen
+        if: steps.chk.outputs.new == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          V: ${{ steps.chk.outputs.version }}
+        run: |
+          # CHANGELOG-Abschnitt "## <Version> – Datum" bis zur naechsten "## "-Zeile
+          awk -v v="$V" '
+            /^## / { if (p) exit; if (index($0, "## " v " ") == 1) { p = 1; next } }
+            p' CHANGELOG.md > notes.md
+          {
+            echo
+            echo "### Docker"
+            echo '```'
+            echo "docker pull ghcr.io/${{ github.repository_owner }}/mirrorsync:$V"
+            echo '```'
+          } >> notes.md
+          git archive --format=zip --prefix=mirrorsync/ -o "mirrorsync-$V.zip" HEAD
+          gh release create "v$V" "mirrorsync-$V.zip" \
+            --target "$GITHUB_SHA" --title "MirrorSync $V" --notes-file notes.md --latest
