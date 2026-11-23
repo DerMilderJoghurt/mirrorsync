@@ -11,7 +11,7 @@ name: Android app
 on:
   push:
     branches-ignore: [main]
-    paths: ["android/**", ".github/workflows/android.yml"]
+    paths: ["android/**", "app/VERSION", ".github/workflows/android.yml"]
   workflow_dispatch:
   workflow_call:
 
