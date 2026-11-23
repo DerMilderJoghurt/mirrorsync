@@ -36,6 +36,7 @@ import geoip
 import i18n
 import update
 import selfupdate
+import preview
 import ipguard
 import msgtpl
 import notify
@@ -1299,7 +1300,7 @@ def bootstrap_users():
 
 # Endpunkt -> benoetigtes Recht. None = nur angemeldet. Fehlende Endpunkte = nur angemeldet.
 ENDPOINT_PERMS = {
-    "update_apply": "system.update", "update_state": "system.update", "index": "jobs.view", "jobs_running": "jobs.view", "schedules": "jobs.view", "schedules_json": "jobs.view", "schedule_job": "jobs.edit", "schedule_chains": "jobs.edit", "show_log": "jobs.logs", "show_run": "jobs.logs", "download_run": "jobs.logs", "delete_job": "jobs.delete", "stop": "jobs.run",
+    "job_preview": "jobs.preview", "update_apply": "system.update", "update_state": "system.update", "index": "jobs.view", "jobs_running": "jobs.view", "schedules": "jobs.view", "schedules_json": "jobs.view", "schedule_job": "jobs.edit", "schedule_chains": "jobs.edit", "show_log": "jobs.logs", "show_run": "jobs.logs", "download_run": "jobs.logs", "delete_job": "jobs.delete", "stop": "jobs.run",
     "job_notify_test": "jobs.notify", "job_pause": "jobs.edit",
     "remotes": "remotes.view", "test_remote": "remotes.test", "delete_remote": "remotes.delete",
     "auth_remote": "remotes.edit", "browse": "remotes.browse", "browse_list": "remotes.browse",
@@ -2445,6 +2446,97 @@ def parse_bw(raw):
     except ValueError:
         return {}
     return data if isinstance(data, dict) else {}
+
+
+PREVIEW_KEYS = ("source", "dest", "selection", "excludes", "include_source_dir", "direction", "delete_excluded")
+
+
+def preview_job_from(f, saved=None):
+    """Aufgabe fuer die Vorschau: gespeicherte Werte, ueberschrieben von Formular- bzw. API-Feldern."""
+    job = {k: (saved or {}).get(k) for k in PREVIEW_KEYS}
+    if f is not None and any(k in f for k in ("source", "dest")):
+        job.update(source=str(f.get("source") or "").strip(), dest=str(f.get("dest") or "").strip(),
+                   selection=str(f.get("selection") or "").replace("\r\n", "\n").strip()[:20000],
+                   excludes=str(f.get("excludes") or "").replace("\r\n", "\n").strip(),
+                   include_source_dir=f.get("include_source_dir") not in (None, "", False, "0", "false", "off"),
+                   direction="bisync" if f.get("direction") == "bisync" else "mirror",
+                   delete_excluded=f.get("delete_excluded") not in (None, "", False, "0", "false", "off"))
+        if has_selection(job):
+            job["include_source_dir"] = False
+    job["source"], job["dest"] = (job.get("source") or "").strip(), (job.get("dest") or "").strip()
+    return job
+
+
+def preview_job(job):
+    """Zielstruktur nach dem naechsten Lauf. Liefert (daten, fehler)."""
+    if not job["source"] or not job["dest"]:
+        return None, "Bitte zuerst Quelle und Ziel angeben."
+    for side in (job["source"], job["dest"]):
+        if not g.access.path_ok(side):
+            return None, i18n.t("Keine Berechtigung für {0}.", side)
+    if not has_selection(job):
+        fs = split_file_source(job["source"])
+        if fs:   # Quelle ist eine Datei: wie beim Speichern Ordner + Auswahl
+            job["source"], job["selection"] = fs[0], fs[1]
+    flt = []
+    if selection_list(job):
+        for rule in selection_filters(job):
+            flt += ["--filter", rule]
+    else:
+        for pattern in exclude_list(job):
+            flt += ["--exclude", pattern]
+    dest = effective_dest(job)
+    bis = is_bisync(job)
+    dst_flt = [] if (job.get("delete_excluded") and not bis and not selection_list(job)) else flt
+    res = {}
+
+    def ls(key, path, args):
+        res[key] = rclone("lsjson", "-R", "--no-mimetype", *args, path, timeout=300)
+    t = threading.Thread(target=ls, args=("dst", dest, dst_flt))
+    t.start()
+    ls("src", job["source"], flt)
+    t.join()
+    def why(out):
+        lines = [x for x in out.splitlines() if x.strip() not in ("[", "]", "")]
+        errs = [re.sub(r"^\d{4}/\d\d/\d\d \d\d:\d\d:\d\d (ERROR|NOTICE) ?: ?", "", x) for x in lines if "ERROR" in x]
+        return (errs[0] if errs else (lines[-1] if lines else ""))[-300:]
+    rc, out = res["src"]
+    if rc != 0:
+        return None, i18n.t("Quelle lässt sich nicht lesen: {0}", why(out))
+    try:
+        src_items = json.loads(out or "[]")
+    except ValueError:
+        return None, "Quelle: unerwartete Antwort von rclone."
+    rc, out = res["dst"]
+    dest_missing = False
+    if rc != 0:
+        if any(w in out.lower() for w in ("not found", "doesn't exist", "no such")):
+            dst_items, dest_missing = [], True
+        else:
+            return None, i18n.t("Ziel lässt sich nicht lesen: {0}", why(out))
+    else:
+        try:
+            dst_items = json.loads(out or "[]")
+        except ValueError:
+            return None, "Ziel: unerwartete Antwort von rclone."
+    entries = preview.compute(src_items, dst_items, "bisync" if bis else "mirror")
+    tree, truncated = preview.build_tree(entries)
+    return {"source": job["source"], "dest": dest, "mode": "bisync" if bis else "mirror", "dest_missing": dest_missing,
+            "selection": selection_list(job), "summary": preview.summary(entries), "truncated": truncated,
+            "max_files": preview.MAX_FILES, "tree": tree}, None
+
+
+@app.post("/job/preview")
+@app.post("/job/<job_id>/preview")
+def job_preview(job_id=None):
+    """Vorschau der Ordnerstruktur im Ziel (mit den noch nicht gespeicherten Werten aus dem Formular)."""
+    saved = load_jobs().get(job_id) if job_id else None
+    if job_id and saved is None:
+        return {"ok": False, "error": i18n.t("Aufgabe nicht gefunden.")}, 404
+    data, err = preview_job(preview_job_from(request.form, saved))
+    if err:
+        return {"ok": False, "error": i18n.t(err)}, 400
+    return dict(data, ok=True)
 
 
 @app.post("/job/notify-test")

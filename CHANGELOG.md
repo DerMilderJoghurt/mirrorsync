@@ -3,6 +3,13 @@
 Version numbers follow [SemVer](https://semver.org/): MAJOR.MINOR.PATCH
 (MAJOR = incompatible change, MINOR = new feature, PATCH = bug fix).
 
+## 1.43.0 – 2026-11-23
+- **Folder structure preview.** In a job, the new "🗂 Preview folder structure" button shows what the destination
+  will look like after the next run: collapsible folder tree, every entry marked as new, will be updated, will be
+  deleted or unchanged, with counters on folders. Uses the values in the form (even unsaved) and the same rules as
+  the real run (selection, excludes, copy source folder itself, two-way). Copies and deletes nothing. New permission
+  `jobs.preview` (admins and Operator), API/MCP `preview_job` and `preview_paths`, all 5 languages.
+
 ## 1.42.0 – 2026-11-23
 - **Self-update via the Docker socket (optional).** If `/var/run/docker.sock` is mounted, there is an **"Update now"**
   button at the bottom left next to the update notice and under Settings → General → Self-update, optionally also

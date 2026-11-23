@@ -492,6 +492,60 @@ def a_update_templates(a):
     return {"ok": True, "message": msg, "templates": _templates_view()}
 
 
+# ================================================================= Vorschau der Ordnerstruktur
+PREVIEW_PROPS = {
+    "source": S(STR, "Quelle (überschreibt die gespeicherte)"), "dest": S(STR, "Ziel (überschreibt das gespeicherte)"),
+    "selection": dict(STRS, description="nur diese Dateien/Ordner (relativ zur Quelle, Ordner mit / am Ende)"),
+    "excludes": dict(STRS, description="Ausschlüsse"), "include_source_dir": S(BOOL, "Quellordner selbst mitkopieren"),
+    "direction": S(STR, "mirror oder bisync", enum=["mirror", "bisync"]), "delete_excluded": S(BOOL, "Ausgeschlossenes im Ziel löschen"),
+    "tree": S(BOOL, "zusätzlich den Baum als JSON liefern (sonst nur Text und Zusammenfassung)"),
+}
+
+
+def _preview(path, a):
+    _check_keys(a, set(PREVIEW_PROPS) | {"job_id"})
+    form = None
+    if "source" in a or "dest" in a:
+        if "job_id" in a:
+            saved = core.load_jobs().get(a["job_id"]) or {}
+            base = {k: saved.get(k) for k in core.PREVIEW_KEYS}
+        else:
+            base = {}
+        base.update({k: a[k] for k in core.PREVIEW_KEYS if k in a})
+        form = {"source": base.get("source") or "", "dest": base.get("dest") or "",
+                "selection": _lines(base.get("selection")), "excludes": _lines(base.get("excludes")),
+                "include_source_dir": _bool(base.get("include_source_dir") or False),
+                "direction": base.get("direction") or "mirror", "delete_excluded": _bool(base.get("delete_excluded") or False)}
+    r = gui("POST", path, form=form or {})
+    body = r["resp"].get_json(silent=True) or {}
+    if r["status"] in (400, 404) and body.get("error"):
+        raise ApiError(r["status"], _t(body["error"]))
+    done(r)
+    out = {k: body.get(k) for k in ("source", "dest", "mode", "dest_missing", "selection", "summary", "truncated")}
+    out["text"] = core.preview.as_text(body["tree"])
+    out["legend"] = _t("+ neu, ~ wird aktualisiert, - wird gelöscht, < kommt nach Seite A (Zwei-Wege)")
+    if _bool(a.get("tree", False)):
+        out["tree"] = body["tree"]
+    return dict(out, ok=True)
+
+
+@action("preview_job", "POST", "/jobs/{job_id}/preview", "jobs.preview", "Aufgaben",
+        "Vorschau: wie die Ordnerstruktur im Ziel nach dem nächsten Lauf aussieht, mit denselben Filtern wie der echte Lauf. "
+        "Ändert nichts. Liefert summary (Dateien neu/aktualisiert/gelöscht/gleich) und text (Baum, + neu, ~ aktualisiert, "
+        "- gelöscht, < nach Seite A). Optional Felder überschreiben (z. B. anderes Ziel ausprobieren).",
+        dict({"job_id": S(STR)}, **PREVIEW_PROPS), ["job_id"], ro=True)
+def a_preview_job(a):
+    return _preview(f"/job/{a['job_id']}/preview", a)
+
+
+@action("preview_paths", "POST", "/jobs/preview", "jobs.preview", "Aufgaben",
+        "Vorschau ohne gespeicherte Aufgabe: Ordnerstruktur im Ziel, wenn source nach dest gespiegelt würde "
+        "(optional selection, excludes, include_source_dir, direction, delete_excluded). Ändert nichts.",
+        PREVIEW_PROPS, ["source", "dest"], ro=True)
+def a_preview_paths(a):
+    return _preview("/job/preview", a)
+
+
 # ================================================================= Allgemeine Einstellungen
 LOG_KEYS = ("log_keep_runs", "log_keep_days", "audit_keep_days")
 SEC_KEYS = ("lock_attempts", "lock_minutes", "fail_notify", "fail_notify_minutes", "trust_proxy", "geoip_auto", "geoip_days", "geoip_mode", "geoip_time", "geoip_dow", "public_url", "require_2fa_mode")

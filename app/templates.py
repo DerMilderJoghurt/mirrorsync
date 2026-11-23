@@ -328,6 +328,33 @@ Vorhanden: {% for r in remotes %}<code>{{ r.name }}:</code> ({{ r.type }}) {% el
 <label class="check" style="margin-top:14px"><input type="checkbox" name="include_source_dir" id="incdir" {{ "checked" if job.include_source_dir }} onchange="destPreview()"> Quellordner selbst mitkopieren (im Ziel wird ein Ordner mit dem Namen der Quelle angelegt)</label>
 <div class="hint" id="incoff" style="display:none">Bei einer Auswahl aus: Die gewählten Ordner und Dateien landen direkt im Ziel, ohne den Quellordner darüber.</div>
 <div class="hint" id="destprev"></div>
+{% if can("jobs.preview") %}<p style="margin:10px 0 0"><button type="button" class="btn" onclick="pvOpen()">🗂 Vorschau der Ordnerstruktur</button> <span class="hint" style="display:inline">Zeigt, wie das Ziel nach dem nächsten Lauf aussieht. Es wird nichts kopiert oder gelöscht.</span></p>
+<dialog id="pvdlg" class="pvdlg"><div style="display:flex;align-items:center;gap:10px"><h3 style="margin:0;flex:1">Vorschau der Ordnerstruktur</h3><button type="button" class="btn sm" onclick="document.getElementById('pvdlg').close()">Schließen</button></div>
+<div id="pvbody" style="margin-top:12px"></div></dialog>
+<style>.pvdlg{width:min(980px,96vw);max-height:88vh;border:1px solid var(--bd);border-radius:12px;background:var(--card);color:var(--fg);padding:18px 20px}.pvdlg::backdrop{background:rgba(0,0,0,.35)}.pvt{font-size:14px;line-height:1.7}.pvt ul{list-style:none;margin:0;padding-left:18px}.pvt>ul{padding-left:0}.pvt summary{cursor:pointer}.pvt .pf{white-space:nowrap}
+.pvt .s-new{color:var(--ok)}.pvt .s-update{color:var(--run,#2563eb)}.pvt .s-delete{color:var(--err);text-decoration:line-through}.pvt .s-to_a{color:var(--warn,#d97706)}
+.pvt .cnt{font-size:12px;color:var(--mut);margin-left:6px}.pvleg span{margin-right:14px;white-space:nowrap}</style>
+<script>
+function pvEsc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+function pvSize(b){const u=['B','KB','MB','GB','TB'];let i=0;while(b>=1024&&i<4){b/=1024;i++}return (i?b.toFixed(1):b)+' '+u[i]}
+const PV_LABEL={new:'neu',update:'wird aktualisiert',delete:'wird gelöscht',to_a:'kommt nach A',same:''};
+function pvCnt(c){const p=[];if(c.new)p.push('+'+c.new);if(c.update)p.push('~'+c.update);if(c.delete)p.push('−'+c.delete);if(c.to_a)p.push('←'+c.to_a);const t=c.new+c.update+c.same+c.to_a;return p.length?'<span class="cnt">'+p.join(' ')+(t?' · '+t+' '+'Dateien':'')+'</span>':(c.same?'<span class="cnt">'+c.same+' '+'Dateien'+'</span>':'')}
+function pvNode(n,depth){
+ if(!n.d){const lab=PV_LABEL[n.s]?' <span class="cnt">'+PV_LABEL[n.s]+'</span>':'';return '<li class="pf s-'+n.s+'">📄 '+pvEsc(n.n)+' <span class="cnt">'+pvSize(n.size||0)+'</span>'+lab+'</li>'}
+ const lab=(n.s!=='same'&&PV_LABEL[n.s])?' <span class="cnt">'+PV_LABEL[n.s]+'</span>':'';
+ const kids=n.ch&&n.ch.length?'<ul>'+n.ch.map(k=>pvNode(k,depth+1)).join('')+'</ul>':'';
+ return '<li><details'+(depth<1?' open':'')+'><summary class="s-'+n.s+'">📁 '+pvEsc(n.n)+'/'+lab+pvCnt(n.c)+'</summary>'+kids+'</details></li>'}
+async function pvOpen(){const d=document.getElementById('pvdlg'),b=document.getElementById('pvbody');b.innerHTML='<p class="mut">'+'Quelle und Ziel werden gelesen …'+'</p>';d.showModal();
+ try{const r=await fetch('{{ "/job/" ~ job_id ~ "/preview" if job_id else "/job/preview" }}',{method:'POST',body:new FormData(document.getElementById('jobform')),headers:{Accept:'application/json'}});
+  const j=await r.json();if(!j.ok){b.innerHTML='<div class="msg err">'+pvEsc(j.error||r.status)+'</div>';return}
+  const f=j.summary.files,y=j.summary.bytes;
+  let h='<p style="margin:0 0 6px"><span class="mut">'+'Ziel'+':</span> <code>'+pvEsc(j.dest)+'</code>'+(j.dest_missing?' <span class="tag">'+'wird angelegt'+'</span>':'')+'</p>';
+  h+='<p class="pvleg" style="margin:0 0 10px"><span class="s-new">+ '+f.new+' '+'neu'+' ('+pvSize(y.new)+')</span><span class="s-update">~ '+f.update+' '+'werden aktualisiert'+'</span><span class="s-delete">− '+f.delete+' '+'werden gelöscht'+'</span>'+(j.mode==='bisync'?'<span class="s-to_a">← '+f.to_a+' '+'kommen nach A'+'</span>':'')+'<span class="mut">'+f.same+' '+'bleiben gleich'+'</span></p>';
+  if(j.mode==='bisync')h+='<div class="hint" style="margin-bottom:8px">'+'Zwei-Wege: So sehen danach beide Seiten aus. Gezeigt ist der Stand ohne Löschungen, die seit dem letzten Lauf auf einer Seite passiert sind.'+'</div>';
+  if(j.truncated)h+='<div class="hint" style="margin-bottom:8px">'+'Sehr viele Dateien: Einzeln gezeigt werden nur die ersten Dateien, die Zähler an den Ordnern stimmen trotzdem.'+'</div>';
+  const kids=j.tree.ch||[];h+=kids.length?'<div class="pvt"><ul>'+kids.map(k=>pvNode(k,0)).join('')+'</ul></div>':'<p class="mut">'+'Nach dem Lauf ist das Ziel leer.'+'</p>';
+  b.innerHTML=h}catch(e){b.innerHTML='<div class="msg err">'+pvEsc(e.message||e)+'</div>'}}
+</script>{% endif %}
 </div>
 <div class="tw-only">
 <div class="row" style="margin-top:6px"><div><label>Wenn eine Datei auf beiden Seiten geändert wurde</label>
