@@ -1,7 +1,7 @@
 # Take the rclone binary from the official image
 FROM rclone/rclone:1.76 AS rclone
 
-FROM python:3.14-alpine
+FROM python:3.15-alpine
 # Time zone data comes via pip (tzdata), so no apk needed
 COPY --from=rclone /usr/local/bin/rclone /usr/local/bin/rclone
 
