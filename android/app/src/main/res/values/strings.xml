@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">MirrorSync</string>
+    <string name="settings_title">Server &amp; notifications</string>
+    <string name="welcome">Enter the address of your MirrorSync server, the same one you open in the browser.</string>
+    <string name="server_url">Server address</string>
+    <string name="server_hint">https://sync.example.com</string>
+    <string name="connect">Connect</string>
+    <string name="save_anyway">Save anyway</string>
+    <string name="checking">Checking connection…</string>
+    <string name="check_ok">Connected to MirrorSync %1$s.</string>
+    <string name="check_fail">No MirrorSync found at this address: %1$s</string>
+    <string name="check_fail_hint">Check the address (http or https, port). You can still save it.</string>
+    <string name="url_invalid">Please enter an address, e.g. https://sync.example.com or http://192.168.1.10:8080.</string>
+    <string name="notifications">Notifications</string>
+    <string name="notify_enabled">Notify me about failed runs</string>
+    <string name="notify_success">Also notify about successful and cancelled runs</string>
+    <string name="notify_interval">Check every</string>
+    <string name="notify_info">The app asks MirrorSync for new results in the background. Android decides the exact time, so a message can arrive a few minutes late.</string>
+    <string name="api_key">API key (optional)</string>
+    <string name="api_key_hint">msk_…</string>
+    <string name="api_key_info">Without a key the app uses your login from the app. A login without \"Stay signed in\" can end when the app is closed, then no notifications arrive. An API key with a role that may view tasks avoids this (Settings → API in MirrorSync).</string>
+    <string name="save">Save</string>
+    <string name="saved">Saved.</string>
+    <string name="open_app">Open MirrorSync</string>
+    <string name="version_info">App version %1$s</string>
+    <string name="minutes">%1$d minutes</string>
+    <string name="hour">1 hour</string>
+    <string name="hours">%1$d hours</string>
+
+    <string name="error_title">MirrorSync cannot be reached</string>
+    <string name="error_text">%1$s\n\n%2$s</string>
+    <string name="retry">Try again</string>
+    <string name="change_server">Change server</string>
+    <string name="exit_title">MirrorSync</string>
+    <string name="exit_text">Close the app or change the server address?</string>
+    <string name="exit">Close</string>
+    <string name="cancel">Cancel</string>
+    <string name="reload">Reload</string>
+    <string name="ssl_title">Certificate not trusted</string>
+    <string name="ssl_text">The certificate of %1$s is not valid (%2$s). Only continue if this is your own server with a self-signed certificate.</string>
+    <string name="ssl_continue">Continue anyway</string>
+    <string name="ssl_expired">expired</string>
+    <string name="ssl_mismatch">issued for another name</string>
+    <string name="ssl_untrusted">unknown issuer</string>
+    <string name="ssl_other">invalid</string>
+    <string name="auth_title">Login for %1$s</string>
+    <string name="auth_user">User name</string>
+    <string name="auth_pass">Password</string>
+    <string name="login">Log in</string>
+    <string name="download_started">Download started: %1$s</string>
+    <string name="download_saved">Saved to Downloads: %1$s</string>
+    <string name="download_failed">Download failed: %1$s</string>
+
+    <string name="ch_failed">Failed runs</string>
+    <string name="ch_done">Finished runs</string>
+    <string name="ch_account">Connection</string>
+    <string name="n_failed">%1$s failed</string>
+    <string name="n_ok">%1$s finished</string>
+    <string name="n_cancelled">%1$s cancelled</string>
+    <string name="n_other">%1$s: %2$s</string>
+    <string name="n_details">%1$s · copied %2$s · deleted %3$s · errors %4$s</string>
+    <string name="n_dry">Test run</string>
+    <string name="n_login_title">Notifications paused</string>
+    <string name="n_login_text">MirrorSync no longer accepts the login of the app. Open the app and log in again, or enter an API key.</string>
+    <string name="n_perm_text">The API key or your user may not view tasks.</string>
+</resources>

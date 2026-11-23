@@ -67,7 +67,7 @@ Changed files are transferred completely (no delta transfer like rsync).
 
 ## Installation
 The ready-made image is in the GitHub Container Registry: `ghcr.io/dermilderjoghurt/mirrorsync`
-(for amd64 and arm64, e.g. Raspberry Pi). Tags: `latest` (newest version), `1.39.0` (fixed version),
+(for amd64 and arm64, e.g. Raspberry Pi). Tags: `latest` (newest version), `1.40.0` (fixed version),
 `1.34` (newest patch of this version).
 
 ### With Docker Compose (recommended)
@@ -712,6 +712,30 @@ release with all changes. Only the installed version number is sent.
   `PATCH /api/v1/settings/update` with `{"update_check": false}` and/or `{"update_interval": 120}` (minutes)
   (`update_update_settings`); `/status` contains `update` with `interval_minutes`.
 - Another repository (e.g. your own fork) can be set with `UPDATE_REPO=owner/repo`.
+
+## Android app (since 1.40.0)
+The folder `android/` contains a small Android app (Android 7 or newer): the MirrorSync web interface without
+browser bar, with its own icon and notifications. Because it shows the normal web interface, every new
+MirrorSync feature is available in the app immediately.
+
+- **Install:** download `mirrorsync-<version>.apk` from the [latest release](https://github.com/DerMilderJoghurt/mirrorsync/releases/latest)
+  on the phone and open it (allow "Install unknown apps" for the browser or file manager once).
+  Updates: install the newer APK over the old one, settings and login stay.
+- **First start:** enter the address you also use in the browser, e.g. `https://sync.example.com` or
+  `http://192.168.1.50:8080`. Change it later via the back button on the start page, the error screen or a long
+  press on the app icon → "Server & notifications".
+- **Passkeys** in the app need HTTPS with a domain name (as in the browser), a current "Android System WebView"
+  and Google Play services. Android checks `https://<your domain>/.well-known/assetlinks.json`, which MirrorSync
+  serves by itself. Google fetches this file from the internet, so it has to be reachable from outside (reverse
+  proxy, no geo-blocking for this path). Passkeys created in the browser work in the app and vice versa.
+  If it does not work, password + 2FA always do.
+- **Notifications:** on by default for failed runs, optionally also for successful and cancelled runs. The app
+  asks `GET /api/v1/jobs` in the background (every 15 min to 6 h, Android may delay it a bit). It uses the login of
+  the app; tick "Stay signed in" when logging in. More robust: enter an API key with a role that may view jobs.
+- **Build it yourself:** `cd android && ./gradlew assembleRelease` (JDK 17, Android SDK). The workflow
+  `.github/workflows/android.yml` builds it on GitHub. To sign with your own key, set the repository secrets
+  `ANDROID_KEYSTORE_B64` (base64 of the `.jks`) and `ANDROID_KEYSTORE_PASSWORD`, and add the key's SHA-256
+  fingerprint to the server via `MIRRORSYNC_ANDROID_CERTS=AB:CD:…` so passkeys keep working.
 
 ## Updating to a new version
 ```bash

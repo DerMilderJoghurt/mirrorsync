@@ -3,6 +3,25 @@
 Version numbers follow [SemVer](https://semver.org/): MAJOR.MINOR.PATCH
 (MAJOR = incompatible change, MINOR = new feature, PATCH = bug fix).
 
+## 1.40.0 – 2026-11-23
+- **Android app** (new, folder `android/`): MirrorSync as an app on the phone. A thin wrapper around the web
+  interface without browser bar, so every new feature is in the app right away. The APK is attached to each
+  GitHub release (`mirrorsync-1.40.0.apk`).
+  - On first start enter the server address (checked via `/health`), change it later via the back button,
+    the error screen or a long press on the app icon.
+  - Login, 2FA and "Stay signed in" work as in the browser; **passkeys** work in the app as well (see below).
+  - **Notifications** about failed runs (optionally also successful/cancelled ones) with copied/deleted/errors;
+    a tap opens the log. The app checks in the background every 15 minutes to 6 hours, using its login or an
+    optional API key.
+  - Downloads (logs, audit CSV, backup export) land in the Downloads folder, file upload for backup import works.
+  - Light/dark design follows the web interface, plain HTTP in the home network and self-signed certificates
+    (after a confirmation) are possible.
+- Server: new public endpoint `/.well-known/assetlinks.json` (Digital Asset Links), so Android lets the app use
+  the passkeys of your domain. Passkey sign-in accepts the app's origin in addition to the HTTPS address.
+  Self-built APKs with an own signing key: add its SHA-256 fingerprint via `MIRRORSYNC_ANDROID_CERTS`.
+- GitHub Actions: new workflow `android.yml` builds the APK; "Image and release" attaches it to the release
+  (signed when the secrets `ANDROID_KEYSTORE_B64` and `ANDROID_KEYSTORE_PASSWORD` are set).
+
 ## 1.39.0 – 2026-11-23
 - **Delete old logs** as its own section under Settings → General: pick a date, "Show count" shows how many runs
   in how many jobs started before that date, "Delete permanently now" (with confirmation) deletes them once,

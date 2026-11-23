@@ -1,0 +1,63 @@
+plugins {
+    id "com.android.application"
+}
+
+// The app carries the same version as MirrorSync itself (app/VERSION in the repository root).
+def msVersion = rootProject.file("../app/VERSION").text.trim()
+def (vMajor, vMinor, vPatch) = msVersion.tokenize(".").collect { it.replaceAll("[^0-9]", "").toInteger() }
+
+// Release signing (optional). Either android/keystore.properties (storeFile, storePassword, keyAlias, keyPassword)
+// or the environment variables MS_KEYSTORE, MS_KEYSTORE_PASSWORD, MS_KEY_ALIAS, MS_KEY_PASSWORD.
+// Without them the release APK stays unsigned (app-release-unsigned.apk).
+def ks = new Properties()
+def ksFile = rootProject.file("keystore.properties")
+if (ksFile.exists()) ksFile.withInputStream { ks.load(it) }
+def ksPath = ks.getProperty("storeFile") ?: System.getenv("MS_KEYSTORE")
+
+android {
+    namespace "io.github.dermilderjoghurt.mirrorsync"
+    compileSdk 35
+
+    defaultConfig {
+        applicationId "io.github.dermilderjoghurt.mirrorsync"
+        minSdk 24
+        targetSdk 35
+        versionCode vMajor * 10000 + vMinor * 100 + vPatch
+        versionName msVersion
+    }
+
+    signingConfigs {
+        if (ksPath) {
+            release {
+                storeFile file(ksPath)
+                storePassword ks.getProperty("storePassword") ?: System.getenv("MS_KEYSTORE_PASSWORD")
+                keyAlias ks.getProperty("keyAlias") ?: System.getenv("MS_KEY_ALIAS") ?: "mirrorsync"
+                keyPassword ks.getProperty("keyPassword") ?: System.getenv("MS_KEY_PASSWORD") ?: System.getenv("MS_KEYSTORE_PASSWORD")
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            if (ksPath) signingConfig signingConfigs.release
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    buildFeatures {
+        buildConfig true
+    }
+
+    lint {
+        abortOnError false
+    }
+}
+
+dependencies {
+    implementation "androidx.webkit:webkit:1.12.1"
+}

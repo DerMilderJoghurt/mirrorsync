@@ -3,8 +3,11 @@
 Die eigentliche Pruefung macht die Bibliothek py_webauthn. Hier nur: Optionen bauen, Antworten pruefen,
 gespeicherte Passkeys verwalten. Ein Passkey ist an einen Domainnamen gebunden (RP-ID) und braucht HTTPS
 (ausser bei localhost)."""
+import base64
 import ipaddress
 import json
+import os
+import re
 import secrets
 import time
 from urllib.parse import urlparse
@@ -19,6 +22,35 @@ except Exception:   # Bibliothek fehlt: Passkeys einfach nicht anbieten
     AVAILABLE = False
 
 RP_NAME = "MirrorSync"
+
+# Android-App (Huelle um die Web-GUI): Passkeys in der App laufen ueber den Credential Manager von Android.
+# Der verlangt, dass die Domain die App per Digital Asset Links freigibt (/.well-known/assetlinks.json),
+# und meldet als Origin "android:apk-key-hash:<SHA-256 des Signaturzertifikats>".
+ANDROID_PACKAGE = "io.github.dermilderjoghurt.mirrorsync"
+ANDROID_CERTS = ["9B:11:08:BB:79:B6:1C:B5:7C:AE:02:E5:67:E0:7B:C6:B9:6E:4D:DF:0F:48:76:E6:98:FE:09:B7:1B:61:F0:6F"]
+
+
+def android_certs():
+    """Fingerabdruecke der offiziellen APK plus eigene aus MIRRORSYNC_ANDROID_CERTS (Komma-getrennt, selbst gebaute APK)."""
+    extra = [c.strip().upper() for c in os.environ.get("MIRRORSYNC_ANDROID_CERTS", "").split(",") if c.strip()]
+    out = []
+    for c in ANDROID_CERTS + extra:
+        h = c.replace(":", "")
+        if re.fullmatch(r"[0-9A-F]{64}", h) and h not in [x.replace(":", "") for x in out]:
+            out.append(":".join(h[i:i + 2] for i in range(0, 64, 2)))
+    return out
+
+
+def android_origins():
+    return ["android:apk-key-hash:" + base64.urlsafe_b64encode(bytes.fromhex(c.replace(":", ""))).decode().rstrip("=")
+            for c in android_certs()]
+
+
+def assetlinks():
+    """Inhalt von /.well-known/assetlinks.json: erlaubt der App, Passkeys dieser Domain zu nutzen."""
+    return [{"relation": ["delegate_permission/common.get_login_creds", "delegate_permission/common.handle_all_urls"],
+             "target": {"namespace": "android_app", "package_name": ANDROID_PACKAGE,
+                        "sha256_cert_fingerprints": android_certs()}}]
 TIMEOUT_S = 300   # so lange gilt eine Anfrage (Challenge)
 
 
@@ -50,11 +82,11 @@ def rp_for(host, public_url=""):
         return None, [], "Adresse unbekannt."
     try:
         ipaddress.ip_address(rp_id)
-        return rp_id, origins, ("Passkeys funktionieren nicht über eine IP-Adresse. Öffne MirrorSync über seinen "
+        return rp_id, origins + android_origins(), ("Passkeys funktionieren nicht über eine IP-Adresse. Öffne MirrorSync über seinen "
                                 "Domainnamen mit HTTPS, z. B. über deinen Reverse-Proxy.")
     except ValueError:
         pass
-    return rp_id, origins, None
+    return rp_id, origins + android_origins(), None   # Browser und Android-App
 
 
 def registration_options(rp_id, user_name, user_handle, existing):

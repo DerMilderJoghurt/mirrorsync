@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_title">Server &amp; Benachrichtigungen</string>
+    <string name="welcome">Gib die Adresse deines MirrorSync-Servers ein, also die, die du auch im Browser öffnest.</string>
+    <string name="server_url">Server-Adresse</string>
+    <string name="connect">Verbinden</string>
+    <string name="save_anyway">Trotzdem speichern</string>
+    <string name="checking">Verbindung wird geprüft …</string>
+    <string name="check_ok">Verbunden mit MirrorSync %1$s.</string>
+    <string name="check_fail">Unter dieser Adresse wurde kein MirrorSync gefunden: %1$s</string>
+    <string name="check_fail_hint">Prüfe die Adresse (http oder https, Port). Speichern geht trotzdem.</string>
+    <string name="url_invalid">Bitte eine Adresse eingeben, z. B. https://sync.example.com oder http://192.168.1.10:8080.</string>
+    <string name="notifications">Benachrichtigungen</string>
+    <string name="notify_enabled">Bei fehlgeschlagenen Läufen benachrichtigen</string>
+    <string name="notify_success">Auch erfolgreiche und abgebrochene Läufe melden</string>
+    <string name="notify_interval">Prüfen alle</string>
+    <string name="notify_info">Die App fragt MirrorSync im Hintergrund nach neuen Ergebnissen. Den genauen Zeitpunkt bestimmt Android, eine Meldung kann also ein paar Minuten später kommen.</string>
+    <string name="api_key">API-Key (optional)</string>
+    <string name="api_key_info">Ohne Key nutzt die App deine Anmeldung aus der App. Eine Anmeldung ohne „Angemeldet bleiben“ kann enden, wenn die App geschlossen wird, danach kommen keine Meldungen mehr. Ein API-Key mit einer Rolle, die Aufgaben sehen darf, verhindert das (in MirrorSync unter Einstellungen → API).</string>
+    <string name="save">Speichern</string>
+    <string name="saved">Gespeichert.</string>
+    <string name="open_app">MirrorSync öffnen</string>
+    <string name="version_info">App-Version %1$s</string>
+    <string name="minutes">%1$d Minuten</string>
+    <string name="hour">1 Stunde</string>
+    <string name="hours">%1$d Stunden</string>
+
+    <string name="error_title">MirrorSync ist nicht erreichbar</string>
+    <string name="retry">Erneut versuchen</string>
+    <string name="change_server">Server ändern</string>
+    <string name="exit_text">App schließen oder Server-Adresse ändern?</string>
+    <string name="exit">Schließen</string>
+    <string name="cancel">Abbrechen</string>
+    <string name="reload">Neu laden</string>
+    <string name="ssl_title">Zertifikat nicht vertrauenswürdig</string>
+    <string name="ssl_text">Das Zertifikat von %1$s ist ungültig (%2$s). Fahre nur fort, wenn das dein eigener Server mit selbst erstelltem Zertifikat ist.</string>
+    <string name="ssl_continue">Trotzdem fortfahren</string>
+    <string name="ssl_expired">abgelaufen</string>
+    <string name="ssl_mismatch">für einen anderen Namen ausgestellt</string>
+    <string name="ssl_untrusted">unbekannter Aussteller</string>
+    <string name="ssl_other">ungültig</string>
+    <string name="auth_title">Anmeldung für %1$s</string>
+    <string name="auth_user">Benutzername</string>
+    <string name="auth_pass">Passwort</string>
+    <string name="login">Anmelden</string>
+    <string name="download_started">Download gestartet: %1$s</string>
+    <string name="download_saved">In Downloads gespeichert: %1$s</string>
+    <string name="download_failed">Download fehlgeschlagen: %1$s</string>
+
+    <string name="ch_failed">Fehlgeschlagene Läufe</string>
+    <string name="ch_done">Abgeschlossene Läufe</string>
+    <string name="ch_account">Verbindung</string>
+    <string name="n_failed">%1$s fehlgeschlagen</string>
+    <string name="n_ok">%1$s abgeschlossen</string>
+    <string name="n_cancelled">%1$s abgebrochen</string>
+    <string name="n_details">%1$s · kopiert %2$s · gelöscht %3$s · Fehler %4$s</string>
+    <string name="n_dry">Testlauf</string>
+    <string name="n_login_title">Benachrichtigungen pausiert</string>
+    <string name="n_login_text">MirrorSync nimmt die Anmeldung der App nicht mehr an. Öffne die App und melde dich neu an, oder trage einen API-Key ein.</string>
+    <string name="n_perm_text">Der API-Key oder dein Benutzer darf keine Aufgaben sehen.</string>
+</resources>
