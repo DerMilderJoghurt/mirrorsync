@@ -2160,7 +2160,6 @@
  "Quelle: unerwartete Antwort von rclone.": "Source : réponse inattendue de rclone.",
  "Ziel: unerwartete Antwort von rclone.": "Destination : réponse inattendue de rclone.",
  "Aufgabe nicht gefunden.": "Tâche introuvable.",
- "Vorschau der Ordnerstruktur im Ziel ansehen (listet Dateien in Quelle und Ziel)": "Voir l'aperçu de l'arborescence de la destination (liste les fichiers de la source et de la destination)",
  "+ neu, ~ wird aktualisiert, - wird gelöscht, < kommt nach Seite A (Zwei-Wege)": "+ nouveau, ~ sera mis à jour, - sera supprimé, < va vers le côté A (bidirectionnel)",
  "Quelle (überschreibt die gespeicherte)": "Source (remplace celle enregistrée)",
  "Ziel (überschreibt das gespeicherte)": "Destination (remplace celle enregistrée)",
@@ -2169,6 +2168,16 @@
  "mirror oder bisync": "mirror ou bisync",
  "Ausgeschlossenes im Ziel löschen": "Supprimer les éléments exclus dans la destination",
  "zusätzlich den Baum als JSON liefern (sonst nur Text und Zusammenfassung)": "renvoyer aussi l'arbre en JSON (sinon seulement texte et résumé)",
- "Vorschau: wie die Ordnerstruktur im Ziel nach dem nächsten Lauf aussieht, mit denselben Filtern wie der echte Lauf. Ändert nichts. Liefert summary (Dateien neu/aktualisiert/gelöscht/gleich) und text (Baum, + neu, ~ aktualisiert, - gelöscht, < nach Seite A). Optional Felder überschreiben (z. B. anderes Ziel ausprobieren).": "Aperçu : à quoi ressemblera l'arborescence de la destination après la prochaine exécution, avec les mêmes filtres que l'exécution réelle. Ne modifie rien. Renvoie summary (fichiers nouveaux/mis à jour/supprimés/identiques) et text (arbre, + nouveau, ~ mis à jour, - supprimé, < vers le côté A). Champs remplaçables en option (p. ex. essayer une autre destination).",
- "Vorschau ohne gespeicherte Aufgabe: Ordnerstruktur im Ziel, wenn source nach dest gespiegelt würde (optional selection, excludes, include_source_dir, direction, delete_excluded). Ändert nichts.": "Aperçu sans tâche enregistrée : arborescence de la destination si source était mis en miroir vers dest (en option selection, excludes, include_source_dir, direction, delete_excluded). Ne modifie rien."
+ "📂 Durchklicken": "📂 Parcourir",
+ "🌳 Baum": "🌳 Arbre",
+ "Nur Änderungen zeigen": "Afficher uniquement les modifications",
+ "Keine Änderungen.": "Aucune modification.",
+ "Änderung": "Modification",
+ "Keine Änderungen in diesem Ordner.": "Aucune modification dans ce dossier.",
+ "Ordner {0} gibt es in der Vorschau nicht.": "Le dossier {0} n'existe pas dans l'aperçu.",
+ "Vorschau der Ordnerstruktur im Ziel ansehen und durchklicken (listet Dateien in Quelle und Ziel)": "Voir et parcourir l'aperçu de l'arborescence de la destination (liste les fichiers de la source et de la destination)",
+ "Ordner im Ziel wie im Datei-Browser öffnen (relativ zum Ziel, z. B. Fotos/2024): liefert entries mit name, dir, status, size, modified und bei Ordnern counts; leer = oberste Ebene": "Ouvrir un dossier de la destination comme dans le navigateur de fichiers (relatif à la destination, p. ex. Photos/2024) : renvoie entries avec name, dir, status, size, modified et counts pour les dossiers ; vide = niveau supérieur",
+ "nur Einträge zeigen, die sich ändern (neu, aktualisiert, gelöscht, nach A)": "afficher uniquement les entrées qui changent (nouvelles, mises à jour, supprimées, vers A)",
+ "Vorschau: wie die Ordnerstruktur im Ziel nach dem nächsten Lauf aussieht, mit denselben Filtern wie der echte Lauf. Ändert nichts. Liefert summary (Dateien neu/aktualisiert/gelöscht/gleich) und text (Baum, + neu, ~ aktualisiert, - gelöscht, < nach Seite A). Mit path einen Ordner wie im Datei-Browser öffnen (entries), mit only_changes nur Änderungen. Optional Felder überschreiben (z. B. anderes Ziel ausprobieren).": "Aperçu : à quoi ressemblera l'arborescence de la destination après la prochaine exécution, avec les mêmes filtres que l'exécution réelle. Ne modifie rien. Renvoie summary (fichiers nouveaux/mis à jour/supprimés/identiques) et text (arbre, + nouveau, ~ mis à jour, - supprimé, < vers le côté A). Avec path, ouvre un dossier comme dans le navigateur de fichiers (entries), avec only_changes seulement les modifications. Champs remplaçables en option (p. ex. essayer une autre destination).",
+ "Vorschau ohne gespeicherte Aufgabe: Ordnerstruktur im Ziel, wenn source nach dest gespiegelt würde (optional selection, excludes, include_source_dir, direction, delete_excluded). Mit path einen Ordner wie im Datei-Browser öffnen. Ändert nichts.": "Aperçu sans tâche enregistrée : arborescence de la destination si source était mis en miroir vers dest (en option selection, excludes, include_source_dir, direction, delete_excluded). Avec path, ouvre un dossier comme dans le navigateur de fichiers. Ne modifie rien."
 }

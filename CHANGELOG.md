@@ -3,6 +3,14 @@
 Version numbers follow [SemVer](https://semver.org/): MAJOR.MINOR.PATCH
 (MAJOR = incompatible change, MINOR = new feature, PATCH = bug fix).
 
+## 1.44.0 – 2026-11-23
+- **Browse the preview like in the file browser.** The folder structure preview now opens a view like the file
+  browser: click folders, path bar and "⬆ .." to go back, columns name, change (new, will be updated, will be
+  deleted, goes to A, with counters on folders), size and modified, search in the folder and "Show changes only".
+  The previous tree view is still available via "🌳 Tree". API/MCP: `preview_job` and `preview_paths` can open a
+  folder with `path` (`entries`) and return only changes with `only_changes`. Permission `jobs.preview` is now
+  labelled "… view and browse". All 5 languages.
+
 ## 1.43.0 – 2026-11-23
 - **Folder structure preview.** In a job, the new "🗂 Preview folder structure" button shows what the destination
   will look like after the next run: collapsible folder tree, every entry marked as new, will be updated, will be

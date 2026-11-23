@@ -13,7 +13,7 @@ PERM_GROUPS = [
         ("jobs.delete", "löschen"),
         ("jobs.run", "starten und stoppen"),
         ("jobs.dryrun", "Testlauf starten"),
-        ("jobs.preview", "Vorschau der Ordnerstruktur im Ziel ansehen (listet Dateien in Quelle und Ziel)"),
+        ("jobs.preview", "Vorschau der Ordnerstruktur im Ziel ansehen und durchklicken (listet Dateien in Quelle und Ziel)"),
         ("jobs.logs", "Logs und Verlauf ansehen"),
         ("jobs.notify", "Benachrichtigungen der Aufgabe ändern"),
         ("jobs.advanced", "zusätzliche rclone-Optionen ändern"),

@@ -53,7 +53,7 @@ def _parents(path):
 
 
 def compute(src_items, dst_items, mode="mirror", delete_extra=True):
-    """Statusliste je Pfad -> (ist_ordner, status, groesse). mode: mirror | bisync."""
+    """Statusliste je Pfad -> (ist_ordner, status, groesse, aenderungszeit). mode: mirror | bisync."""
     src, dst = _index(src_items), _index(dst_items)
     out = {}
     for p, it in src.items():
@@ -65,7 +65,7 @@ def compute(src_items, dst_items, mode="mirror", delete_extra=True):
             st = "same"
         else:
             st = "update"
-        out[p] = (is_dir, st, 0 if is_dir else int(it.get("Size") or 0))
+        out[p] = (is_dir, st, 0 if is_dir else int(it.get("Size") or 0), it.get("ModTime") or "")
     for p, it in dst.items():
         if p in out:
             continue
@@ -74,13 +74,13 @@ def compute(src_items, dst_items, mode="mirror", delete_extra=True):
             st = "to_a"
         else:
             st = "delete" if delete_extra else "same"
-        out[p] = (is_dir, st, 0 if is_dir else int(it.get("Size") or 0))
+        out[p] = (is_dir, st, 0 if is_dir else int(it.get("Size") or 0), it.get("ModTime") or "")
     # Ordner, die nur implizit vorkommen (z. B. bei Speichern ohne echte Ordner wie S3)
     for p in list(out):
         for q in _parents(p):
             if q not in out:
                 kids_state = out[p][1]
-                out[q] = (True, "new" if kids_state == "new" else ("delete" if kids_state == "delete" else "same"), 0)
+                out[q] = (True, "new" if kids_state == "new" else ("delete" if kids_state == "delete" else "same"), 0, "")
     return out
 
 
@@ -90,7 +90,7 @@ def build_tree(entries, max_files=MAX_FILES):
     files_shown = 0
     truncated = False
     for path in sorted(entries, key=lambda x: (x.count("/"), x.lower())):
-        is_dir, st, size = entries[path]
+        is_dir, st, size, mod = entries[path]
         node = root
         parts = path.split("/")
         for part in parts[:-1]:
@@ -103,7 +103,7 @@ def build_tree(entries, max_files=MAX_FILES):
             child["s"] = st
         else:
             if files_shown < max_files:
-                node["ch"][name] = {"n": name, "d": False, "s": st, "size": size}
+                node["ch"][name] = {"n": name, "d": False, "s": st, "size": size, "m": (mod or "")[:19]}
                 files_shown += 1
             else:
                 truncated = True
@@ -129,7 +129,7 @@ def build_tree(entries, max_files=MAX_FILES):
 
 def summary(entries):
     s = {"files": {k: 0 for k in STATUSES}, "bytes": {k: 0 for k in STATUSES}, "dirs": {k: 0 for k in STATUSES}}
-    for is_dir, st, size in entries.values():
+    for is_dir, st, size, _mod in entries.values():
         if is_dir:
             s["dirs"][st] += 1
         else:

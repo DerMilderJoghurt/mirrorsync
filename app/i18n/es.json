@@ -2160,7 +2160,6 @@
  "Quelle: unerwartete Antwort von rclone.": "Origen: respuesta inesperada de rclone.",
  "Ziel: unerwartete Antwort von rclone.": "Destino: respuesta inesperada de rclone.",
  "Aufgabe nicht gefunden.": "Tarea no encontrada.",
- "Vorschau der Ordnerstruktur im Ziel ansehen (listet Dateien in Quelle und Ziel)": "Ver la vista previa de la estructura de carpetas del destino (lista archivos en origen y destino)",
  "+ neu, ~ wird aktualisiert, - wird gelöscht, < kommt nach Seite A (Zwei-Wege)": "+ nuevo, ~ se actualizará, - se borrará, < va al lado A (bidireccional)",
  "Quelle (überschreibt die gespeicherte)": "Origen (sustituye al guardado)",
  "Ziel (überschreibt das gespeicherte)": "Destino (sustituye al guardado)",
@@ -2169,6 +2168,16 @@
  "mirror oder bisync": "mirror o bisync",
  "Ausgeschlossenes im Ziel löschen": "Borrar lo excluido en el destino",
  "zusätzlich den Baum als JSON liefern (sonst nur Text und Zusammenfassung)": "devolver también el árbol como JSON (si no, solo texto y resumen)",
- "Vorschau: wie die Ordnerstruktur im Ziel nach dem nächsten Lauf aussieht, mit denselben Filtern wie der echte Lauf. Ändert nichts. Liefert summary (Dateien neu/aktualisiert/gelöscht/gleich) und text (Baum, + neu, ~ aktualisiert, - gelöscht, < nach Seite A). Optional Felder überschreiben (z. B. anderes Ziel ausprobieren).": "Vista previa: cómo quedará la estructura de carpetas del destino tras la próxima ejecución, con los mismos filtros que la ejecución real. No cambia nada. Devuelve summary (archivos nuevos/actualizados/borrados/iguales) y text (árbol, + nuevo, ~ actualizado, - borrado, < al lado A). Opcionalmente sustituye campos (p. ej. probar otro destino).",
- "Vorschau ohne gespeicherte Aufgabe: Ordnerstruktur im Ziel, wenn source nach dest gespiegelt würde (optional selection, excludes, include_source_dir, direction, delete_excluded). Ändert nichts.": "Vista previa sin tarea guardada: estructura de carpetas del destino si source se reflejara en dest (opcional selection, excludes, include_source_dir, direction, delete_excluded). No cambia nada."
+ "📂 Durchklicken": "📂 Navegar",
+ "🌳 Baum": "🌳 Árbol",
+ "Nur Änderungen zeigen": "Mostrar solo cambios",
+ "Keine Änderungen.": "Sin cambios.",
+ "Änderung": "Cambio",
+ "Keine Änderungen in diesem Ordner.": "No hay cambios en esta carpeta.",
+ "Ordner {0} gibt es in der Vorschau nicht.": "La carpeta {0} no existe en la vista previa.",
+ "Vorschau der Ordnerstruktur im Ziel ansehen und durchklicken (listet Dateien in Quelle und Ziel)": "Ver y navegar la vista previa de la estructura de carpetas del destino (lista archivos en origen y destino)",
+ "Ordner im Ziel wie im Datei-Browser öffnen (relativ zum Ziel, z. B. Fotos/2024): liefert entries mit name, dir, status, size, modified und bei Ordnern counts; leer = oberste Ebene": "Abrir una carpeta del destino como en el explorador de archivos (relativa al destino, p. ej. Fotos/2024): devuelve entries con name, dir, status, size, modified y counts en carpetas; vacío = nivel superior",
+ "nur Einträge zeigen, die sich ändern (neu, aktualisiert, gelöscht, nach A)": "mostrar solo entradas que cambian (nuevas, actualizadas, borradas, hacia A)",
+ "Vorschau: wie die Ordnerstruktur im Ziel nach dem nächsten Lauf aussieht, mit denselben Filtern wie der echte Lauf. Ändert nichts. Liefert summary (Dateien neu/aktualisiert/gelöscht/gleich) und text (Baum, + neu, ~ aktualisiert, - gelöscht, < nach Seite A). Mit path einen Ordner wie im Datei-Browser öffnen (entries), mit only_changes nur Änderungen. Optional Felder überschreiben (z. B. anderes Ziel ausprobieren).": "Vista previa: cómo quedará la estructura de carpetas del destino tras la próxima ejecución, con los mismos filtros que la ejecución real. No cambia nada. Devuelve summary (archivos nuevos/actualizados/borrados/iguales) y text (árbol, + nuevo, ~ actualizado, - borrado, < al lado A). Con path abre una carpeta como en el explorador de archivos (entries), con only_changes solo los cambios. Opcionalmente sustituye campos (p. ej. probar otro destino).",
+ "Vorschau ohne gespeicherte Aufgabe: Ordnerstruktur im Ziel, wenn source nach dest gespiegelt würde (optional selection, excludes, include_source_dir, direction, delete_excluded). Mit path einen Ordner wie im Datei-Browser öffnen. Ändert nichts.": "Vista previa sin tarea guardada: estructura de carpetas del destino si source se reflejara en dest (opcional selection, excludes, include_source_dir, direction, delete_excluded). Con path abre una carpeta como en el explorador de archivos. No cambia nada."
 }

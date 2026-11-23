@@ -2160,7 +2160,6 @@
  "Quelle: unerwartete Antwort von rclone.": "Source: unexpected response from rclone.",
  "Ziel: unerwartete Antwort von rclone.": "Destination: unexpected response from rclone.",
  "Aufgabe nicht gefunden.": "Job not found.",
- "Vorschau der Ordnerstruktur im Ziel ansehen (listet Dateien in Quelle und Ziel)": "View the folder structure preview of the destination (lists files in source and destination)",
  "+ neu, ~ wird aktualisiert, - wird gelöscht, < kommt nach Seite A (Zwei-Wege)": "+ new, ~ will be updated, - will be deleted, < goes to side A (two-way)",
  "Quelle (überschreibt die gespeicherte)": "Source (overrides the saved one)",
  "Ziel (überschreibt das gespeicherte)": "Destination (overrides the saved one)",
@@ -2169,6 +2168,16 @@
  "mirror oder bisync": "mirror or bisync",
  "Ausgeschlossenes im Ziel löschen": "Delete excluded items in the destination",
  "zusätzlich den Baum als JSON liefern (sonst nur Text und Zusammenfassung)": "also return the tree as JSON (otherwise only text and summary)",
- "Vorschau: wie die Ordnerstruktur im Ziel nach dem nächsten Lauf aussieht, mit denselben Filtern wie der echte Lauf. Ändert nichts. Liefert summary (Dateien neu/aktualisiert/gelöscht/gleich) und text (Baum, + neu, ~ aktualisiert, - gelöscht, < nach Seite A). Optional Felder überschreiben (z. B. anderes Ziel ausprobieren).": "Preview: what the folder structure in the destination will look like after the next run, with the same filters as the real run. Changes nothing. Returns summary (files new/updated/deleted/same) and text (tree, + new, ~ updated, - deleted, < to side A). Optionally override fields (e.g. try another destination).",
- "Vorschau ohne gespeicherte Aufgabe: Ordnerstruktur im Ziel, wenn source nach dest gespiegelt würde (optional selection, excludes, include_source_dir, direction, delete_excluded). Ändert nichts.": "Preview without a saved job: folder structure in the destination if source were mirrored to dest (optional selection, excludes, include_source_dir, direction, delete_excluded). Changes nothing."
+ "📂 Durchklicken": "📂 Browse",
+ "🌳 Baum": "🌳 Tree",
+ "Nur Änderungen zeigen": "Show changes only",
+ "Keine Änderungen.": "No changes.",
+ "Änderung": "Change",
+ "Keine Änderungen in diesem Ordner.": "No changes in this folder.",
+ "Ordner {0} gibt es in der Vorschau nicht.": "Folder {0} does not exist in the preview.",
+ "Vorschau der Ordnerstruktur im Ziel ansehen und durchklicken (listet Dateien in Quelle und Ziel)": "View and browse the folder structure preview of the destination (lists files in source and destination)",
+ "Ordner im Ziel wie im Datei-Browser öffnen (relativ zum Ziel, z. B. Fotos/2024): liefert entries mit name, dir, status, size, modified und bei Ordnern counts; leer = oberste Ebene": "Open a folder in the destination like in the file browser (relative to the destination, e.g. Photos/2024): returns entries with name, dir, status, size, modified and counts for folders; empty = top level",
+ "nur Einträge zeigen, die sich ändern (neu, aktualisiert, gelöscht, nach A)": "only show entries that change (new, updated, deleted, to A)",
+ "Vorschau: wie die Ordnerstruktur im Ziel nach dem nächsten Lauf aussieht, mit denselben Filtern wie der echte Lauf. Ändert nichts. Liefert summary (Dateien neu/aktualisiert/gelöscht/gleich) und text (Baum, + neu, ~ aktualisiert, - gelöscht, < nach Seite A). Mit path einen Ordner wie im Datei-Browser öffnen (entries), mit only_changes nur Änderungen. Optional Felder überschreiben (z. B. anderes Ziel ausprobieren).": "Preview: what the folder structure in the destination will look like after the next run, with the same filters as the real run. Changes nothing. Returns summary (files new/updated/deleted/same) and text (tree, + new, ~ updated, - deleted, < to side A). With path, open a folder like in the file browser (entries), with only_changes just the changes. Optionally override fields (e.g. try another destination).",
+ "Vorschau ohne gespeicherte Aufgabe: Ordnerstruktur im Ziel, wenn source nach dest gespiegelt würde (optional selection, excludes, include_source_dir, direction, delete_excluded). Mit path einen Ordner wie im Datei-Browser öffnen. Ändert nichts.": "Preview without a saved job: folder structure in the destination if source were mirrored to dest (optional selection, excludes, include_source_dir, direction, delete_excluded). With path, open a folder like in the file browser. Changes nothing."
 }

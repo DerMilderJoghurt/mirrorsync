@@ -333,7 +333,14 @@ Vorhanden: {% for r in remotes %}<code>{{ r.name }}:</code> ({{ r.type }}) {% el
 <div id="pvbody" style="margin-top:12px"></div></dialog>
 <style>.pvdlg{width:min(980px,96vw);max-height:88vh;border:1px solid var(--bd);border-radius:12px;background:var(--card);color:var(--fg);padding:18px 20px}.pvdlg::backdrop{background:rgba(0,0,0,.35)}.pvt{font-size:14px;line-height:1.7}.pvt ul{list-style:none;margin:0;padding-left:18px}.pvt>ul{padding-left:0}.pvt summary{cursor:pointer}.pvt .pf{white-space:nowrap}
 .pvt .s-new{color:var(--ok)}.pvt .s-update{color:var(--run,#2563eb)}.pvt .s-delete{color:var(--err);text-decoration:line-through}.pvt .s-to_a{color:var(--warn,#d97706)}
-.pvt .cnt{font-size:12px;color:var(--mut);margin-left:6px}.pvleg span{margin-right:14px;white-space:nowrap}</style>
+.pvt .cnt{font-size:12px;color:var(--mut);margin-left:6px}.pvleg span{margin-right:14px;white-space:nowrap}
+.pvbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:0 0 8px}.pvbar input[type=text]{height:32px;width:min(220px,50vw)}
+.pvseg{display:inline-flex;border:1px solid var(--bd);border-radius:8px;overflow:hidden}.pvseg button{border:0;background:transparent;color:var(--fg);font:inherit;font-size:13px;padding:5px 12px;cursor:pointer}.pvseg button.on{background:var(--acc-soft);font-weight:600}
+.pvb .fbcrumbs{margin:0 0 6px}.pvb .fbtable{max-height:56vh}.pvb table{width:100%}.pvb th{position:sticky;top:0;background:var(--card);z-index:1;text-align:left}.pvb td{padding:6px 10px}.pvb .num{text-align:right;white-space:nowrap}
+.pvb tr.fdir a{text-decoration:none;color:var(--fg);font-weight:500}.pvb tr.s-delete td:first-child{text-decoration:line-through;opacity:.75}
+.pvb .st{font-size:12px;white-space:nowrap}.pvb .st.s-new{color:var(--ok)}.pvb .st.s-update{color:var(--run,#2563eb)}.pvb .st.s-delete{color:var(--err)}.pvb .st.s-to_a{color:var(--warn,#d97706)}
+.pvb tr.s-new td:first-child{box-shadow:inset 3px 0 0 var(--ok)}.pvb tr.s-update td:first-child{box-shadow:inset 3px 0 0 var(--run,#2563eb)}.pvb tr.s-delete td:first-child{box-shadow:inset 3px 0 0 var(--err)}.pvb tr.s-to_a td:first-child{box-shadow:inset 3px 0 0 var(--warn,#d97706)}
+.pvb .cnt{font-size:12px;color:var(--mut);margin-left:6px}@media(max-width:700px){.pvb .hide-sm{display:none}}</style>
 <script>
 function pvEsc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
 function pvSize(b){const u=['B','KB','MB','GB','TB'];let i=0;while(b>=1024&&i<4){b/=1024;i++}return (i?b.toFixed(1):b)+' '+u[i]}
@@ -352,8 +359,37 @@ async function pvOpen(){const d=document.getElementById('pvdlg'),b=document.getE
   h+='<p class="pvleg" style="margin:0 0 10px"><span class="s-new">+ '+f.new+' '+'neu'+' ('+pvSize(y.new)+')</span><span class="s-update">~ '+f.update+' '+'werden aktualisiert'+'</span><span class="s-delete">− '+f.delete+' '+'werden gelöscht'+'</span>'+(j.mode==='bisync'?'<span class="s-to_a">← '+f.to_a+' '+'kommen nach A'+'</span>':'')+'<span class="mut">'+f.same+' '+'bleiben gleich'+'</span></p>';
   if(j.mode==='bisync')h+='<div class="hint" style="margin-bottom:8px">'+'Zwei-Wege: So sehen danach beide Seiten aus. Gezeigt ist der Stand ohne Löschungen, die seit dem letzten Lauf auf einer Seite passiert sind.'+'</div>';
   if(j.truncated)h+='<div class="hint" style="margin-bottom:8px">'+'Sehr viele Dateien: Einzeln gezeigt werden nur die ersten Dateien, die Zähler an den Ordnern stimmen trotzdem.'+'</div>';
-  const kids=j.tree.ch||[];h+=kids.length?'<div class="pvt"><ul>'+kids.map(k=>pvNode(k,0)).join('')+'</ul></div>':'<p class="mut">'+'Nach dem Lauf ist das Ziel leer.'+'</p>';
-  b.innerHTML=h}catch(e){b.innerHTML='<div class="msg err">'+pvEsc(e.message||e)+'</div>'}}
+  PV.data=j;PV.path=[];
+  if(!(j.tree.ch||[]).length){b.innerHTML=h+'<p class="mut">'+'Nach dem Lauf ist das Ziel leer.'+'</p>';return}
+  h+='<div class="pvbar"><span class="pvseg"><button type="button" data-v="browse" onclick="pvSetView(\'browse\')">'+'📂 Durchklicken'+'</button><button type="button" data-v="tree" onclick="pvSetView(\'tree\')">'+'🌳 Baum'+'</button></span>'+
+   '<label class="check" style="margin:0"><input type="checkbox" id="pvonly" onchange="pvRender()"> '+'Nur Änderungen zeigen'+'</label><span style="flex:1"></span>'+
+   '<input type="text" id="pvq" placeholder="'+'Im Ordner suchen'+'" autocomplete="off" oninput="pvRender()"></div><div id="pvview"></div>';
+  b.innerHTML=h;pvRender()}catch(e){b.innerHTML='<div class="msg err">'+pvEsc(e.message||e)+'</div>'}}
+const PV={data:null,path:[],view:'browse'};try{PV.view=localStorage.getItem('pvView')||'browse'}catch(e){}
+function pvSetView(v){PV.view=v;try{localStorage.setItem('pvView',v)}catch(e){}pvRender()}
+function pvChanged(n){return n.s!=='same'||(n.d&&(n.c.new+n.c.update+n.c.delete+n.c.to_a)>0)}
+function pvPrune(n){if(!n.d)return n;return Object.assign({},n,{ch:n.ch.filter(pvChanged).map(pvPrune)})}
+function pvDate(s){return s?s.slice(8,10)+'.'+s.slice(5,7)+'.'+s.slice(0,4)+' '+s.slice(11,16):''}
+function pvGo(i){PV.path=PV.path.slice(0,i);document.getElementById('pvq').value='';pvRender()}
+function pvInto(name){PV.path.push(name);document.getElementById('pvq').value='';pvRender()}
+function pvRender(){const v=document.getElementById('pvview');if(!v||!PV.data)return;
+ document.querySelectorAll('.pvseg button').forEach(x=>x.classList.toggle('on',x.dataset.v===PV.view));
+ const only=document.getElementById('pvonly').checked,q=document.getElementById('pvq');q.style.display=PV.view==='browse'?'':'none';
+ const root=only?pvPrune(PV.data.tree):PV.data.tree;
+ if(PV.view==='tree'){const kids=root.ch||[];v.innerHTML=kids.length?'<div class="pvt"><ul>'+kids.map(k=>pvNode(k,0)).join('')+'</ul></div>':'<p class="mut">'+'Keine Änderungen.'+'</p>';return}
+ let node=root,ok=[];for(const p of PV.path){const k=(node.ch||[]).find(x=>x.d&&x.n===p);if(!k)break;node=k;ok.push(p)}PV.path=ok;
+ let c='<div class="fbcrumbs"><a href="#" onclick="pvGo(0);return false">🎯 '+pvEsc(PV.data.dest)+'</a>';
+ PV.path.forEach((p,i)=>{c+='<span class="sep">›</span>'+(i===PV.path.length-1?'<b>'+pvEsc(p)+'</b>':'<a href="#" onclick="pvGo('+(i+1)+');return false">'+pvEsc(p)+'</a>')});c+='</div>';
+ const f=q.value.trim().toLowerCase();const rows=(node.ch||[]).filter(k=>!f||k.n.toLowerCase().includes(f));
+ let t='<div class="fbtable"><table><thead><tr><th>'+'Name'+'</th><th>'+'Änderung'+'</th><th class="num hide-sm">'+'Größe'+'</th><th class="hide-sm">'+'Geändert'+'</th></tr></thead><tbody>';
+ if(PV.path.length)t+='<tr class="fdir"><td colspan="4"><a href="#" onclick="pvGo('+(PV.path.length-1)+');return false">⬆ ..</a></td></tr>';
+ rows.forEach((k,i)=>{const lab=PV_LABEL[k.s]?'<span class="st s-'+k.s+'">'+PV_LABEL[k.s]+'</span>':'';
+  if(k.d){const b=k.b,sz=b.new+b.update+b.same+b.to_a;
+   t+='<tr class="fdir s-'+k.s+'"><td><a href="#" data-i="'+i+'">📁 '+pvEsc(k.n)+'</a></td><td>'+(k.s!=='same'?lab:'')+pvCnt(k.c)+'</td><td class="num hide-sm">'+(sz?pvSize(sz):'')+'</td><td class="hide-sm"></td></tr>'}
+  else t+='<tr class="ffile s-'+k.s+'"><td>📄 '+pvEsc(k.n)+'</td><td>'+lab+'</td><td class="num hide-sm">'+pvSize(k.size||0)+'</td><td class="hide-sm"><small>'+pvDate(k.m)+'</small></td></tr>'});
+ if(!rows.length)t+='<tr><td colspan="4" class="mut" style="padding:14px">'+(only?'Keine Änderungen in diesem Ordner.':'Ordner ist leer.')+'</td></tr>';
+ v.innerHTML='<div class="pvb">'+c+t+'</tbody></table></div></div>';
+ v.querySelectorAll('a[data-i]').forEach(a=>a.onclick=e=>{e.preventDefault();pvInto(rows[+a.dataset.i].n)})}
 </script>{% endif %}
 </div>
 <div class="tw-only">

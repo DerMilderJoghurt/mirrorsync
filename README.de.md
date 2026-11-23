@@ -4,7 +4,7 @@
 
 # MirrorSync – 1:1-Spiegelung mit Web-GUI und Zeitplänen
 
-Version **1.43.0** · Änderungen siehe [CHANGELOG.md](CHANGELOG.md) (englisch) · [English version](README.md)
+Version **1.44.0** · Änderungen siehe [CHANGELOG.md](CHANGELOG.md) (englisch) · [English version](README.md)
 
 Ein Docker-Container, der Ordner **einweg 1:1 spiegelt** (wie FreeFileSync „Spiegeln"):
 Das Ziel wird exakt wie die Quelle, inklusive Löschungen. Als Sync-Motor dient
@@ -68,7 +68,7 @@ Geänderte Dateien werden komplett neu übertragen (kein Delta wie bei rsync).
 
 ## Installation
 Das fertige Image liegt in der GitHub Container Registry: `ghcr.io/dermilderjoghurt/mirrorsync`
-(für amd64 und arm64, z. B. Raspberry Pi). Tags: `latest` (neueste Version), `1.43.0` (feste Version),
+(für amd64 und arm64, z. B. Raspberry Pi). Tags: `latest` (neueste Version), `1.44.0` (feste Version),
 `1.40` (neuester Patch dieser Version). Das Image wird nur veröffentlicht, wenn sich die Versionsnummer ändert.
 Update-Prüfer wie Dockhand oder Watchtower melden deshalb nur dann ein Update, wenn es wirklich eine neue Version gibt.
 
@@ -227,7 +227,10 @@ In einer Aufgabe zeigt der Knopf **„🗂 Vorschau der Ordnerstruktur“** (unt
 nächsten Lauf aussieht. Es werden nur Quelle und Ziel gelesen, nichts wird kopiert oder gelöscht. Die Vorschau
 nimmt die Werte, die gerade im Formular stehen, du musst also nicht erst speichern.
 
-- Der Ordnerbaum lässt sich auf- und zuklappen. Jeder Eintrag ist markiert: **neu**, **wird aktualisiert**
+- **Durchklicken wie im Datei-Browser** (seit 1.44.0, Standard): Ordner anklicken, über die Pfadleiste oder „⬆ ..“
+  zurück, Spalten Name, Änderung, Größe und Geändert, Suche im Ordner und **„Nur Änderungen zeigen“**. Mit
+  **„🌳 Baum“** wechselst du zur aufklappbaren Baumansicht, die Wahl merkt sich der Browser.
+- Jeder Eintrag ist markiert: **neu**, **wird aktualisiert**
   (Größe oder Änderungszeit anders), **wird gelöscht** (gibt es in der Quelle nicht mehr) oder unverändert. Ordner
   zeigen, wie viele Dateien darin neu sind, aktualisiert oder gelöscht werden.
 - Es gelten dieselben Regeln wie beim echten Lauf: „Nur diese Dateien und Ordner“, Ausschlüsse, „Quellordner
@@ -236,12 +239,14 @@ nimmt die Werte, die gerade im Formular stehen, du musst also nicht erst speiche
   „kommt nach A“ markiert. Löschungen seit dem letzten Lauf sind dabei nicht berücksichtigt.
 - Gibt es das Ziel noch nicht, steht das oben, und alles ist „neu“. Bei sehr vielen Dateien (über 3000) werden
   nur die ersten einzeln gezeigt, die Zähler stimmen trotzdem.
-- **Recht:** `jobs.preview` („Vorschau der Ordnerstruktur im Ziel ansehen“). Admins und die Standardrolle
+- **Recht:** `jobs.preview` („Vorschau der Ordnerstruktur im Ziel ansehen und durchklicken“). Admins und die Standardrolle
   Operator haben es. Eigene Rollen, die schon in der Datenbank stehen, bekommen es nicht automatisch.
 - **API/MCP:** `POST /api/v1/jobs/{job_id}/preview` (`preview_job`, gespeicherte Aufgabe, Felder optional
   überschreibbar) und `POST /api/v1/jobs/preview` (`preview_paths`, nur `source` und `dest`). Antwort mit
   `summary` (Zähler) und `text` (Baum mit `+` neu, `~` aktualisiert, `-` gelöscht, `<` nach Seite A), mit
-  `tree: true` auch als JSON.
+  `tree: true` auch als JSON. Mit `path` (z. B. `Fotos/2024`) wird ein Ordner wie im Datei-Browser geöffnet
+  (`entries` mit `name`, `dir`, `status`, `size`, `modified`, bei Ordnern `counts`), mit `only_changes: true` nur
+  Einträge, die sich ändern.
 
 ## Nur einzelne Dateien und Ordner
 Im Feld **Nur diese Dateien und Ordner** stehen Einträge relativ zur Quelle, einer pro Zeile, Ordner mit `/` am
@@ -797,7 +802,7 @@ MirrorSync kann sich selbst aktualisieren, wenn du den Docker-Socket in den Cont
   sie entfernt und die bisherige läuft wieder. Ergebnis und Ablauf stehen in der GUI, im Audit-Log
   („Update gestartet / abgeschlossen / fehlgeschlagen“) und in `config/selfupdate.json`.
 - **Voraussetzungen:** Das Image muss aus einem Registry kommen (`image: ghcr.io/dermilderjoghurt/mirrorsync:latest`).
-  Mit `build: .` gebaute Images kann MirrorSync nicht neu holen. Mit festem Versions-Tag (`:1.43.0`) wird nur dieser
+  Mit `build: .` gebaute Images kann MirrorSync nicht neu holen. Mit festem Versions-Tag (`:1.44.0`) wird nur dieser
   Tag neu geholt. `/config` muss als Volume oder Ordner eingebunden sein (ist es in der Beispiel-Compose).
 - **Recht:** `system.update` („MirrorSync aktualisieren“, Admins haben es automatisch). Automatik und Uhrzeit
   ändern braucht `system.settings`.

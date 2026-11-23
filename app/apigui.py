@@ -499,11 +499,42 @@ PREVIEW_PROPS = {
     "excludes": dict(STRS, description="Ausschlüsse"), "include_source_dir": S(BOOL, "Quellordner selbst mitkopieren"),
     "direction": S(STR, "mirror oder bisync", enum=["mirror", "bisync"]), "delete_excluded": S(BOOL, "Ausgeschlossenes im Ziel löschen"),
     "tree": S(BOOL, "zusätzlich den Baum als JSON liefern (sonst nur Text und Zusammenfassung)"),
+    "path": S(STR, "Ordner im Ziel wie im Datei-Browser öffnen (relativ zum Ziel, z. B. Fotos/2024): liefert entries mit "
+                   "name, dir, status, size, modified und bei Ordnern counts; leer = oberste Ebene"),
+    "only_changes": S(BOOL, "nur Einträge zeigen, die sich ändern (neu, aktualisiert, gelöscht, nach A)"),
 }
+
+
+def _pv_folder(root, path, only):
+    """Einen Ordner des Vorschau-Baums wie im Datei-Browser auflisten."""
+    node, parts = root, [x for x in (path or "").strip("/").split("/") if x]
+    for i, part in enumerate(parts):
+        nxt = next((k for k in node.get("ch", []) if k["d"] and k["n"] == part), None)
+        if nxt is None:
+            raise ApiError(404, _t("Ordner {0} gibt es in der Vorschau nicht.").replace("{0}", "/".join(parts[:i + 1])))
+        node = nxt
+
+    def changed(k):
+        return k["s"] != "same" or (k["d"] and any(k["c"][x] for x in ("new", "update", "delete", "to_a")))
+    out = []
+    for k in node.get("ch", []):
+        if only and not changed(k):
+            continue
+        e = {"name": k["n"], "dir": k["d"], "status": k["s"]}
+        if k["d"]:
+            e["counts"] = k["c"]
+            e["size"] = sum(v for x, v in k["b"].items() if x != "delete")
+        else:
+            e["size"] = k.get("size", 0)
+            e["modified"] = k.get("m") or None
+        out.append(e)
+    return "/".join(parts), out
 
 
 def _preview(path, a):
     _check_keys(a, set(PREVIEW_PROPS) | {"job_id"})
+    a = dict(a)
+    folder, only = a.pop("path", None), _bool(a.pop("only_changes", False))
     form = None
     if "source" in a or "dest" in a:
         if "job_id" in a:
@@ -524,6 +555,8 @@ def _preview(path, a):
     out = {k: body.get(k) for k in ("source", "dest", "mode", "dest_missing", "selection", "summary", "truncated")}
     out["text"] = core.preview.as_text(body["tree"])
     out["legend"] = _t("+ neu, ~ wird aktualisiert, - wird gelöscht, < kommt nach Seite A (Zwei-Wege)")
+    if folder is not None or only:
+        out["path"], out["entries"] = _pv_folder(body["tree"], folder, only)
     if _bool(a.get("tree", False)):
         out["tree"] = body["tree"]
     return dict(out, ok=True)
@@ -532,7 +565,8 @@ def _preview(path, a):
 @action("preview_job", "POST", "/jobs/{job_id}/preview", "jobs.preview", "Aufgaben",
         "Vorschau: wie die Ordnerstruktur im Ziel nach dem nächsten Lauf aussieht, mit denselben Filtern wie der echte Lauf. "
         "Ändert nichts. Liefert summary (Dateien neu/aktualisiert/gelöscht/gleich) und text (Baum, + neu, ~ aktualisiert, "
-        "- gelöscht, < nach Seite A). Optional Felder überschreiben (z. B. anderes Ziel ausprobieren).",
+        "- gelöscht, < nach Seite A). Mit path einen Ordner wie im Datei-Browser öffnen (entries), mit only_changes nur "
+        "Änderungen. Optional Felder überschreiben (z. B. anderes Ziel ausprobieren).",
         dict({"job_id": S(STR)}, **PREVIEW_PROPS), ["job_id"], ro=True)
 def a_preview_job(a):
     return _preview(f"/job/{a['job_id']}/preview", a)
@@ -540,7 +574,8 @@ def a_preview_job(a):
 
 @action("preview_paths", "POST", "/jobs/preview", "jobs.preview", "Aufgaben",
         "Vorschau ohne gespeicherte Aufgabe: Ordnerstruktur im Ziel, wenn source nach dest gespiegelt würde "
-        "(optional selection, excludes, include_source_dir, direction, delete_excluded). Ändert nichts.",
+        "(optional selection, excludes, include_source_dir, direction, delete_excluded). Mit path einen Ordner wie im "
+        "Datei-Browser öffnen. Ändert nichts.",
         PREVIEW_PROPS, ["source", "dest"], ro=True)
 def a_preview_paths(a):
     return _preview("/job/preview", a)
