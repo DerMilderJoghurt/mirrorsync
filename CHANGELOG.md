@@ -3,6 +3,23 @@
 Version numbers follow [SemVer](https://semver.org/): MAJOR.MINOR.PATCH
 (MAJOR = incompatible change, MINOR = new feature, PATCH = bug fix).
 
+## 1.41.0 – 2026-11-23
+- **Require 2FA**, globally and per user. Under Settings → General → Sign-in and security: *Off (per user only)*,
+  *For new users* or *For all users*. Under Users → Edit the “Require 2FA” checkbox. Affected users land on
+  “My account” with the QR code after signing in and can do nothing else until 2FA is set up; afterwards only an
+  admin can turn it off. The user list shows “Required, not set up yet”. API/MCP: `require_2fa_mode` in
+  `update_security_settings`, `require_2fa` in `create_user`/`update_user`; `get_user` returns `require_2fa`,
+  `must_2fa`, `totp_setup_pending`. Permissions: `system.settings` and `users.manage`. Audit log and all 5 languages
+  updated.
+- **Create notifications via the API and MCP:** new actions `setup_notification_channel`
+  (`POST /api/v1/settings/notifications/channels/{channel}`, channels webhook, smtp, telegram, apprise with
+  readable fields, append Apprise URLs with `add_urls`, optionally `test: true` right away) and
+  `remove_notification_channel` (turn off, with `forget: true` also delete credentials). Permission `notify.edit`.
+- The version number at the bottom left now links to the release notes on GitHub.
+- Fixed: a small scrollbar appeared to the right of the tabs in the settings. The tabs can still be swiped on narrow
+  screens, but without a visible bar.
+- Audit log: readable names for more notification fields (e.g. Telegram chat ID, Webhook on).
+
 ## 1.40.1 – 2026-11-23
 - **Fixed: update checkers kept reporting a pending update.** Until now every push to main rebuilt the image and
   pushed it as `:latest`, also for changes that do not affect the image (README, workflows, Android app,

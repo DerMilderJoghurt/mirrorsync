@@ -27,7 +27,7 @@ nav a{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8p
 nav a:hover{background:var(--card2);color:var(--fg)}nav a.active{background:var(--acc-soft);color:var(--acc)}
 nav svg,.btn svg{width:16px;height:16px;flex:0 0 16px}
 .side-foot{margin-top:auto;padding:12px 10px;border-top:1px solid var(--bd);display:flex;flex-direction:column;gap:2px}
-.side-foot .ver{color:var(--mut);font-size:12px;padding:6px 10px}.side-foot .ver .upd{color:var(--acc);font-weight:600;text-decoration:none}.side-foot .ver .upd:hover{text-decoration:underline}
+.side-foot .ver{color:var(--mut);font-size:12px;padding:6px 10px}.side-foot .ver .upd{color:var(--acc);font-weight:600;text-decoration:none}.side-foot .ver .upd:hover{text-decoration:underline}.side-foot .ver .vlink{color:inherit;text-decoration:none}.side-foot .ver .vlink:hover{color:var(--fg);text-decoration:underline}
 .side-foot button,.side-foot a{all:unset;display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;color:var(--mut);cursor:pointer;font-weight:500}
 .side-foot button:hover,.side-foot a:hover{background:var(--card2);color:var(--fg)}.side-foot svg{width:16px;height:16px}
 .content{flex:1;min-width:0}
@@ -139,7 +139,7 @@ details summary{cursor:pointer;color:var(--mut);font-weight:500}
 .mobile-nav{display:none}
 .userchip{gap:10px!important;align-items:center!important}.userchip b{color:var(--fg);font-weight:600}.userchip small{font-size:11.5px}
 .avatar{width:28px;height:28px;border-radius:50%;background:var(--acc-soft);color:var(--acc);display:grid;place-items:center;font-weight:700;font-size:13px;flex:0 0 28px}
-.tabs{display:flex;gap:4px;border-bottom:1px solid var(--bd);margin:-4px 0 18px;overflow-x:auto}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--bd);margin:-4px 0 18px;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;-ms-overflow-style:none}.tabs::-webkit-scrollbar{display:none}
 .tabs a{padding:9px 14px;color:var(--mut);text-decoration:none;font-weight:500;border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap}
 .tabs a:hover{color:var(--fg)}.tabs a.active{color:var(--acc);border-bottom-color:var(--acc)}
 .codes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 18px;font:14px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;padding:14px;border:1px dashed var(--bd2);border-radius:10px;background:var(--card2)}
@@ -169,7 +169,7 @@ table,tbody,tr,td{display:block;width:100%}tr:first-child:has(th){display:none}t
 <button type="button" onclick="toggleTheme()" title="Design wechseln">{{ ICON.theme }}<span id="themeLabel" class="lbl">Design wechseln</span></button>
 {% if g.user %}<a href="/account" class="userchip" title="{{ g.user }}"><span class="avatar">{{ g.user[:1]|upper }}</span><span class="lbl"><b>{{ g.user }}</b><br><small>{{ role_name(g.role) }}</small></span></a>
 <a href="/logout" title="Abmelden">{{ ICON.logout }}<span class="lbl">Abmelden</span></a>{% endif %}
-<div class="ver">MirrorSync v{{ VERSION }}{% set upd_s = UPDATE() %}{% if upd_s and upd_s.update_available %}<br><a class="upd" href="{{ upd_s.url }}" target="_blank" rel="noopener" title="Neue Version verfügbar">⬆ v{{ upd_s.latest }} verfügbar</a>{% endif %}</div>
+<div class="ver"><a class="vlink" href="{{ RELEASE_URL }}" target="_blank" rel="noopener" title="Versionshinweise auf GitHub">MirrorSync v{{ VERSION }}</a>{% set upd_s = UPDATE() %}{% if upd_s and upd_s.update_available %}<br><a class="upd" href="{{ upd_s.url }}" target="_blank" rel="noopener" title="Neue Version verfügbar">⬆ v{{ upd_s.latest }} verfügbar</a>{% endif %}</div>
 </div>
 </aside>
 <div class="content">
@@ -1465,7 +1465,7 @@ document.querySelectorAll('.rv_pw,.rv_code').forEach(i=>i.addEventListener('keyd
 {% if u.fail_count %}<br><small class="fehler">{{ u.fail_count }} Fehlversuch{{ "e" if u.fail_count != 1 }}</small>{% endif %}
 <br><small>angelegt {{ u.created }}</small></div></div></td>
 <td><span class="tag {{ 'laeuft' if u.role == 'admin' else ('ok' if u.role in roles else 'fehler') }}">{{ roles[u.role].name if u.role in roles else u.role ~ ' (fehlt)' }}</span>{% if u.group_names %}<br><small class="mut">{{ u.group_names|join(", ") }}</small>{% endif %}</td>
-<td>{% if u.totp_enabled %}<span class="tag ok">aktiv</span><br><small>{{ u.backup_left }} Backup-Codes</small>{% else %}<span class="tag">aus</span>{% endif %}{% if u.n_passkeys %}<br><small>🔑 {{ u.n_passkeys }} Passkey{{ "s" if u.n_passkeys != 1 }}</small>{% endif %}</td>
+<td>{% if u.totp_enabled %}<span class="tag ok">aktiv</span><br><small>{{ u.backup_left }} Backup-Codes</small>{% elif u.must2fa %}<span class="tag gestoppt">Pflicht, noch nicht eingerichtet</span>{% else %}<span class="tag">aus</span>{% endif %}{% if u.must2fa and u.totp_enabled %}<br><small>Pflicht</small>{% endif %}{% if u.n_passkeys %}<br><small>🔑 {{ u.n_passkeys }} Passkey{{ "s" if u.n_passkeys != 1 }}</small>{% endif %}</td>
 <td class="hide-sm"><small>{% if u.last_login %}{{ u.last_login }}<br>{% if u.last_ip %}<code>{{ u.last_ip }}</code> {{ u.last_flag }} {{ u.last_country }}{% endif %}{% else %}noch nie{% endif %}</small></td>
 <td style="text-align:right;white-space:nowrap">{% if can("users.manage") %}{% if u.disabled_by or (u.why == "gesperrt" and u.auto_lock_until) %}<form class="inline" method="post" action="/users/{{ u.name }}/unlock"><button class="btn sm pri">Entsperren</button></form> {% endif %}<a class="btn sm" href="/users/{{ u.name }}/edit">Bearbeiten</a>
 {% if u.name != g.user %}<form class="inline" method="post" action="/users/{{ u.name }}/delete" onsubmit="return confirm('Benutzer {{ u.name }} löschen?')"><button class="btn sm del">Entfernen</button></form>{% endif %}{% endif %}</td>
@@ -1504,12 +1504,19 @@ document.querySelectorAll('.rv_pw,.rv_code').forEach(i=>i.addEventListener('keyd
 <div class="hint">Während der Sperre kann sich der Benutzer nicht anmelden, offene Sitzungen enden sofort. Danach ist das Konto automatisch wieder aktiv. Zeitzone des Containers.</div></div>{% endif %}
 {% if name and u.passkeys %}<label class="check"><input type="checkbox" name="reset_passkeys"> Alle {{ u.passkeys|length }} Passkeys dieses Benutzers entfernen (z. B. Gerät verloren)</label>{% endif %}
 {% if name and u.totp_enabled %}<label class="check"><input type="checkbox" name="reset_2fa"> 2FA zurücksetzen (z. B. Handy verloren). Der Benutzer meldet sich dann nur mit Passwort an und kann 2FA neu einrichten.</label>{% endif %}
+<h3 style="margin-top:22px">Zwei-Faktor-Anmeldung (2FA)</h3><input type="hidden" name="r2fa_form" value="1">
+<label class="check"><input type="checkbox" name="require_2fa" {{ "checked" if (form.get('require_2fa') if form.get('r2fa_form') else req_default) }}> 2FA erzwingen</label>
+{% if req_all %}<div class="hint">Zurzeit ist 2FA global für alle Benutzer Pflicht (Einstellungen → Allgemein), das Häkchen wirkt erst, wenn du das dort wieder änderst.</div>{% endif %}
+<div class="hint">Nach der Anmeldung kann der Benutzer nichts anderes tun, bis er unter „Mein Konto“ eine Authenticator-App eingerichtet hat. Er kann 2FA danach nicht selbst ausschalten.</div>{% if name %}<div class="hint">{% if u.totp_enabled %}2FA ist bei diesem Benutzer eingerichtet.{% else %}2FA ist bei diesem Benutzer noch nicht eingerichtet.{% endif %}</div>{% endif %}
 <p style="margin-top:20px"><button class="btn pri">Speichern</button> <a class="btn" href="/users">Abbrechen</a></p>
 </form>
 {% endblock %}
 """,
 "account.html": r"""{% extends "base.html" %}{% block title %}Einstellungen{% endblock %}
-{% block body %}{% if not welcome %}{% include "tabs.html" %}{% endif %}
+{% block body %}{% if not welcome and not force_2fa %}{% include "tabs.html" %}{% endif %}
+{% if force_2fa %}<div class="card" style="border-color:var(--acc)"><h2>{{ ICON.lock }} Zwei-Faktor-Anmeldung einrichten</h2>
+<p class="mut" style="margin:0">Für dein Konto ist eine Zwei-Faktor-Anmeldung Pflicht. Richte sie unten mit einer Authenticator-App ein, danach kannst du MirrorSync wie gewohnt benutzen.</p>
+<p style="margin:12px 0 0"><a class="btn sm" href="/logout">Abmelden</a></p></div>{% endif %}
 {% if welcome %}<div class="card" style="border-color:var(--acc)"><h2>Schritt 2 von 2: Konto zusätzlich absichern (optional)</h2>
 <p class="mut" style="margin:0 0 12px">Dein Admin <b style="color:var(--fg)">{{ g.user }}</b> ist angelegt und angemeldet. Du kannst jetzt eine Zwei-Faktor-Anmeldung und einen Passkey einrichten, beides geht auch später unter Einstellungen → Mein Konto.</p>
 <a class="btn pri" href="/account?done=1">Fertig, weiter zur Übersicht</a></div>{% endif %}
@@ -1568,8 +1575,9 @@ async function pkAdd(){const m=document.getElementById('pkmsg');m.className='hin
 <p><span class="tag ok">aktiv</span> &nbsp;<span class="mut">Beim Anmelden wird zusätzlich ein Code aus deiner Authenticator-App abgefragt. Noch {{ backup_left }} Backup-Codes übrig.</span></p>
 <div class="row"><form method="post"><input type="hidden" name="action" value="codes"><label>Neue Backup-Codes erzeugen</label>
 <div class="row" style="flex-direction:row"><input type="password" name="password" placeholder="Passwort zur Bestätigung" required><button class="btn" style="flex:0 0 auto">Erzeugen</button></div></form>
-<form method="post" onsubmit="return confirm('2FA wirklich ausschalten?')"><input type="hidden" name="action" value="2fa_disable"><label>2FA ausschalten</label>
-<div class="row" style="flex-direction:row"><input type="password" name="password" placeholder="Passwort zur Bestätigung" required><button class="btn del" style="flex:0 0 auto">Ausschalten</button></div></form></div>
+{% if must_2fa %}<div><label>2FA ausschalten</label><div class="hint">Für dein Konto ist 2FA Pflicht. Ausschalten kann sie nur ein Administrator.</div></div>
+{% else %}<form method="post" onsubmit="return confirm('2FA wirklich ausschalten?')"><input type="hidden" name="action" value="2fa_disable"><label>2FA ausschalten</label>
+<div class="row" style="flex-direction:row"><input type="password" name="password" placeholder="Passwort zur Bestätigung" required><button class="btn del" style="flex:0 0 auto">Ausschalten</button></div></form>{% endif %}</div>
 {% elif setup_secret %}
 <div style="display:flex;gap:24px;flex-wrap:wrap;align-items:flex-start">
 <div class="qr">{{ qr|safe }}</div>
@@ -1809,6 +1817,12 @@ scope();
 <form method="post"><input type="hidden" name="section" value="security"><div class="card"><h2>Anmeldung und Sicherheit</h2>
 <div class="row"><div><label>Konto sperren nach so vielen Fehlversuchen</label><input type="text" inputmode="numeric" name="lock_attempts" value="{{ s.lock_attempts }}"><div class="hint">0 = nie sperren. Falsches Passwort und falscher 2FA-Code zählen.</div></div>
 <div><label>Sperrdauer in Minuten</label><input type="text" inputmode="numeric" name="lock_minutes" value="{{ s.lock_minutes }}"><div class="hint">0 = dauerhaft deaktivieren, bis ein Admin es wieder freigibt. Der letzte Admin wird höchstens 15 Minuten gesperrt.</div></div></div>
+{% set r2 = s.require_2fa_mode if s.require_2fa_mode in ("off", "new", "all") else "off" %}
+<label>Zwei-Faktor-Anmeldung (2FA) erzwingen</label>
+<div class="seg"><label><input type="radio" name="require_2fa_mode" value="off" {{ "checked" if r2 == "off" }}><span>Aus (nur pro Benutzer)</span></label>
+<label><input type="radio" name="require_2fa_mode" value="new" {{ "checked" if r2 == "new" }}><span>Für neue Benutzer</span></label>
+<label><input type="radio" name="require_2fa_mode" value="all" {{ "checked" if r2 == "all" }}><span>Für alle Benutzer</span></label></div>
+<div class="hint">Wer 2FA einrichten muss, kann nach der Anmeldung nichts anderes tun, bis eine Authenticator-App eingerichtet ist, und kann 2FA danach nicht selbst ausschalten. „Für neue Benutzer“ setzt beim Anlegen das Häkchen „2FA erzwingen“, bestehende Benutzer bleiben, wie sie sind. „Für alle Benutzer“ gilt sofort für jedes Konto, auch für deins. Pro Benutzer schaltest du es unter Benutzer → Bearbeiten ein.</div>
 {% set fm = s.fail_notify or ("lock" if s.lock_notify else "off") %}
 <div class="row"><div style="flex:2"><label>Benachrichtigung über fehlgeschlagene Anmeldungen</label><select name="fail_notify">
 <option value="every" {{ "selected" if fm == "every" }}>bei jedem Fehlversuch (gedrosselt) und bei Sperre</option>

@@ -377,6 +377,79 @@ def a_test_notify(a):
         raise
 
 
+# Kanal einrichten: kurze Feldnamen je Kanal -> Einstellungen
+CHANNEL_FIELDS = {
+    "webhook": {"url": "webhook_url", "method": "webhook_method", "body": "webhook_body"},
+    "smtp": {"host": "smtp_host", "port": "smtp_port", "security": "smtp_security", "user": "smtp_user",
+             "password": "smtp_pass", "from": "smtp_from", "to": "smtp_to"},
+    "telegram": {"token": "telegram_token", "chat_id": "telegram_chat_id"},
+    "apprise": {"mode": "apprise_mode", "urls": "apprise_urls", "api_url": "apprise_api_url", "api_key": "apprise_api_key",
+                "tag": "apprise_tag"},
+}
+CHANNEL_PROPS = {
+    "channel": S(STR, "webhook, smtp (E-Mail), telegram oder apprise", enum=["webhook", "smtp", "telegram", "apprise"]),
+    "enabled": S(BOOL, "Kanal einschalten (Standard: true)"),
+    "url": S(STR, "webhook: Adresse"), "method": S(STR, "webhook: POST oder PUT", enum=["POST", "PUT"]),
+    "body": S(STR, "webhook: eigener Body (leer = Standard-JSON)"),
+    "host": S(STR, "smtp: Server"), "port": S(INT, "smtp: Port, z. B. 587"),
+    "security": S(STR, "smtp: starttls, ssl oder none", enum=["starttls", "ssl", "none"]),
+    "user": S(STR, "smtp: Benutzer"), "password": S(STR, "smtp: Passwort (wird nur gesetzt, nie angezeigt)"),
+    "from": S(STR, "smtp: Absender"), "to": S(STR, "smtp: Empfänger, mehrere mit Komma"),
+    "token": S(STR, "telegram: Bot-Token (wird nur gesetzt, nie angezeigt)"), "chat_id": S(STR, "telegram: Chat-ID"),
+    "mode": S(STR, "apprise: lib = URLs direkt senden, api = über einen Apprise-API-Server", enum=["lib", "api"]),
+    "urls": dict(STRS, description="apprise: URLs (ersetzt die vorhandenen)"),
+    "add_urls": dict(STRS, description="apprise: URLs zu den vorhandenen hinzufügen"),
+    "api_url": S(STR, "apprise: Adresse des Apprise-API-Servers"), "api_key": S(STR, "apprise: Schlüssel/Konfiguration (wird nur gesetzt)"),
+    "tag": S(STR, "apprise: Tag"),
+    "test": S(BOOL, "danach gleich eine Testnachricht über diesen Kanal senden"),
+}
+
+
+@action("setup_notification_channel", "POST", "/settings/notifications/channels/{channel}", "notify.edit", "Benachrichtigungen",
+        "Benachrichtigungs-Kanal anlegen bzw. einrichten (webhook, smtp, telegram, apprise) und einschalten. Nur die angegebenen "
+        "Felder werden geändert. Mit test=true wird gleich eine Testnachricht gesendet. Wann benachrichtigt wird (when) steht in update_notifications.",
+        CHANNEL_PROPS, ["channel"])
+def a_setup_channel(a):
+    ch = a.get("channel")
+    if ch not in CHANNEL_FIELDS:
+        raise ApiError(400, _t("Unbekannter Kanal."))
+    allowed = set(CHANNEL_FIELDS[ch]) | {"channel", "enabled", "test"} | ({"add_urls"} if ch == "apprise" else set())
+    _check_keys(a, allowed)
+    fields = {f"{ch}_enabled": _bool(a.get("enabled", True))}
+    for short, key in CHANNEL_FIELDS[ch].items():
+        if short in a:
+            fields[key] = a[short]
+    if a.get("add_urls"):
+        have = core.notify.apprise_list(_lines(fields.get("apprise_urls")) if "apprise_urls" in fields else core.load_settings().get("apprise_urls"))
+        add = a["add_urls"] if isinstance(a["add_urls"], list) else [a["add_urls"]]
+        fields["apprise_urls"] = have + [str(u).strip() for u in add if str(u).strip() and str(u).strip() not in have]
+    test = None
+    if _bool(a.get("test", False)):
+        test = ch
+    try:
+        msg = _save_notify(fields, test=test)
+    except ApiError as e:
+        if test and e.status == 400:
+            return {"ok": False, "message": e.msg, "settings": _notify_view()}
+        raise
+    return {"ok": True, "message": msg, "settings": _notify_view()}
+
+
+@action("remove_notification_channel", "DELETE", "/settings/notifications/channels/{channel}", "notify.edit", "Benachrichtigungen",
+        "Benachrichtigungs-Kanal ausschalten. forget=true löscht zusätzlich die gespeicherten Zugangsdaten und Adressen des Kanals.",
+        {"channel": CHANNEL_PROPS["channel"], "forget": S(BOOL, "Zugangsdaten und Adressen löschen")}, ["channel"])
+def a_remove_channel(a):
+    ch = a.get("channel")
+    if ch not in CHANNEL_FIELDS:
+        raise ApiError(400, _t("Unbekannter Kanal."))
+    fields = {f"{ch}_enabled": False}
+    if _bool(a.get("forget", False)):
+        for key in CHANNEL_FIELDS[ch].values():
+            d = core.notify.DEFAULTS[key]
+            fields[key] = "" if key in core.notify.SECRET_FIELDS else d
+    return {"ok": True, "message": _save_notify(fields), "settings": _notify_view()}
+
+
 def _templates_view():
     s = core.load_settings()
     d = core.msgtpl.editor_data(list(core.msgtpl.EVENTS), s.get("msg_templates"))
@@ -421,7 +494,7 @@ def a_update_templates(a):
 
 # ================================================================= Allgemeine Einstellungen
 LOG_KEYS = ("log_keep_runs", "log_keep_days", "audit_keep_days")
-SEC_KEYS = ("lock_attempts", "lock_minutes", "fail_notify", "fail_notify_minutes", "trust_proxy", "geoip_auto", "geoip_days", "geoip_mode", "geoip_time", "geoip_dow", "public_url")
+SEC_KEYS = ("lock_attempts", "lock_minutes", "fail_notify", "fail_notify_minutes", "trust_proxy", "geoip_auto", "geoip_days", "geoip_mode", "geoip_time", "geoip_dow", "public_url", "require_2fa_mode")
 
 
 @action("get_settings", "GET", "/settings/general", "system.settings", "Einstellungen",
@@ -492,12 +565,14 @@ def a_update_logs(a):
 
 @action("update_security_settings", "PATCH", "/settings/security", "system.settings", "Einstellungen",
         "Sperre nach Fehlversuchen (lock_attempts, lock_minutes), Meldung (fail_notify off|lock|every, fail_notify_minutes), "
+        "require_2fa_mode (2FA erzwingen: off = nur pro Benutzer, new = neue Benutzer bekommen require_2fa, all = für alle Benutzer), "
         "trust_proxy, geoip_auto, geoip_mode (interval = alle geoip_days Tage: 1, 7, 14, 30, 60, 90; schedule = zu geoip_time HH:MM an den "
         "Wochentagen geoip_dow, z. B. \"mon,thu\"), public_url.",
         {"lock_attempts": S(INT), "lock_minutes": S(INT), "fail_notify": S(STR, enum=["off", "lock", "every"]),
          "fail_notify_minutes": S(INT), "trust_proxy": S(BOOL), "geoip_auto": S(BOOL),
          "geoip_days": S(INT, enum=[1, 7, 14, 30, 60, 90]), "geoip_mode": S(STR, enum=["interval", "schedule"]),
-         "geoip_time": S(STR, "HH:MM"), "geoip_dow": S(STR, "mon,tue,wed,thu,fri,sat,sun (kommagetrennt)"), "public_url": S(STR)})
+         "geoip_time": S(STR, "HH:MM"), "geoip_dow": S(STR, "mon,tue,wed,thu,fri,sat,sun (kommagetrennt)"), "public_url": S(STR),
+         "require_2fa_mode": S(STR, enum=["off", "new", "all"])})
 def a_update_security(a):
     _check_keys(a, SEC_KEYS)
     s = core.load_settings()
@@ -505,6 +580,8 @@ def a_update_security(a):
     for k in SEC_KEYS:
         v = a.get(k, s.get(k))
         form[k] = _bool(v) if k in ("trust_proxy", "geoip_auto") else ("" if v is None else str(v))
+    if "require_2fa_mode" in a and a["require_2fa_mode"] not in ("off", "new", "all"):
+        raise ApiError(400, "require_2fa_mode: erlaubt sind off, new oder all.")
     if "geoip_days" in a and str(a["geoip_days"]) not in {str(d) for d in core.geoip.INTERVALS}:
         raise ApiError(400, "geoip_days: erlaubt sind 1, 7, 14, 30, 60 oder 90.")
     return ok(gui("POST", "/settings/general", form=form))
@@ -631,7 +708,8 @@ def _user_view(name, u):
     return {"name": name, "role": u.get("role"), "disabled": bool(u.get("disabled")), "disabled_by": u.get("disabled_by", ""),
             "lock_from": u.get("lock_from", ""), "lock_until": u.get("lock_until", ""),
             "auto_lock_until": u.get("auto_lock_until", ""), "inactive_reason": core.users.inactive_reason(u) or "",
-            "totp": bool(u.get("totp_enabled")), "backup_codes_left": len(u.get("backup_codes") or []),
+            "totp": bool(u.get("totp_enabled")), "require_2fa": bool(u.get("require_2fa")),
+            "must_2fa": core.must_2fa(u), "totp_setup_pending": core.needs_2fa(u), "backup_codes_left": len(u.get("backup_codes") or []),
             "passkeys": [{k: p.get(k) for k in ("name", "created", "last_used", "count") if k in p} for p in u.get("passkeys") or []],
             "fail_count": u.get("fail_count", 0), "last_login": u.get("last_login", ""), "last_ip": u.get("last_ip", ""),
             "last_country": u.get("last_country", ""), "created": u.get("created", ""), "language": u.get("lang", ""),
@@ -654,10 +732,12 @@ def a_get_user(a):
     return _user_view(*_user(a["name"]))
 
 
-USER_KEYS = ("name", "password", "role", "disabled", "lock_from", "lock_until", "unlock", "reset_2fa", "reset_passkeys", "groups", "sidebar")
+USER_KEYS = ("name", "password", "role", "disabled", "lock_from", "lock_until", "unlock", "reset_2fa", "reset_passkeys", "require_2fa", "groups", "sidebar")
 USER_PROPS = {"password": S(STR, "mindestens 8 Zeichen"), "role": S(STR, "Rollen-ID, siehe list_roles"), "disabled": S(BOOL),
               "lock_from": S(STR, "JJJJ-MM-TTTHH:MM, leer = keine"), "lock_until": S(STR, "JJJJ-MM-TTTHH:MM, leer = keine"),
               "unlock": S(BOOL, "automatische Sperre aufheben"), "reset_2fa": S(BOOL, "2FA zurücksetzen"),
+              "require_2fa": S(BOOL, "2FA erzwingen: der Benutzer muss nach der Anmeldung zuerst 2FA einrichten und kann sie nicht selbst ausschalten. "
+                                     "Beim Anlegen ohne Angabe gilt die globale Einstellung (require_2fa_mode)"),
               "reset_passkeys": S(BOOL, "alle Passkeys entfernen"),
               "groups": dict(STRS, description="Gruppen-IDs (ersetzt die Mitgliedschaften; braucht groups.manage)"),
               "sidebar": {"type": "string", "enum": ["full", "mini"], "description": "Seitenleiste der Oberfläche: full = ausgeklappt, mini = eingeklappt (nur Symbole)"}}
@@ -672,6 +752,8 @@ def _user_form(u, a):
         form.update(password=a["password"], password2=a["password"])
     for k in ("unlock", "reset_2fa", "reset_passkeys"):
         form[k] = _bool(a.get(k, False))
+    if "require_2fa" in a:
+        form.update(r2fa_form="1", require_2fa=_bool(a["require_2fa"]))
     if "groups" in a:
         need("groups.manage")
         grs = core.load_groups()
@@ -686,7 +768,7 @@ def _user_form(u, a):
 
 
 @action("create_user", "POST", "/users", "users.manage", "Benutzer", "Benutzer anlegen.",
-        dict({"name": S(STR)}, **{k: v for k, v in USER_PROPS.items() if k in ("password", "role", "disabled", "lock_from", "lock_until")}),
+        dict({"name": S(STR)}, **{k: v for k, v in USER_PROPS.items() if k in ("password", "role", "disabled", "lock_from", "lock_until", "require_2fa")}),
         ["name", "password", "role"])
 def a_create_user(a):
     _check_keys(a, USER_KEYS)

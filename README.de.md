@@ -4,7 +4,7 @@
 
 # MirrorSync – 1:1-Spiegelung mit Web-GUI und Zeitplänen
 
-Version **1.40.1** · Änderungen siehe [CHANGELOG.md](CHANGELOG.md) (englisch) · [English version](README.md)
+Version **1.41.0** · Änderungen siehe [CHANGELOG.md](CHANGELOG.md) (englisch) · [English version](README.md)
 
 Ein Docker-Container, der Ordner **einweg 1:1 spiegelt** (wie FreeFileSync „Spiegeln"):
 Das Ziel wird exakt wie die Quelle, inklusive Löschungen. Als Sync-Motor dient
@@ -68,7 +68,7 @@ Geänderte Dateien werden komplett neu übertragen (kein Delta wie bei rsync).
 
 ## Installation
 Das fertige Image liegt in der GitHub Container Registry: `ghcr.io/dermilderjoghurt/mirrorsync`
-(für amd64 und arm64, z. B. Raspberry Pi). Tags: `latest` (neueste Version), `1.40.1` (feste Version),
+(für amd64 und arm64, z. B. Raspberry Pi). Tags: `latest` (neueste Version), `1.41.0` (feste Version),
 `1.40` (neuester Patch dieser Version). Das Image wird nur veröffentlicht, wenn sich die Versionsnummer ändert.
 Update-Prüfer wie Dockhand oder Watchtower melden deshalb nur dann ein Update, wenn es wirklich eine neue Version gibt.
 
@@ -154,6 +154,16 @@ zusammen, z. B. „Buchhaltung“ oder „Home Assistant“.
 Unter **Einstellungen → Mein Konto** richtet jeder Benutzer selbst 2FA ein (QR-Code mit Google/Microsoft
 Authenticator, Aegis, 2FAS, Bitwarden … scannen) und bekommt 10 Backup-Codes, die nur einmal angezeigt werden.
 Passwörter werden gehasht in der Datenbank `config/mirrorsync.db` gespeichert.
+
+**2FA erzwingen** (seit 1.41.0): Unter **Einstellungen → Allgemein → Anmeldung und Sicherheit** wählst du global
+*Aus (nur pro Benutzer)*, *Für neue Benutzer* oder *Für alle Benutzer*. Pro Benutzer gibt es unter
+**Benutzer → Bearbeiten** das Häkchen **„2FA erzwingen“** (bei „Für neue Benutzer“ ist es beim Anlegen schon
+gesetzt). Wer 2FA einrichten muss, landet nach der Anmeldung direkt bei „Mein Konto“ mit dem QR-Code und kann
+nichts anderes tun, bis die Authenticator-App eingerichtet ist. Ausschalten kann die 2FA dann nur ein Admin
+(„2FA zurücksetzen“, danach muss der Benutzer sie beim nächsten Anmelden neu einrichten). Die Benutzerliste zeigt
+„Pflicht, noch nicht eingerichtet“. API-Keys (REST, MCP) sind davon nicht betroffen. Rechte: global
+`system.settings`, pro Benutzer `users.manage`; per API `require_2fa_mode` (`update_security_settings`) und
+`require_2fa` (`create_user`, `update_user`).
 
 - **Bestehende Installation:** Sind schon Benutzer angelegt, ändert sich nichts. `WEB_USER`/`WEB_PASS` kannst du
   aus der Compose-Datei löschen, sie werden nur noch für den Notfall (`ADMIN_RESET`) gebraucht.
@@ -620,7 +630,10 @@ Fehler kommen als `{"error": "…"}` mit passendem Status (400, 401, 403, 404, 4
 
 **Alles aus der GUI geht auch per API und MCP** (seit 1.21.0): Zusätzlich zu den Aufgaben gibt es Endpunkte für
 Zeitpläne und Ketten, Speicherorte (anlegen mit Assistent-Fragen, ändern, testen, neu anmelden, löschen),
-Benachrichtigungen und Vorlagen, allgemeine Einstellungen (Logs, Sicherheit, Länder-Datenbank, Sprache,
+Benachrichtigungen und Vorlagen (seit 1.41.0 auch Kanäle anlegen: `setup_notification_channel` bzw.
+`POST /settings/notifications/channels/{webhook|smtp|telegram|apprise}` mit Feldern wie `url`, `host`, `token`,
+`chat_id`, `add_urls` und optional `test: true`; ausschalten mit `remove_notification_channel`, Recht `notify.edit`),
+allgemeine Einstellungen (Logs, Sicherheit, Länder-Datenbank, Sprache,
 Bandbreite mit Einheit), Zugriff nach IP und Land, Gruppen, Sichtbarkeit (`visible_to` bei Aufgaben und
 Speicherorten, `groups` bei Benutzern), Benutzer (anlegen, ändern, sperren, entsperren, 2FA und
 Passkeys zurücksetzen, löschen), Anmeldeverlauf, Rollen, API-Keys sowie Sicherung, Export, Import und

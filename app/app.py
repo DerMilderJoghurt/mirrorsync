@@ -119,6 +119,7 @@ app.jinja_env.globals.update(_=i18n.t, lang_code=i18n.current, LANGS=i18n.langua
                              bw_unit=lambda: load_settings().get("bw_unit") or "MB/s")
 app.jinja_env.filters["regex_cmd"] = lambda h: (re.search(r'rclone authorize "[^\n]*', h or "") or [None])[0]
 app.jinja_env.globals["VERSION"] = VERSION
+app.jinja_env.globals["RELEASE_URL"] = f"https://github.com/{update.REPO}/releases/tag/v{VERSION}"
 app.jinja_env.globals["UPDATE"] = lambda: update_status() if g.get("user") else None
 notify.VERSION = VERSION
 app.jinja_env.globals["ICON"] = {k: Markup(v) for k, v in ICONS.items()}
@@ -381,7 +382,7 @@ SETTINGS_FILE = os.path.join(CONFIG_DIR, "settings.json")
 
 LOG_DEFAULTS = {"log_keep_runs": "50", "log_keep_days": "30", "log_keep_unit": "d", "trust_proxy": False, "geoip_auto": True, "geoip_days": "30",
                 "geoip_mode": "interval", "geoip_time": "03:00", "geoip_dow": "mon",
-                "lock_attempts": "5", "lock_minutes": "15", "lock_notify": True,
+                "lock_attempts": "5", "lock_minutes": "15", "lock_notify": True, "require_2fa_mode": "off",
                 "fail_notify": "", "fail_notify_minutes": "15", "audit_keep_days": "365", "update_check": True, "update_interval": "60"}
 RUN_ID_RE = re.compile(r"^[A-Za-z0-9_.-]{1,64}$")
 
@@ -1246,6 +1247,24 @@ def scope_ok():
     return True
 
 
+REQ2FA_MODES = ("off", "new", "all")
+
+
+def require_2fa_mode():
+    m = load_settings().get("require_2fa_mode")
+    return m if m in REQ2FA_MODES else "off"
+
+
+def must_2fa(u):
+    """2FA ist fuer dieses Konto Pflicht: Haekchen am Benutzer oder global fuer alle."""
+    return bool(u and (u.get("require_2fa") or require_2fa_mode() == "all"))
+
+
+def needs_2fa(u):
+    """2FA ist Pflicht, aber noch nicht eingerichtet."""
+    return bool(u and not u.get("totp_enabled") and must_2fa(u))
+
+
 def current_user():
     name = session.get("user")
     u = store.get(name) if name else None
@@ -1343,6 +1362,11 @@ def auth():
             return {"ok": False, "error": "Nicht angemeldet"}, 401
         nxt = request.full_path.rstrip("?") if request.method == "GET" else "/"
         return redirect(url_for("login", next=nxt) if nxt != "/" else url_for("login"))
+    if needs_2fa(u) and not (request.path == "/logout" or request.path.startswith("/account")):
+        # 2FA ist fuer dieses Konto Pflicht: bis sie eingerichtet ist, nur "Mein Konto" und Abmelden
+        if wants_json:
+            return {"ok": False, "error": i18n.t("Bitte zuerst die Zwei-Faktor-Anmeldung einrichten (Einstellungen → Mein Konto).")}, 403
+        return redirect(url_for("account"))
     perm = endpoint_perm()
     if (perm and not g.access.has(perm)) or not scope_ok():
         if wants_json:
@@ -2794,7 +2818,7 @@ def general_settings():
             s.update(lock_attempts=str(int(a)), lock_minutes=str(int(m)), lock_notify=f.get("fail_notify") in ("lock", "every"),
                      fail_notify=f.get("fail_notify") if f.get("fail_notify") in ("off", "lock", "every") else "lock",
                      fail_notify_minutes=str(max(1, min(1440, int(f.get("fail_notify_minutes") or 15)))) if (f.get("fail_notify_minutes") or "15").isdigit() else "15",
-                     trust_proxy="trust_proxy" in f, geoip_auto="geoip_auto" in f,
+                     trust_proxy="trust_proxy" in f, geoip_auto="geoip_auto" in f, require_2fa_mode=f.get("require_2fa_mode") if f.get("require_2fa_mode") in REQ2FA_MODES else s.get("require_2fa_mode", "off"),
                      geoip_days=f.get("geoip_days") if f.get("geoip_days", "").isdigit() and int(f["geoip_days"]) in geoip.INTERVALS else (s.get("geoip_days") or "30"),
                      public_url=f.get("public_url", "").strip().rstrip("/")[:200])
             s["geoip_mode"] = "schedule" if f.get("geoip_mode") == "schedule" else "interval"
@@ -3545,7 +3569,7 @@ def users_page():
     grs = load_groups()
     rows = [dict(u, name=n, backup_left=len(u.get("backup_codes") or []), n_passkeys=len(u.get("passkeys") or []), why=users.inactive_reason(u),
                  group_names=[grs[x]["name"] for x in roles.groups_of(grs, n)],
-                 planned=users.lock_pending(u) and not users.inactive_reason(u))
+                 planned=users.lock_pending(u) and not users.inactive_reason(u), must2fa=must_2fa(u))
             for n, u in sorted(all_users.items())]
     fails = login_log.unacked()
     return render_template("users.html", rows=rows, msg=session.pop("flash", None), err=None,
@@ -3624,6 +3648,8 @@ def user_edit(name=None):
         elif not within(all_roles.get(role)) or (name and not within(all_roles.get(u.get("role")))):
             err = "Du kannst keine Rolle mit mehr Rechten vergeben, als du selbst hast."
         disabled = f.get("active") == "0"
+        req2fa = bool(f.get("require_2fa")) if f.get("r2fa_form") else (
+            bool(u.get("require_2fa")) if name else require_2fa_mode() == "new")
         lock_from = f.get("lock_from", "").strip()[:16] if f.get("lock") else ""
         lock_until = f.get("lock_until", "").strip()[:16] if f.get("lock") else ""
         dt_ok = lambda v: not v or re.match(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$", v)
@@ -3647,6 +3673,10 @@ def user_edit(name=None):
                     entry = all_users[name]
                     changed = entry.get("role") != role or bool(pw) or (disabled and not entry.get("disabled"))
                     entry.update(role=role, disabled=disabled, lock_from=lock_from, lock_until=lock_until)
+                    if req2fa:
+                        entry["require_2fa"] = True
+                    else:
+                        entry.pop("require_2fa", None)
                     if not disabled:
                         entry.update(disabled_by="", fail_count=0)
                     if f.get("unlock"):
@@ -3665,6 +3695,8 @@ def user_edit(name=None):
                         entry["sv"] = entry.get("sv", 1) + 1   # bestehende Anmeldungen beenden
                 else:
                     all_users[new_name] = dict(users.new_user(pw, role), disabled=disabled, lock_from=lock_from, lock_until=lock_until)
+                    if req2fa:
+                        all_users[new_name]["require_2fa"] = True
                 store.save(all_users)
             if g.access.has("groups.manage") and f.get("grp_form"):
                 grs = load_groups()
@@ -3683,7 +3715,8 @@ def user_edit(name=None):
             return redirect(url_for("users_page"))
     grs = load_groups()
     mine = roles.groups_of(grs, name) if name else []
-    return render_template("user_edit.html", name=name, u=u, err=err, roles=role_store.load(), form=request.form,
+    req_default = bool(u.get("require_2fa")) if name else require_2fa_mode() == "new"
+    return render_template("user_edit.html", name=name, u=u, err=err, roles=role_store.load(), form=request.form, req_default=req_default, req_all=require_2fa_mode() == "all",
                            all_groups=[(gid, dict(x, editable=group_within(x))) for gid, x in sorted(grs.items(), key=lambda kv: kv[1].get("name", "").lower())],
                            my_groups=mine, my_group_names=[grs[x]["name"] for x in mine])
 
@@ -3714,6 +3747,8 @@ def account():
     if request.args.get("done"):
         session.pop("welcome", None)
         return redirect(url_for("index"))
+    if request.method == "GET" and needs_2fa(store.get(g.user)) and not session.get("totp_setup"):
+        session["totp_setup"] = users.new_totp_secret()   # Pflicht: QR-Code gleich anzeigen
     u = store.get(g.user)
     msg = session.pop("flash", None)
     err = None
@@ -3771,7 +3806,9 @@ def account():
                 session.pop("totp_setup", None)
                 msg = "Zwei-Faktor-Anmeldung ist aktiv."
         elif action == "2fa_disable":
-            if not users.check_password(u, request.form.get("password", "")):
+            if must_2fa(u):
+                err = "Für dein Konto ist 2FA Pflicht. Ausschalten kann sie nur ein Administrator (2FA zurücksetzen)."
+            elif not users.check_password(u, request.form.get("password", "")):
                 err = "Passwort falsch."
             else:
                 store.update(g.user, totp_enabled=False, totp_secret="", backup_codes=[])
@@ -3788,7 +3825,7 @@ def account():
     qr = users.qr_svg(users.otpauth_uri(setup_secret, g.user)) if setup_secret else None
     rp_id, _, pk_problem = _pk_rp()
     return render_template("account.html", u=u, msg=msg, err=err, codes=codes, setup_secret=setup_secret, qr=qr,
-                           welcome=session.get("welcome"), passkeys_list=u.get("passkeys") or [], pk_problem=pk_problem,
+                           welcome=session.get("welcome"), force_2fa=needs_2fa(u), must_2fa=must_2fa(u), passkeys_list=u.get("passkeys") or [], pk_problem=pk_problem,
                            pk_rp=rp_id,
                            backup_left=len(u.get("backup_codes") or []),
                            my_logins=[e for e in login_log.load() if e.get("user") == g.user][:10])

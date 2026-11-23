@@ -4,7 +4,7 @@
 
 # MirrorSync – 1:1 mirroring with a web GUI and schedules
 
-Version **1.40.1** · Changes: [CHANGELOG.md](CHANGELOG.md) · [Deutsche Version](README.de.md)
+Version **1.41.0** · Changes: [CHANGELOG.md](CHANGELOG.md) · [Deutsche Version](README.de.md)
 
 A Docker container that **mirrors folders one-way, 1:1** (like FreeFileSync "Mirror"):
 the destination becomes an exact copy of the source, including deletions. The sync engine is
@@ -67,7 +67,7 @@ Changed files are transferred completely (no delta transfer like rsync).
 
 ## Installation
 The ready-made image is in the GitHub Container Registry: `ghcr.io/dermilderjoghurt/mirrorsync`
-(for amd64 and arm64, e.g. Raspberry Pi). Tags: `latest` (newest version), `1.40.1` (fixed version),
+(for amd64 and arm64, e.g. Raspberry Pi). Tags: `latest` (newest version), `1.41.0` (fixed version),
 `1.40` (newest patch of this version). The image is only published when the version number changes, so
 update checkers such as Dockhand or Watchtower only report an update when there really is a new version.
 
@@ -152,6 +152,15 @@ e.g. "Accounting" or "Home Assistant".
 Under **Settings → My account** every user sets up 2FA themselves (scan the QR code with Google/Microsoft
 Authenticator, Aegis, 2FAS, Bitwarden …) and receives 10 backup codes that are shown only once.
 Passwords are stored hashed in the database `config/mirrorsync.db`.
+
+**Require 2FA** (since 1.41.0): Under **Settings → General → Sign-in and security** choose globally
+*Off (per user only)*, *For new users* or *For all users*. Per user there is the **“Require 2FA”** checkbox under
+**Users → Edit** (with “For new users” it is already ticked when you create a user). A user who has to set up 2FA
+lands on “My account” with the QR code right after signing in and can do nothing else until the authenticator app
+is set up. Afterwards only an admin can turn it off (“Reset 2FA”; the user then has to set it up again at the next
+sign-in). The user list shows “Required, not set up yet”. API keys (REST, MCP) are not affected. Permissions:
+`system.settings` globally, `users.manage` per user; via the API `require_2fa_mode` (`update_security_settings`)
+and `require_2fa` (`create_user`, `update_user`).
 
 - **Existing installation:** if users already exist, nothing changes. You can remove `WEB_USER`/`WEB_PASS`
   from the compose file, they are only needed for emergencies (`ADMIN_RESET`).
@@ -602,7 +611,10 @@ Errors come as `{"error": "…"}` with a matching status (400, 401, 403, 404, 40
 
 **Everything in the GUI also works via API and MCP** (since 1.21.0): besides jobs there are endpoints for
 schedules and chains, storage locations (create with wizard questions, change, test, re-authorize, delete),
-notifications and templates, general settings (logs, security, country database, language, bandwidth with
+notifications and templates (since 1.41.0 also creating channels: `setup_notification_channel` or
+`POST /settings/notifications/channels/{webhook|smtp|telegram|apprise}` with fields such as `url`, `host`, `token`,
+`chat_id`, `add_urls` and optionally `test: true`; turn one off with `remove_notification_channel`, permission
+`notify.edit`), general settings (logs, security, country database, language, bandwidth with
 unit), access by IP and country, groups, visibility (`visible_to` on jobs and storage locations, `groups` on
 users), users (create, change, lock, unlock, reset 2FA and passkeys, delete), sign-in history, roles, API keys,
 as well as backup, export, import and restore. The full list is in `/api/docs`.
