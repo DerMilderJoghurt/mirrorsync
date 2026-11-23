@@ -60,6 +60,45 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+  # Vulnerability scan of the freshly built image with Trivy. Results appear under Security → Code scanning
+  # and in the job log. Does not block the release; new findings show up there and as Dependabot PRs.
+  scan:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read version from app/VERSION
+        id: ver
+        run: echo "version=$(tr -d ' \n\r' < app/VERSION)" >> "$GITHUB_OUTPUT"
+
+      - name: Trivy scan (SARIF)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ghcr.io/dermilderjoghurt/mirrorsync:${{ steps.ver.outputs.version }}
+          format: sarif
+          output: trivy.sarif
+          severity: CRITICAL,HIGH,MEDIUM
+          ignore-unfixed: true
+
+      - name: Upload results to GitHub Security
+        uses: github/codeql-action/upload-sarif@1bd86f2fdb4b86187fa4059f16f31a3202acc9ea # v4.39.4
+        with:
+          sarif_file: trivy.sarif
+          category: trivy-image
+
+      - name: Trivy summary (table in the log)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ghcr.io/dermilderjoghurt/mirrorsync:${{ steps.ver.outputs.version }}
+          format: table
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          skip-setup-trivy: true
+
   # On a new version in app/VERSION, automatically creates tag vX.Y.Z and a GitHub release
   # (text from the matching CHANGELOG section, ZIP of the repo attached).
   release:

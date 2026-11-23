@@ -1,7 +1,7 @@
 # Take the rclone binary from the official image
-FROM rclone/rclone:1.68 AS rclone
+FROM rclone/rclone:1.76 AS rclone
 
-FROM python:3.12-alpine
+FROM python:3.14-alpine
 # Time zone data comes via pip (tzdata), so no apk needed
 COPY --from=rclone /usr/local/bin/rclone /usr/local/bin/rclone
 
@@ -18,7 +18,7 @@ RUN for i in 1 2 3; do \
     exit 1
 COPY app/ .
 
-ARG VERSION=1.36.0
+ARG VERSION=1.37.0
 LABEL org.opencontainers.image.title="MirrorSync" org.opencontainers.image.version=$VERSION
 ENV TZ=Europe/Berlin CONFIG_DIR=/config LOG_DIR=/logs PORT=8080 PYTHONUNBUFFERED=1
 VOLUME ["/config", "/logs"]

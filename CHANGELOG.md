@@ -3,6 +3,14 @@
 Version numbers follow [SemVer](https://semver.org/): MAJOR.MINOR.PATCH
 (MAJOR = incompatible change, MINOR = new feature, PATCH = bug fix).
 
+## 1.37.0 – 2026-11-23
+- **Dependencies updated:** rclone 1.68 → 1.76, Python 3.12 → 3.14 (Alpine), Flask 3.0.3 → 3.1.3,
+  APScheduler 3.10.4 → 3.11.3, tzdata 2024.2 → 2026.6, segno 1.6.1 → 1.6.6. Waitress, Apprise, webauthn and
+  swagger-ui-bundle were already current. Mirroring, two-way sync, GUI, API, MCP, 2FA QR code and passkeys tested.
+- **Automatic checks on GitHub:** Dependabot opens weekly pull requests for new versions of the Python packages,
+  the base images and the GitHub Actions. Trivy scans every newly built image and, once a week, the current image
+  for known vulnerabilities; results are under "Security" in the repository.
+
 ## 1.36.0 – 2026-11-23
 - **First-time setup without a one-time code:** as long as no user exists, the first visit in the browser creates
   the admin directly (user name and password are enough). The setup code from the container log is gone.

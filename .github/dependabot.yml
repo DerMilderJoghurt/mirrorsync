@@ -1,0 +1,24 @@
+# Dependabot: weekly pull requests for new versions of the Python packages, the base images
+# (python, rclone) and the GitHub Actions used here. Security fixes come as soon as they are published.
+version: 2
+updates:
+  - package-ecosystem: pip
+    directory: /app
+    schedule:
+      interval: weekly
+    groups:
+      python-packages:
+        patterns: ["*"]
+
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
