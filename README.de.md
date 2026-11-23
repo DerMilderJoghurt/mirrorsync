@@ -68,7 +68,7 @@ Geänderte Dateien werden komplett neu übertragen (kein Delta wie bei rsync).
 
 ## Installation
 Das fertige Image liegt in der GitHub Container Registry: `ghcr.io/dermilderjoghurt/mirrorsync`
-(für amd64 und arm64, z. B. Raspberry Pi). Tags: `latest` (neueste Version), `1.39.0` (feste Version),
+(für amd64 und arm64, z. B. Raspberry Pi). Tags: `latest` (neueste Version), `1.40.0` (feste Version),
 `1.34` (neuester Patch dieser Version).
 
 ### Mit Docker Compose (empfohlen)
@@ -732,6 +732,30 @@ Release mit allen Änderungen. Übertragen wird dabei nur die eigene Versionsnum
   `PATCH /api/v1/settings/update` mit `{"update_check": false}` und/oder `{"update_interval": 120}` (Minuten)
   (`update_update_settings`); `/status` enthält `update` mit `interval_minutes`.
 - Ein anderes Repo (z. B. ein eigener Fork) lässt sich per `UPDATE_REPO=besitzer/repo` einstellen.
+
+## Android-App (seit 1.40.0)
+Im GitHub-Repo liegt unter `android/` eine kleine Android-App (ab Android 7): die MirrorSync-Weboberfläche ohne
+Browserleiste, mit eigenem Symbol und Benachrichtigungen. Weil sie die normale Weboberfläche zeigt, ist jede neue
+MirrorSync-Funktion sofort in der App.
+
+- **Installieren:** `mirrorsync-<version>.apk` aus dem [neuesten Release](https://github.com/DerMilderJoghurt/mirrorsync/releases/latest)
+  auf dem Handy laden und öffnen (einmalig „Unbekannte Apps installieren“ für Browser oder Dateimanager erlauben).
+  Updates: neuere APK einfach drüber installieren, Einstellungen und Anmeldung bleiben.
+- **Erster Start:** die Adresse eingeben, die du auch im Browser nutzt, z. B. `https://sync.example.com` oder
+  `http://192.168.1.50:8080`. Später ändern über die Zurück-Taste auf der Startseite, den Fehlerbildschirm oder
+  langes Drücken auf das App-Symbol → „Server & Benachrichtigungen“.
+- **Passkeys** in der App brauchen wie im Browser HTTPS mit Domainnamen, eine aktuelle „Android System WebView“
+  und Google-Play-Dienste. Android prüft `https://<deine Domain>/.well-known/assetlinks.json`, das MirrorSync selbst
+  ausliefert. Google holt diese Datei aus dem Internet, sie muss also von außen erreichbar sein (Reverse-Proxy,
+  kein Geo-Blocking für diesen Pfad). Im Browser angelegte Passkeys gehen auch in der App und umgekehrt.
+  Klappt es nicht, geht Passwort + 2FA immer.
+- **Benachrichtigungen:** standardmäßig an für fehlgeschlagene Läufe, wahlweise auch für erfolgreiche und
+  abgebrochene. Die App fragt im Hintergrund `GET /api/v1/jobs` ab (alle 15 Min. bis 6 Std., Android verschiebt
+  das evtl. etwas). Sie nutzt die Anmeldung der App, beim Anmelden „Angemeldet bleiben“ ankreuzen. Robuster: einen
+  API-Key mit einer Rolle eintragen, die Aufgaben sehen darf.
+- **Selbst bauen:** `cd android && ./gradlew assembleRelease` (JDK 17, Android SDK). Mit eigenem Schlüssel
+  signiert: dessen SHA-256-Fingerabdruck am Server über `MIRRORSYNC_ANDROID_CERTS=AB:CD:…` eintragen, damit
+  Passkeys weiter gehen.
 
 ## Update auf eine neue Version
 ```bash

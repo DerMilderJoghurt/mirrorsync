@@ -1313,6 +1313,8 @@ def auth():
             br["out"]["denied"] = perm or "scope"
             return {"ok": False, "error": "Keine Berechtigung"}, 403
         return None
+    if request.path == "/.well-known/assetlinks.json":   # oeffentlich: Android prueft damit die App (Passkeys)
+        return None
     blocked = _ip_blocked()
     if blocked:
         return blocked
@@ -1879,6 +1881,12 @@ def audit_export():
 @app.get("/favicon.ico")
 def favicon():
     return app.send_static_file("favicon.ico")
+
+
+@app.get("/.well-known/assetlinks.json")
+def android_assetlinks():
+    """Digital Asset Links fuer die Android-App (Passkeys in der App)."""
+    return flask.Response(json.dumps(passkeys.assetlinks(), indent=2), mimetype="application/json")
 
 
 @app.get("/health")
