@@ -3,6 +3,15 @@
 Versionsnummern nach [SemVer](https://semver.org/lang/de/): MAJOR.MINOR.PATCH
 (MAJOR = inkompatible Änderung, MINOR = neue Funktion, PATCH = Fehlerbehebung).
 
+## 1.33.1 – 2026-11-23
+- **Fertiges Image auf GitHub:** `ghcr.io/dermilderjoghurt/mirrorsync` (amd64 und arm64) mit den Tags `latest`,
+  `1.33.1` und `1.33`, automatisch gebaut per GitHub Action bei jedem Push auf `main`.
+- `docker-compose.yml` nutzt jetzt das fertige Image und ein normales Docker-Netz mit Port 8080 statt macvlan.
+  Selbst bauen geht weiter mit `build: .`.
+- README: Schnellstart mit `docker run`, Installation per Compose/Portainer ohne Bauen, Update per `docker compose pull`,
+  Screenshots der Oberfläche.
+- Keine Änderungen an der App selbst.
+
 ## 1.33.0 – 2026-11-23
 - **Nächster Lauf in der Aufgaben-Übersicht:** Unter dem Status steht bei jeder Aufgabe, wann sie das nächste Mal
   startet („heute, 14:30“, „morgen, 03:00“ oder Datum), auch auf dem Handy. Live-Aufgaben zeigen die nächste Runde,

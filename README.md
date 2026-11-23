@@ -1,11 +1,35 @@
 # MirrorSync – 1:1-Spiegelung mit Web-GUI und Zeitplänen
 
-Version **1.33.0** · Änderungen siehe [CHANGELOG.md](CHANGELOG.md)
+Version **1.33.1** · Änderungen siehe [CHANGELOG.md](CHANGELOG.md)
 
 Ein Docker-Container, der Ordner **einweg 1:1 spiegelt** (wie FreeFileSync „Spiegeln"):
 Das Ziel wird exakt wie die Quelle, inklusive Löschungen. Als Sync-Motor dient
 [rclone](https://rclone.org), damit gehen **SMB, WebDAV (Nextcloud …), SFTP/SSH, FTP/FTPS,
 S3, lokale Ordner** und viele mehr, in jeder Kombination (z. B. SMB → WebDAV).
+
+![Aufgaben-Übersicht](docs/screenshots/aufgaben.png)
+
+<details><summary>Weitere Screenshots</summary>
+
+| | |
+|---|---|
+| ![Dunkles Design](docs/screenshots/aufgaben-dunkel.png) | ![Aufgabe bearbeiten](docs/screenshots/aufgabe-bearbeiten.png) |
+| Dunkles Design | Aufgabe bearbeiten |
+| ![Zeitpläne](docs/screenshots/zeitplaene.png) | ![Speicherorte](docs/screenshots/speicherorte.png) |
+| Zeitpläne | Speicherorte |
+| ![Dateimanager](docs/screenshots/dateien.png) | |
+| Dateimanager | |
+
+</details>
+
+## Schnellstart
+```bash
+docker run -d --name mirrorsync --restart unless-stopped \
+  -p 8080:8080 -e PORT=8080 -e TZ=Europe/Berlin \
+  -v ./config:/config -v ./logs:/logs \
+  ghcr.io/dermilderjoghurt/mirrorsync:latest
+```
+Dann `http://<docker-host>:8080` öffnen und den Einrichtungs-Code aus `docker logs mirrorsync` eingeben.
 
 ## Funktionen
 - **Mehrere Benutzer** mit **eigenen Rollen** (Einzelrechte pro Aktion, beschränkbar auf einzelne Aufgaben und Speicherorte), **2FA** per Authenticator-App inkl. Backup-Codes und **Passkeys**
@@ -39,35 +63,43 @@ Beachte: Alle Daten fließen durch den Docker-Host, seine Verbindung zu A und B 
 Geänderte Dateien werden komplett neu übertragen (kein Delta wie bei rsync).
 
 ## Installation
-> **Wichtig:** `docker-compose.yml`, `Dockerfile` und der Ordner `app/` müssen **im selben Ordner** liegen,
-> und in der Compose-Datei muss **`build: .`** stehen. Das Image wird aus diesem Ordner gebaut und liegt in
-> keinem Registry. Fehlt `build: .`, sucht Docker `mirrorsync:1.33.0` online und bricht mit
-> „pull access denied“ / „repository does not exist“ ab.
+Das fertige Image liegt in der GitHub Container Registry: `ghcr.io/dermilderjoghurt/mirrorsync`
+(für amd64 und arm64, z. B. Raspberry Pi). Tags: `latest` (neueste Version), `1.33.1` (feste Version),
+`1.33` (neuester Patch dieser Version).
 
-1. ZIP auf den Docker-Host entpacken, z. B. nach `/opt/mirrorsync/`:
-   ```
-   /opt/mirrorsync/
-   ├── docker-compose.yml
-   ├── Dockerfile
-   └── app/
-   ```
-2. In `docker-compose.yml` anpassen:
+### Mit Docker Compose (empfohlen)
+1. Ordner anlegen und die [`docker-compose.yml`](docker-compose.yml) hineinlegen, z. B. nach `/opt/mirrorsync/`.
+2. Bei Bedarf anpassen:
+   - Port: `ports: - "8080:8080"` (linke Zahl = Port auf dem Docker-Host, frei wählbar).
    - Benutzer und Passwort gehören **nicht** in die Compose-Datei. Den ersten Admin legst du beim ersten Aufruf
      der Web-GUI an (siehe „Ersteinrichtung“).
-   - Netzwerk: Beispiel ist macvlan mit fester IP `192.168.1.50` und einem bestehenden Netz `macvlan_net`.
-     Ohne macvlan den `networks:`-Teil entfernen und `ports: - "8080:80"` eintragen.
-   - `PORT` legt den Port der GUI fest (Standard im Beispiel: 80).
    - optional lokale Ordner unter `volumes` (erscheinen in der GUI als `/data/...`)
-3. Im Ordner bauen und starten:
+3. Starten:
    ```bash
    cd /opt/mirrorsync
-   docker compose up -d --build
+   docker compose up -d
    ```
-4. Im Browser `http://192.168.1.50` (bzw. ohne macvlan `http://<docker-host>:8080`) öffnen und anmelden.
+4. Im Browser `http://<docker-host>:8080` öffnen.
 
-**Portainer:** Ein Stack aus dem Web-Editor hat keinen Zugriff auf das Dockerfile. Entweder den Stack
-mit „Repository“/„Upload“ aus diesem Ordner anlegen, oder das Image vorher einmal per Konsole bauen
-(`cd /opt/mirrorsync && docker build -t mirrorsync:1.33.0 .`) und im Stack-Editor die Zeile `build: .` weglassen.
+**Portainer:** Die `docker-compose.yml` einfach in den Stack-Editor kopieren, es muss nichts gebaut werden.
+
+### Mit docker run
+```bash
+docker run -d \
+  --name mirrorsync \
+  --restart unless-stopped \
+  -p 8080:8080 \
+  -e PORT=8080 \
+  -e TZ=Europe/Berlin \
+  -v /opt/mirrorsync/config:/config \
+  -v /opt/mirrorsync/logs:/logs \
+  ghcr.io/dermilderjoghurt/mirrorsync:latest
+```
+Lokale Ordner zusätzlich mit z. B. `-v /srv/daten:/data/daten:ro` einbinden.
+
+### Selbst bauen
+Repo klonen und in der `docker-compose.yml` die Zeile `image:` durch `build: .` ersetzen (oder
+`docker build -t mirrorsync .`), dann `docker compose up -d --build`.
 
 ## Benutzer, Rechte und 2FA
 Unter **Einstellungen → Benutzer** werden Benutzer angelegt, unter **Einstellungen → Rollen** die Rollen.
@@ -672,8 +704,12 @@ automatisch in allen Auswahllisten.
 - Zurück auf eine Version vor 1.18.0: die Dateien aus `config/json-backup/` zurück nach `config/` legen.
 
 ## Update auf eine neue Version
-Neue Dateien über die alten kopieren (`config/` und `logs/` bleiben erhalten; eigene Anpassungen in
-`docker-compose.yml` wie Passwort und Netzwerk übernehmen), dann `docker compose up -d --build`. Die laufende Version steht unten in der GUI und unter `/health`.
+```bash
+docker compose pull && docker compose up -d
+```
+Mit `docker run`: `docker pull ghcr.io/dermilderjoghurt/mirrorsync:latest`, Container entfernen und mit
+demselben Befehl neu starten. `config/` und `logs/` bleiben erhalten. Die laufende Version steht unten in der
+GUI und unter `/health`.
 
 ## Hinweise
 - **Spiegeln löscht im Ziel.** Ziel nie auf einen Ordner mit anderen wichtigen Daten zeigen lassen.
