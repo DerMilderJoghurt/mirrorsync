@@ -316,7 +316,6 @@
  "Audit-Log exportiert": "Audit log exported",
  "Audit-Log: so viele Tage behalten": "Audit log: keep this many days",
  "Auf diesem Gerät ist schon ein Passkey für dein Konto gespeichert.": "A passkey for your account is already stored on this device.",
- "Aufbewahrung: log_keep_runs (1–1000), log_keep_days und audit_keep_days (0–3650, 0 = unbegrenzt).": "Retention: log_keep_runs (1–1000), log_keep_days and audit_keep_days (0–3650, 0 = unlimited).",
  "Aufgabe": "Job",
  "Aufgabe (beim Test aus einer Aufgabe) oder „Test“": "Job (when testing from a job) or “Test”",
  "Aufgabe anlegen": "Create job",
@@ -2031,5 +2030,17 @@
  "Fragt im eingestellten Abstand bei GitHub nach, ob es eine neuere Version gibt, und zeigt sie unten links neben der Versionsnummer an. Übertragen wird dabei nur die eigene Versionsnummer. Erlaubt sind 5 Minuten bis 720 Stunden, Standard 1 Stunde.": "Asks GitHub at the set interval whether a newer version exists and shows it at the bottom left next to the version number. Only the installed version number is sent. Allowed: 5 minutes to 720 hours, default 1 hour.",
  "Automatische Prüfung auf neue Versionen ein- oder ausschalten (update_check) und den Abstand in Minuten festlegen (update_interval, 5–43200, Standard 60). Nicht angegebene Felder bleiben unverändert.": "Turn the automatic check for new versions on or off (update_check) and set the interval in minutes (update_interval, 5–43200, default 60). Fields left out stay unchanged.",
  "Abstand: 5 Minuten bis 720 Stunden (30 Tage).": "Interval: 5 minutes to 720 hours (30 days).",
- "Update-Prüfung alle (Minuten)": "Update check every (minutes)"
+ "Update-Prüfung alle (Minuten)": "Update check every (minutes)",
+ "0 bis 1000, 0 = unbegrenzt": "0 to 1000, 0 = unlimited",
+ "Höchstens so lange behalten": "Keep at most this long",
+ "Wochen": "Weeks",
+ "Monate": "Months",
+ "0 = unbegrenzt. Ein Monat zählt als 30 Tage.": "0 = unlimited. A month counts as 30 days.",
+ "Nur Logs ab diesem Datum behalten": "Only keep logs from this date",
+ "Optional. Ältere Läufe werden gelöscht, leer = kein Datum. Sind mehrere Grenzen gesetzt, gilt die, die zuerst greift. Der neueste Lauf bleibt immer erhalten.": "Optional. Older runs are deleted, empty = no date. If several limits are set, whichever applies first wins. The newest run is always kept.",
+ "Alter: 0 bis 3650 Tage (520 Wochen, 121 Monate), 0 = unbegrenzt.": "Age: 0 to 3650 days (520 weeks, 121 months), 0 = unlimited.",
+ "Datum bitte als JJJJ-MM-TT angeben oder leer lassen.": "Please enter the date as YYYY-MM-DD or leave it empty.",
+ "Logs ab Datum behalten": "Keep logs from date",
+ "Logs behalten (Einheit)": "Keep logs (unit)",
+ "Aufbewahrung: log_keep_runs (0–1000), log_keep_days und audit_keep_days (0–3650); 0 = unbegrenzt. log_keep_from: Datum JJJJ-MM-TT, ältere Läufe werden gelöscht, leer = kein Datum. Es gilt die Grenze, die zuerst greift.": "Retention: log_keep_runs (0–1000), log_keep_days and audit_keep_days (0–3650); 0 = unlimited. log_keep_from: date YYYY-MM-DD, older runs are deleted, empty = no date. Whichever limit applies first wins."
 }

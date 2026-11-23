@@ -316,7 +316,6 @@
  "Audit-Log exportiert": "Journal d’audit exporté",
  "Audit-Log: so viele Tage behalten": "Journal d’audit : conserver ce nombre de jours",
  "Auf diesem Gerät ist schon ein Passkey für dein Konto gespeichert.": "Une passkey pour ton compte est déjà enregistrée sur cet appareil.",
- "Aufbewahrung: log_keep_runs (1–1000), log_keep_days und audit_keep_days (0–3650, 0 = unbegrenzt).": "Conservation : log_keep_runs (1–1000), log_keep_days et audit_keep_days (0–3650, 0 = illimitée).",
  "Aufgabe": "Tâche",
  "Aufgabe (beim Test aus einer Aufgabe) oder „Test“": "Tâche (lors d’un test depuis une tâche) ou « Test »",
  "Aufgabe anlegen": "Créer une tâche",
@@ -2031,5 +2030,17 @@
  "Fragt im eingestellten Abstand bei GitHub nach, ob es eine neuere Version gibt, und zeigt sie unten links neben der Versionsnummer an. Übertragen wird dabei nur die eigene Versionsnummer. Erlaubt sind 5 Minuten bis 720 Stunden, Standard 1 Stunde.": "Interroge GitHub à l’intervalle choisi pour savoir s’il existe une version plus récente et l’affiche en bas à gauche à côté du numéro de version. Seul le numéro de version installé est transmis. Autorisé : de 5 minutes à 720 heures, 1 heure par défaut.",
  "Automatische Prüfung auf neue Versionen ein- oder ausschalten (update_check) und den Abstand in Minuten festlegen (update_interval, 5–43200, Standard 60). Nicht angegebene Felder bleiben unverändert.": "Activer ou désactiver la vérification automatique des nouvelles versions (update_check) et définir l’intervalle en minutes (update_interval, 5–43200, 60 par défaut). Les champs omis restent inchangés.",
  "Abstand: 5 Minuten bis 720 Stunden (30 Tage).": "Intervalle : de 5 minutes à 720 heures (30 jours).",
- "Update-Prüfung alle (Minuten)": "Vérification des mises à jour toutes les (minutes)"
+ "Update-Prüfung alle (Minuten)": "Vérification des mises à jour toutes les (minutes)",
+ "0 bis 1000, 0 = unbegrenzt": "0 à 1000, 0 = illimité",
+ "Höchstens so lange behalten": "Conserver au maximum",
+ "Wochen": "Semaines",
+ "Monate": "Mois",
+ "0 = unbegrenzt. Ein Monat zählt als 30 Tage.": "0 = illimité. Un mois compte pour 30 jours.",
+ "Nur Logs ab diesem Datum behalten": "Ne conserver que les journaux à partir de cette date",
+ "Optional. Ältere Läufe werden gelöscht, leer = kein Datum. Sind mehrere Grenzen gesetzt, gilt die, die zuerst greift. Der neueste Lauf bleibt immer erhalten.": "Facultatif. Les exécutions plus anciennes sont supprimées, vide = pas de date. Si plusieurs limites sont définies, celle qui s’applique en premier l’emporte. L’exécution la plus récente est toujours conservée.",
+ "Alter: 0 bis 3650 Tage (520 Wochen, 121 Monate), 0 = unbegrenzt.": "Ancienneté : de 0 à 3650 jours (520 semaines, 121 mois), 0 = illimité.",
+ "Datum bitte als JJJJ-MM-TT angeben oder leer lassen.": "Saisissez la date au format AAAA-MM-JJ ou laissez le champ vide.",
+ "Logs ab Datum behalten": "Conserver les journaux à partir de la date",
+ "Logs behalten (Einheit)": "Conserver les journaux (unité)",
+ "Aufbewahrung: log_keep_runs (0–1000), log_keep_days und audit_keep_days (0–3650); 0 = unbegrenzt. log_keep_from: Datum JJJJ-MM-TT, ältere Läufe werden gelöscht, leer = kein Datum. Es gilt die Grenze, die zuerst greift.": "Conservation : log_keep_runs (0–1000), log_keep_days et audit_keep_days (0–3650) ; 0 = illimité. log_keep_from : date AAAA-MM-JJ, les exécutions plus anciennes sont supprimées, vide = pas de date. La limite qui s’applique en premier l’emporte."
 }

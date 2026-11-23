@@ -4,7 +4,7 @@
 
 # MirrorSync – 1:1 mirroring with a web GUI and schedules
 
-Version **1.37.3** · Changes: [CHANGELOG.md](CHANGELOG.md) · [Deutsche Version](README.de.md)
+Version **1.38.0** · Changes: [CHANGELOG.md](CHANGELOG.md) · [Deutsche Version](README.de.md)
 
 A Docker container that **mirrors folders one-way, 1:1** (like FreeFileSync "Mirror"):
 the destination becomes an exact copy of the source, including deletions. The sync engine is
@@ -67,7 +67,7 @@ Changed files are transferred completely (no delta transfer like rsync).
 
 ## Installation
 The ready-made image is in the GitHub Container Registry: `ghcr.io/dermilderjoghurt/mirrorsync`
-(for amd64 and arm64, e.g. Raspberry Pi). Tags: `latest` (newest version), `1.37.3` (fixed version),
+(for amd64 and arm64, e.g. Raspberry Pi). Tags: `latest` (newest version), `1.38.0` (fixed version),
 `1.34` (newest patch of this version).
 
 ### With Docker Compose (recommended)
@@ -534,8 +534,14 @@ with the number of copied, deleted and failed files. Clicking a run opens its fu
 - "Download" saves the complete log as a text file
 - A running run refreshes every 3 seconds
 
-Retention under Settings → General: by default the last 50 runs per job and at most 30 days (0 = unlimited).
-The newest run is always kept.
+Retention under Settings → General → Keep logs:
+- **Runs per job** (default 50, 0 = unlimited).
+- **At most this long** as a number of days, weeks or months (default 30 days, 0 = unlimited, a month = 30 days).
+- Optionally **only keep logs from a date**, older runs are deleted.
+
+If several limits are set, whichever applies first wins. The newest run is always kept. API/MCP:
+`PATCH /api/v1/settings/logs` (`update_log_settings`) with `log_keep_runs`, `log_keep_days` (in days) and
+`log_keep_from` (`YYYY-MM-DD`, empty = no date).
 
 ## API keys, REST API and MCP
 Under **Settings → API** you create API keys (permission "Manage API keys", admins have it):

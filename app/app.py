@@ -379,7 +379,7 @@ def build_sync_cmd(job, dry_run, mode="full", max_age=None):
 SETTINGS_FILE = os.path.join(CONFIG_DIR, "settings.json")
 
 
-LOG_DEFAULTS = {"log_keep_runs": "50", "log_keep_days": "30", "trust_proxy": False, "geoip_auto": True, "geoip_days": "30",
+LOG_DEFAULTS = {"log_keep_runs": "50", "log_keep_days": "30", "log_keep_unit": "d", "log_keep_from": "", "trust_proxy": False, "geoip_auto": True, "geoip_days": "30",
                 "geoip_mode": "interval", "geoip_time": "03:00", "geoip_dow": "mon",
                 "lock_attempts": "5", "lock_minutes": "15", "lock_notify": True,
                 "fail_notify": "", "fail_notify_minutes": "15", "audit_keep_days": "365", "update_check": True, "update_interval": "60"}
@@ -420,10 +420,22 @@ def _update_loop():
         time.sleep(60)   # der eingestellte Abstand kann bis 5 Minuten herunter gehen
 
 
+LOG_UNITS = {"d": 1, "w": 7, "m": 30}   # Tage, Wochen, Monate (30 Tage)
+
+
+def keep_from_ts(value):
+    """'YYYY-MM-DD' -> Zeitstempel 00:00 Uhr Ortszeit; leer/ungueltig -> None."""
+    try:
+        return time.mktime(time.strptime((value or "").strip(), "%Y-%m-%d"))
+    except ValueError:
+        return None
+
+
 def keep_limits():
     st = load_settings()
     try:
-        runs = max(1, min(1000, int(st.get("log_keep_runs") or 50)))
+        v = st.get("log_keep_runs")
+        runs = max(0, min(1000, int(v if v not in (None, "") else 50)))   # 0 = unbegrenzt
     except ValueError:
         runs = 50
     try:
@@ -440,6 +452,7 @@ def run_log_path(job_id, run_id):
 def cleanup_logs(job_id):
     """Alte Lauf-Logs nach Anzahl und Alter loeschen. Der neueste Lauf bleibt immer erhalten."""
     runs, days = keep_limits()
+    from_ts = keep_from_ts(load_settings().get("log_keep_from"))
     with _lock:
         jobs = load_jobs()
         job = jobs.get(job_id)
@@ -447,6 +460,8 @@ def cleanup_logs(job_id):
             return
         hist = job.get("history", [])
         cutoff = time.time() - days * 86400 if days else None
+        if from_ts:   # "Logs ab dem ... behalten": was zuerst greift, gilt
+            cutoff = max(cutoff or 0, from_ts)
         keep = []
         for i, h in enumerate(hist):
             too_old = False
@@ -455,7 +470,7 @@ def cleanup_logs(job_id):
                     too_old = time.mktime(time.strptime(h["start"], "%Y-%m-%d %H:%M:%S")) < cutoff
                 except (KeyError, ValueError):
                     pass
-            if i < runs and not too_old:
+            if (not runs or i < runs) and not too_old:
                 keep.append(h)
         kept_runs = {h.get("run") for h in keep}
         job["history"] = keep
@@ -2780,13 +2795,31 @@ def general_settings():
             msg = "Bandbreite gespeichert. Gilt ab dem nächsten Lauf."
     elif request.method == "POST":
         vals = {}
-        for key, lo, hi in (("log_keep_runs", 1, 1000), ("log_keep_days", 0, 3650), ("audit_keep_days", 0, 3650)):
-            v = request.form.get(key, "").strip()
+        f = request.form.to_dict()
+        unit = f.get("log_keep_unit") if f.get("log_keep_unit") in LOG_UNITS else "d"
+        if "log_keep_value" in f:   # GUI: Zahl + Einheit (Tage/Wochen/Monate)
+            v = f["log_keep_value"].strip()
+            if not v.isdigit() or int(v) * LOG_UNITS[unit] > 3650:
+                err = "Alter: 0 bis 3650 Tage (520 Wochen, 121 Monate), 0 = unbegrenzt."
+            else:
+                f["log_keep_days"] = str(int(v) * LOG_UNITS[unit])
+        elif f.get("log_keep_days", "").strip().isdigit():
+            unit = "d"   # API: Angabe in Tagen
+        for key, lo, hi in (("log_keep_runs", 0, 1000), ("log_keep_days", 0, 3650), ("audit_keep_days", 0, 3650)):
+            if err:
+                break
+            v = f.get(key, "").strip()
             if not v.isdigit() or not lo <= int(v) <= hi:
                 err = f"Bitte eine Zahl von {lo} bis {hi} eintragen."
                 break
             vals[key] = str(int(v))
+        kf = (f.get("log_keep_from") or "").strip()
+        if not err and kf and not keep_from_ts(kf):
+            err = "Datum bitte als JJJJ-MM-TT angeben oder leer lassen."
         if not err:
+            if int(vals["log_keep_days"]) % LOG_UNITS[unit]:
+                unit = "d"
+            vals.update(log_keep_unit=unit, log_keep_from=kf)
             s.update(vals)
             save_settings(s)
             with _lock:

@@ -420,7 +420,7 @@ def a_update_templates(a):
 
 
 # ================================================================= Allgemeine Einstellungen
-LOG_KEYS = ("log_keep_runs", "log_keep_days", "audit_keep_days")
+LOG_KEYS = ("log_keep_runs", "log_keep_days", "audit_keep_days", "log_keep_from")
 SEC_KEYS = ("lock_attempts", "lock_minutes", "fail_notify", "fail_notify_minutes", "trust_proxy", "geoip_auto", "geoip_days", "geoip_mode", "geoip_time", "geoip_dow", "public_url")
 
 
@@ -465,8 +465,9 @@ def a_update_update_settings(a):
 
 
 @action("update_log_settings", "PATCH", "/settings/logs", "system.settings", "Einstellungen",
-        "Aufbewahrung: log_keep_runs (1–1000), log_keep_days und audit_keep_days (0–3650, 0 = unbegrenzt).",
-        {k: S(INT) for k in LOG_KEYS})
+        "Aufbewahrung: log_keep_runs (0–1000), log_keep_days und audit_keep_days (0–3650); 0 = unbegrenzt. "
+        "log_keep_from: Datum JJJJ-MM-TT, ältere Läufe werden gelöscht, leer = kein Datum. Es gilt die Grenze, die zuerst greift.",
+        dict({k: S(INT) for k in LOG_KEYS if k != "log_keep_from"}, log_keep_from=S(STR)))
 def a_update_logs(a):
     _check_keys(a, LOG_KEYS)
     s = core.load_settings()

@@ -39,7 +39,7 @@ LABELS = {
     "remotes": "Speicherorte", "description": "Beschreibung", "type": "Typ", "allow": "Erlaubt-Liste", "block": "Sperrliste",
     "country_mode": "Länder-Regel", "countries": "Länder", "auto_attempts": "Auto-Sperre nach Fehlversuchen",
     "auto_minutes": "Auto-Sperre Minuten", "auto_window": "Zeitfenster Fehlversuche", "auto_exempt_lan": "LAN ausnehmen",
-    "notify": "Benachrichtigen", "trust_proxy": "Reverse-Proxy vertrauen", "public_url": "Öffentliche Adresse", "log_keep_runs": "Logs behalten (Läufe)",
+    "notify": "Benachrichtigen", "trust_proxy": "Reverse-Proxy vertrauen", "public_url": "Öffentliche Adresse", "log_keep_runs": "Logs behalten (Läufe)", "log_keep_from": "Logs ab Datum behalten", "log_keep_unit": "Logs behalten (Einheit)",
     "log_keep_days": "Logs behalten (Tage)", "audit_keep_days": "Audit-Log behalten (Tage)", "lock_attempts": "Sperre nach Fehlversuchen",
     "lock_minutes": "Sperrdauer", "fail_notify": "Fehlversuche melden", "geoip_auto": "Länder-Datenbank automatisch", "update_check": "Nach neuen Versionen suchen", "update_interval": "Update-Prüfung alle (Minuten)", "geoip_days": "Länder-Datenbank erneuern alle (Tage)", "geoip_mode": "Länder-Datenbank erneuern", "geoip_time": "Länder-Datenbank: Uhrzeit", "geoip_dow": "Länder-Datenbank: Wochentage", "visible_to": "Sichtbar für", "windows": "aktiv nur zu Zeiten", "versions_keep": "Versionen behalten", "versions_days": "Versionen höchstens Tage", "expires": "gültig bis", "ips": "erlaubte IPs", "members": "Mitglieder", "keys": "API-Keys", "bw_unit": "Einheit der Bandbreite",
     "hash": "Passwort", "pass": "Passwort", "token": "Token", "smtp_pass": "SMTP-Passwort", "telegram_token": "Telegram-Token",

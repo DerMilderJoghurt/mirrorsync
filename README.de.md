@@ -4,7 +4,7 @@
 
 # MirrorSync – 1:1-Spiegelung mit Web-GUI und Zeitplänen
 
-Version **1.37.3** · Änderungen siehe [CHANGELOG.md](CHANGELOG.md) (englisch) · [English version](README.md)
+Version **1.38.0** · Änderungen siehe [CHANGELOG.md](CHANGELOG.md) (englisch) · [English version](README.md)
 
 Ein Docker-Container, der Ordner **einweg 1:1 spiegelt** (wie FreeFileSync „Spiegeln"):
 Das Ziel wird exakt wie die Quelle, inklusive Löschungen. Als Sync-Motor dient
@@ -68,7 +68,7 @@ Geänderte Dateien werden komplett neu übertragen (kein Delta wie bei rsync).
 
 ## Installation
 Das fertige Image liegt in der GitHub Container Registry: `ghcr.io/dermilderjoghurt/mirrorsync`
-(für amd64 und arm64, z. B. Raspberry Pi). Tags: `latest` (neueste Version), `1.37.3` (feste Version),
+(für amd64 und arm64, z. B. Raspberry Pi). Tags: `latest` (neueste Version), `1.38.0` (feste Version),
 `1.34` (neuester Patch dieser Version).
 
 ### Mit Docker Compose (empfohlen)
@@ -549,8 +549,14 @@ auf einen Lauf öffnet sein ganzes Log:
 - „Herunterladen" speichert das vollständige Log als Textdatei
 - Ein laufender Lauf aktualisiert sich alle 3 Sekunden
 
-Aufbewahrung unter Einstellungen → Allgemein: Standard sind die letzten 50 Läufe pro Aufgabe und höchstens
-30 Tage (0 = unbegrenzt). Der neueste Lauf bleibt immer erhalten. Das Log aus Version 1.4 und älter wird beim
+Aufbewahrung unter Einstellungen → Allgemein → Logs aufbewahren:
+- **Läufe pro Aufgabe** (Standard 50, 0 = unbegrenzt).
+- **Höchstens so lange** als Zahl in Tagen, Wochen oder Monaten (Standard 30 Tage, 0 = unbegrenzt, ein Monat = 30 Tage).
+- Optional **nur Logs ab einem Datum** behalten, ältere Läufe werden gelöscht.
+
+Sind mehrere Grenzen gesetzt, gilt die, die zuerst greift. Der neueste Lauf bleibt immer erhalten. API/MCP:
+`PATCH /api/v1/settings/logs` (`update_log_settings`) mit `log_keep_runs`, `log_keep_days` (in Tagen) und
+`log_keep_from` (`JJJJ-MM-TT`, leer = kein Datum). Das Log aus Version 1.4 und älter wird beim
 ersten Start als Lauf „alt-…" übernommen.
 
 ## API-Keys, REST-API und MCP

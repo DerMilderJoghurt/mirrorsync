@@ -3,6 +3,15 @@
 Version numbers follow [SemVer](https://semver.org/): MAJOR.MINOR.PATCH
 (MAJOR = incompatible change, MINOR = new feature, PATCH = bug fix).
 
+## 1.38.0 – 2026-11-23
+- **More flexible log retention** (Settings → General → Keep logs):
+  - "Runs per job to keep" now allows 0 = unlimited.
+  - The age is entered as a number of days, weeks or months (a month = 30 days, 0 = unlimited).
+  - New: "Only keep logs from this date". Older runs are deleted, empty = no date.
+  - If several limits are set, whichever applies first wins. The newest run is always kept.
+- API/MCP: `PATCH /settings/logs` (`update_log_settings`) with `log_keep_runs` 0–1000 and the new `log_keep_from`
+  (`YYYY-MM-DD`). Changes are recorded in the audit log, all texts in 5 languages.
+
 ## 1.37.3 – 2026-11-23
 - The hourly security scan now runs on the full hour.
 

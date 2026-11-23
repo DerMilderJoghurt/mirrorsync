@@ -316,7 +316,6 @@
  "Audit-Log exportiert": "Registro di audit esportato",
  "Audit-Log: so viele Tage behalten": "Registro di audit: conserva questi giorni",
  "Auf diesem Gerät ist schon ein Passkey für dein Konto gespeichert.": "Su questo dispositivo è già salvata una passkey per il tuo account.",
- "Aufbewahrung: log_keep_runs (1–1000), log_keep_days und audit_keep_days (0–3650, 0 = unbegrenzt).": "Conservazione: log_keep_runs (1–1000), log_keep_days e audit_keep_days (0–3650, 0 = illimitata).",
  "Aufgabe": "Attività",
  "Aufgabe (beim Test aus einer Aufgabe) oder „Test“": "Attività (nel test da un’attività) o “Test”",
  "Aufgabe anlegen": "Crea attività",
@@ -2031,5 +2030,17 @@
  "Fragt im eingestellten Abstand bei GitHub nach, ob es eine neuere Version gibt, und zeigt sie unten links neben der Versionsnummer an. Übertragen wird dabei nur die eigene Versionsnummer. Erlaubt sind 5 Minuten bis 720 Stunden, Standard 1 Stunde.": "Chiede a GitHub all’intervallo impostato se esiste una versione più recente e la mostra in basso a sinistra accanto al numero di versione. Viene inviato solo il numero di versione installato. Consentito: da 5 minuti a 720 ore, predefinito 1 ora.",
  "Automatische Prüfung auf neue Versionen ein- oder ausschalten (update_check) und den Abstand in Minuten festlegen (update_interval, 5–43200, Standard 60). Nicht angegebene Felder bleiben unverändert.": "Attivare o disattivare il controllo automatico di nuove versioni (update_check) e impostare l’intervallo in minuti (update_interval, 5–43200, predefinito 60). I campi non indicati restano invariati.",
  "Abstand: 5 Minuten bis 720 Stunden (30 Tage).": "Intervallo: da 5 minuti a 720 ore (30 giorni).",
- "Update-Prüfung alle (Minuten)": "Controllo aggiornamenti ogni (minuti)"
+ "Update-Prüfung alle (Minuten)": "Controllo aggiornamenti ogni (minuti)",
+ "0 bis 1000, 0 = unbegrenzt": "da 0 a 1000, 0 = illimitato",
+ "Höchstens so lange behalten": "Conserva al massimo",
+ "Wochen": "Settimane",
+ "Monate": "Mesi",
+ "0 = unbegrenzt. Ein Monat zählt als 30 Tage.": "0 = illimitato. Un mese conta come 30 giorni.",
+ "Nur Logs ab diesem Datum behalten": "Conserva solo i log da questa data",
+ "Optional. Ältere Läufe werden gelöscht, leer = kein Datum. Sind mehrere Grenzen gesetzt, gilt die, die zuerst greift. Der neueste Lauf bleibt immer erhalten.": "Facoltativo. Le esecuzioni precedenti vengono eliminate, vuoto = nessuna data. Se sono impostati più limiti, vale quello che interviene per primo. L’esecuzione più recente viene sempre conservata.",
+ "Alter: 0 bis 3650 Tage (520 Wochen, 121 Monate), 0 = unbegrenzt.": "Età: da 0 a 3650 giorni (520 settimane, 121 mesi), 0 = illimitato.",
+ "Datum bitte als JJJJ-MM-TT angeben oder leer lassen.": "Inserisci la data come AAAA-MM-GG o lasciala vuota.",
+ "Logs ab Datum behalten": "Conserva log dalla data",
+ "Logs behalten (Einheit)": "Conserva log (unità)",
+ "Aufbewahrung: log_keep_runs (0–1000), log_keep_days und audit_keep_days (0–3650); 0 = unbegrenzt. log_keep_from: Datum JJJJ-MM-TT, ältere Läufe werden gelöscht, leer = kein Datum. Es gilt die Grenze, die zuerst greift.": "Conservazione: log_keep_runs (0–1000), log_keep_days e audit_keep_days (0–3650); 0 = illimitato. log_keep_from: data AAAA-MM-GG, le esecuzioni precedenti vengono eliminate, vuoto = nessuna data. Vale il limite che interviene per primo."
 }
