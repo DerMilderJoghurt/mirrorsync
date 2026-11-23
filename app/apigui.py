@@ -420,7 +420,7 @@ def a_update_templates(a):
 
 
 # ================================================================= Allgemeine Einstellungen
-LOG_KEYS = ("log_keep_runs", "log_keep_days", "audit_keep_days", "log_keep_from")
+LOG_KEYS = ("log_keep_runs", "log_keep_days", "audit_keep_days")
 SEC_KEYS = ("lock_attempts", "lock_minutes", "fail_notify", "fail_notify_minutes", "trust_proxy", "geoip_auto", "geoip_days", "geoip_mode", "geoip_time", "geoip_dow", "public_url")
 
 
@@ -464,10 +464,26 @@ def a_update_update_settings(a):
     return {"ok": True, "message": msg, "update": core.update_status()}
 
 
+@action("purge_logs", "POST", "/logs/purge", "system.settings", "Einstellungen",
+        "Einmalig alle Läufe samt Log löschen, die vor einem Datum gestartet sind (before: JJJJ-MM-TT). "
+        "Laufende Aufgaben bleiben unberührt. dry_run=true zählt nur (runs, jobs), ohne zu löschen.",
+        {"before": S(STR), "dry_run": S(BOOL)}, ["before"])
+def a_purge_logs(a):
+    _check_keys(a, ("before", "dry_run"))
+    ts = core.keep_from_ts(str(a.get("before") or ""))
+    if not ts:
+        raise ApiError(400, _t("Datum bitte als JJJJ-MM-TT angeben."))
+    if a.get("dry_run") is not None and _bool(a["dry_run"]):
+        n, nj = core.purge_logs_before(ts, dry=True)
+        return {"ok": True, "dry_run": True, "before": a["before"], "runs": n, "jobs": nj}
+    n, nj = core.purge_logs_before(ts, dry=True)
+    msg = done(gui("POST", "/settings/general", form={"section": "purge", "purge_before": a["before"], "purge_action": "delete"}))
+    return {"ok": True, "dry_run": False, "before": a["before"], "runs": n, "jobs": nj, "message": msg}
+
+
 @action("update_log_settings", "PATCH", "/settings/logs", "system.settings", "Einstellungen",
-        "Aufbewahrung: log_keep_runs (0–1000), log_keep_days und audit_keep_days (0–3650); 0 = unbegrenzt. "
-        "log_keep_from: Datum JJJJ-MM-TT, ältere Läufe werden gelöscht, leer = kein Datum. Es gilt die Grenze, die zuerst greift.",
-        dict({k: S(INT) for k in LOG_KEYS if k != "log_keep_from"}, log_keep_from=S(STR)))
+        "Aufbewahrung: log_keep_runs (0–1000), log_keep_days und audit_keep_days (0–3650); 0 = unbegrenzt.",
+        {k: S(INT) for k in LOG_KEYS})
 def a_update_logs(a):
     _check_keys(a, LOG_KEYS)
     s = core.load_settings()

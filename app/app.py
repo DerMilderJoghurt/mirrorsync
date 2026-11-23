@@ -379,7 +379,7 @@ def build_sync_cmd(job, dry_run, mode="full", max_age=None):
 SETTINGS_FILE = os.path.join(CONFIG_DIR, "settings.json")
 
 
-LOG_DEFAULTS = {"log_keep_runs": "50", "log_keep_days": "30", "log_keep_unit": "d", "log_keep_from": "", "trust_proxy": False, "geoip_auto": True, "geoip_days": "30",
+LOG_DEFAULTS = {"log_keep_runs": "50", "log_keep_days": "30", "log_keep_unit": "d", "trust_proxy": False, "geoip_auto": True, "geoip_days": "30",
                 "geoip_mode": "interval", "geoip_time": "03:00", "geoip_dow": "mon",
                 "lock_attempts": "5", "lock_minutes": "15", "lock_notify": True,
                 "fail_notify": "", "fail_notify_minutes": "15", "audit_keep_days": "365", "update_check": True, "update_interval": "60"}
@@ -445,6 +445,54 @@ def keep_limits():
     return runs, days
 
 
+def _run_ts(run_id, start=""):
+    try:
+        return time.mktime(time.strptime(start, "%Y-%m-%d %H:%M:%S"))
+    except (TypeError, ValueError):
+        pass
+    try:
+        return time.mktime(time.strptime(str(run_id)[-15:] if str(run_id).startswith("alt-") else str(run_id)[:15], "%Y%m%d-%H%M%S"))
+    except ValueError:
+        return None
+
+
+def purge_logs_before(before_ts, dry=False):
+    """Einmalig alle Lauf-Logs loeschen, die vor before_ts gestartet sind (laufende bleiben).
+    Gibt (Anzahl Laeufe, Anzahl Aufgaben) zurueck; dry=True zaehlt nur."""
+    total, touched = 0, 0
+    with _lock:
+        jobs = load_jobs()
+        for jid, job in jobs.items():
+            cur = _current_run.get(jid)
+            old_runs = set()
+            d = os.path.join(LOG_DIR, jid)
+            files = [fn[:-4] for fn in os.listdir(d) if fn.endswith(".log")] if os.path.isdir(d) else []
+            for h in job.get("history", []):
+                ts = _run_ts(h.get("run"), h.get("start", ""))
+                if ts is not None and ts < before_ts and h.get("run") != cur:
+                    old_runs.add(h.get("run"))
+            for rid in files:
+                ts = _run_ts(rid)
+                if ts is not None and ts < before_ts and rid != cur:
+                    old_runs.add(rid)
+            old_runs.discard(None)
+            if not old_runs:
+                continue
+            total += len(old_runs)
+            touched += 1
+            if dry:
+                continue
+            job["history"] = [h for h in job.get("history", []) if h.get("run") not in old_runs]
+            for rid in old_runs:
+                try:
+                    os.remove(run_log_path(jid, rid))
+                except OSError:
+                    pass
+        if not dry and total:
+            save_jobs(jobs)
+    return total, touched
+
+
 def run_log_path(job_id, run_id):
     return os.path.join(LOG_DIR, job_id, f"{run_id}.log")
 
@@ -452,7 +500,6 @@ def run_log_path(job_id, run_id):
 def cleanup_logs(job_id):
     """Alte Lauf-Logs nach Anzahl und Alter loeschen. Der neueste Lauf bleibt immer erhalten."""
     runs, days = keep_limits()
-    from_ts = keep_from_ts(load_settings().get("log_keep_from"))
     with _lock:
         jobs = load_jobs()
         job = jobs.get(job_id)
@@ -460,8 +507,6 @@ def cleanup_logs(job_id):
             return
         hist = job.get("history", [])
         cutoff = time.time() - days * 86400 if days else None
-        if from_ts:   # "Logs ab dem ... behalten": was zuerst greift, gilt
-            cutoff = max(cutoff or 0, from_ts)
         keep = []
         for i, h in enumerate(hist):
             too_old = False
@@ -2731,6 +2776,7 @@ def settings_page():
 def general_settings():
     s = load_settings()
     msg = err = None
+    purge = None
     if request.method == "POST" and request.form.get("section") == "security":
         f = request.form
         a, m = f.get("lock_attempts", "").strip(), f.get("lock_minutes", "").strip()
@@ -2765,6 +2811,23 @@ def general_settings():
             save_settings(s)
             i18n.default_lang = lang
             msg = "Standardsprache gespeichert."
+    elif request.method == "POST" and request.form.get("section") == "purge":
+        before = (request.form.get("purge_before") or "").strip()
+        ts = keep_from_ts(before)
+        if not ts:
+            err = "Datum bitte als JJJJ-MM-TT angeben."
+        else:
+            day = time.strftime("%d.%m.%Y", time.localtime(ts))
+            if request.form.get("purge_action") == "delete":
+                n, nj = purge_logs_before(ts)
+                msg = i18n.t("{0} Läufe aus {1} Aufgaben gelöscht (gestartet vor dem {2}).", n, nj, day)
+                audit_add("settings", "Logs gelöscht", "Allgemein", detail=i18n.t("{0} Läufe vor dem {1}", n, day),
+                          info={"Vor dem": before, "Läufe": n, "Aufgaben": nj})
+            else:
+                n, nj = purge_logs_before(ts, dry=True)
+                purge = {"before": before, "runs": n}
+                msg = (i18n.t("Vor dem {0} gestartet: {1} Läufe in {2} Aufgaben. Zum Löschen unten bestätigen.", day, n, nj)
+                       if n else i18n.t("Vor dem {0} gibt es keine Läufe.", day))
     elif request.method == "POST" and request.form.get("section") == "update":
         s["update_check"] = "update_check" in request.form
         iv = (request.form.get("update_interval_value") or "").strip()
@@ -2813,13 +2876,11 @@ def general_settings():
                 err = f"Bitte eine Zahl von {lo} bis {hi} eintragen."
                 break
             vals[key] = str(int(v))
-        kf = (f.get("log_keep_from") or "").strip()
-        if not err and kf and not keep_from_ts(kf):
-            err = "Datum bitte als JJJJ-MM-TT angeben oder leer lassen."
         if not err:
             if int(vals["log_keep_days"]) % LOG_UNITS[unit]:
                 unit = "d"
-            vals.update(log_keep_unit=unit, log_keep_from=kf)
+            vals.update(log_keep_unit=unit)
+            s.pop("log_keep_from", None)   # 1.38.0: dauerhafte Datumsgrenze, ersetzt durch "Alte Logs löschen"
             s.update(vals)
             save_settings(s)
             with _lock:
@@ -2835,7 +2896,7 @@ def general_settings():
     pk_rp_id, _, _pk_prob = _pk_rp()
     return render_template("general.html", s=s, msg=msg, err=err, usage=usage, bw_cfg=bw, geo=geoip.status(), pk_now=pk_rp_id,
                            attribution=Markup(geoip.ATTRIBUTION), my_ip=_client_ip(), my_loc=geoip.locate(_client_ip()),
-                           next_geoip=next_run("_geoip"), tz=TZ, upd=update_status(),
+                           next_geoip=next_run("_geoip"), tz=TZ, upd=update_status(), purge=purge,
                            fwd=request.headers.get("X-Forwarded-For", ""),
                            bw_desc=bwlimit.describe(bw, s.get("bw_unit") or "MB/s"), bw_tt=bwlimit.timetable(bw))
 

@@ -4,7 +4,7 @@
 
 # MirrorSync – 1:1 mirroring with a web GUI and schedules
 
-Version **1.38.0** · Changes: [CHANGELOG.md](CHANGELOG.md) · [Deutsche Version](README.de.md)
+Version **1.39.0** · Changes: [CHANGELOG.md](CHANGELOG.md) · [Deutsche Version](README.de.md)
 
 A Docker container that **mirrors folders one-way, 1:1** (like FreeFileSync "Mirror"):
 the destination becomes an exact copy of the source, including deletions. The sync engine is
@@ -67,7 +67,7 @@ Changed files are transferred completely (no delta transfer like rsync).
 
 ## Installation
 The ready-made image is in the GitHub Container Registry: `ghcr.io/dermilderjoghurt/mirrorsync`
-(for amd64 and arm64, e.g. Raspberry Pi). Tags: `latest` (newest version), `1.38.0` (fixed version),
+(for amd64 and arm64, e.g. Raspberry Pi). Tags: `latest` (newest version), `1.39.0` (fixed version),
 `1.34` (newest patch of this version).
 
 ### With Docker Compose (recommended)
@@ -537,11 +537,14 @@ with the number of copied, deleted and failed files. Clicking a run opens its fu
 Retention under Settings → General → Keep logs:
 - **Runs per job** (default 50, 0 = unlimited).
 - **At most this long** as a number of days, weeks or months (default 30 days, 0 = unlimited, a month = 30 days).
-- Optionally **only keep logs from a date**, older runs are deleted.
 
-If several limits are set, whichever applies first wins. The newest run is always kept. API/MCP:
-`PATCH /api/v1/settings/logs` (`update_log_settings`) with `log_keep_runs`, `log_keep_days` (in days) and
-`log_keep_from` (`YYYY-MM-DD`, empty = no date).
+If both limits are set, whichever applies first wins. The newest run is always kept. API/MCP:
+`PATCH /api/v1/settings/logs` (`update_log_settings`) with `log_keep_runs` and `log_keep_days` (in days).
+
+**Delete old logs** (since 1.39.0, same page): pick a date, click "Show count", then confirm "Delete permanently
+now". All runs started before that date are deleted once, together with their log. Running jobs are not affected,
+the retention settings do not change, and the audit log records the deletion.
+API/MCP: `POST /api/v1/logs/purge` (`purge_logs`) with `before` (`YYYY-MM-DD`); `dry_run: true` only counts.
 
 ## API keys, REST API and MCP
 Under **Settings → API** you create API keys (permission "Manage API keys", admins have it):

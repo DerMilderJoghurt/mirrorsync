@@ -3,6 +3,14 @@
 Version numbers follow [SemVer](https://semver.org/): MAJOR.MINOR.PATCH
 (MAJOR = incompatible change, MINOR = new feature, PATCH = bug fix).
 
+## 1.39.0 – 2026-11-23
+- **Delete old logs** as its own section under Settings → General: pick a date, "Show count" shows how many runs
+  in how many jobs started before that date, "Delete permanently now" (with confirmation) deletes them once,
+  including their logs. Running jobs are not affected, the deletion is recorded in the audit log.
+  API/MCP: `POST /logs/purge` (`purge_logs`) with `before` (YYYY-MM-DD) and `dry_run`, permission "general settings".
+- The permanent rule "Only keep logs from this date" from 1.38.0 is removed in favour of this (including
+  `log_keep_from` in the API). Runs per job (0 = unlimited) and age in days, weeks or months stay.
+
 ## 1.38.0 – 2026-11-23
 - **More flexible log retention** (Settings → General → Keep logs):
   - "Runs per job to keep" now allows 0 = unlimited.
