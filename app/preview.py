@@ -31,9 +31,18 @@ def _ts(s):
         return None
 
 
-def _differs(a, b, window=1.0):
+def _differs(a, b, window=1.0, compare="standard"):
+    """Wie rclone: standard = Groesse + Aenderungszeit, size = nur Groesse, checksum = Groesse + Pruefsumme
+    (gibt es keine gemeinsame Pruefsumme, wie standard), tolerant = Aenderungszeit mit grosszuegigem Fenster."""
     if a.get("Size", -1) != b.get("Size", -1):
         return True
+    if compare == "size":
+        return False
+    if compare == "checksum":
+        ha, hb = a.get("Hashes") or {}, b.get("Hashes") or {}
+        common = [k for k in ha if k in hb and ha[k] and hb[k]]
+        if common:
+            return ha[common[0]] != hb[common[0]]
     ta, tb = _ts(a.get("ModTime")), _ts(b.get("ModTime"))
     return ta is not None and tb is not None and abs(ta - tb) > window
 
@@ -52,7 +61,7 @@ def _parents(path):
     return ["/".join(parts[:i]) for i in range(1, len(parts))]
 
 
-def compute(src_items, dst_items, mode="mirror", delete_extra=True):
+def compute(src_items, dst_items, mode="mirror", delete_extra=True, compare="standard", window=1):
     """Statusliste je Pfad -> (ist_ordner, status, groesse, aenderungszeit). mode: mirror | bisync."""
     src, dst = _index(src_items), _index(dst_items)
     out = {}
@@ -61,7 +70,7 @@ def compute(src_items, dst_items, mode="mirror", delete_extra=True):
         is_dir = bool(it.get("IsDir"))
         if d is None:
             st = "new"
-        elif is_dir or not _differs(it, d):
+        elif is_dir or not _differs(it, d, max(1.0, float(window)) if compare == "tolerant" else 1.0, compare):
             st = "same"
         else:
             st = "update"

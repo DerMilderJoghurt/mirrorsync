@@ -269,6 +269,8 @@ def public_job(jid, j, history=False):
     out.setdefault("msg_tpl_on", False)
     out.setdefault("visible_to", "all")
     out["live_mode"] = core.live_mode(j)
+    out.update(compare=core.compare_of(j), compare_window=core.compare_window(j), speed=core.speed_of(j),
+               checksum=core.compare_of(j) == "checksum")
     out["direction"] = "bisync" if core.is_bisync(j) else "mirror"
     if core.is_bisync(j):
         out.update(bisync_conflict=j.get("bisync_conflict") or "newer", bisync_max_delete=str(core.bisync_max_delete(j)),
@@ -289,7 +291,7 @@ BOOL_FIELDS = ("enabled", "dry_run", "versioning", "checksum", "delete_excluded"
 TEXT_FIELDS = ("name", "source", "dest", "schedule", "max_delete", "extra_flags", "excludes", "selection", "trigger",
                "after_job", "after_when", "paused_until", "pause_chain", "live_interval", "live_full", "live_mode", "direction", "bisync_conflict", "bisync_max_delete", "bw_mode", "versions_keep", "versions_days",
                "notify_mode", "notify_when", "notify_webhook_url", "notify_smtp_to", "notify_telegram_chat_id",
-               "notify_telegram_token", "notify_apprise_urls", "notify_apprise_tag")
+               "notify_telegram_token", "notify_apprise_urls", "notify_apprise_tag", "compare", "compare_window", "speed")
 
 
 class Fields(dict):
@@ -321,6 +323,16 @@ def _fields(base, data):
             src[k] = v
         elif k not in ("id", "history", "running", "next_run", "next_start", "next_start_kind", "effective_dest", "is_paused", "owner", "bisync_ready", "bisync_need_resync"):
             raise ApiError(400, f"Unbekanntes Feld: {k}")
+    for k, allowed in (("compare", core.COMPARE_MODES), ("speed", core.SPEEDS)):
+        if k in data and data[k] not in allowed:
+            raise ApiError(400, core.i18n.t("{0}: nur {1}.", k, ", ".join(allowed)))
+    if "compare" in data:
+        src["checksum"] = False
+    elif "checksum" in data:   # alte Einstellung: true = Pruefsumme, false = zurueck auf Standard (falls vorher Pruefsumme)
+        old = core.compare_of(base)
+        src["compare"] = "checksum" if data["checksum"] else ("standard" if old == "checksum" else old)
+    else:
+        src["compare"] = core.compare_of(base)
     for k in BOOL_FIELDS:
         if src.get(k):
             f[k] = "on"
@@ -575,7 +587,8 @@ def _schema(props=None, required=None):
 
 JOB_ID = {"job_id": {"type": "string", "description": "ID der Aufgabe (siehe list_jobs)"}}
 JOB_FIELDS = {"type": "object", "description": "Felder der Aufgabe, z. B. name, source, dest, trigger (time|after|live|manual), "
-              "schedule (Cron), selection, excludes, enabled, dry_run, versioning, max_delete", "additionalProperties": True}
+              "schedule (Cron), selection, excludes, enabled, dry_run, versioning, max_delete, compare (standard|size|checksum|tolerant: "
+              "woran eine Änderung erkannt wird), compare_window (Sekunden bei tolerant), speed (gentle|normal|fast|max)", "additionalProperties": True}
 TOOLS = [
     ("status", "Überblick: Version, laufende, fehlgeschlagene und pausierte Aufgaben, Rechte des Keys.", None,
      _schema(), lambda a: op_status(), True),
@@ -734,7 +747,12 @@ def openapi():
                 "selection": {"type": "array", "items": {"type": "string"}, "example": ["Projekte/", "bericht.docx"]},
                 "excludes": {"type": "array", "items": {"type": "string"}, "example": ["*.tmp"]},
                 "enabled": {"type": "boolean"}, "dry_run": {"type": "boolean"}, "versioning": {"type": "boolean"},
-                "checksum": {"type": "boolean"}, "include_source_dir": {"type": "boolean"},
+                "checksum": {"type": "boolean", "description": "veraltet, wie compare=checksum"}, "include_source_dir": {"type": "boolean"},
+                "compare": {"type": "string", "enum": ["standard", "size", "checksum", "tolerant"],
+                            "description": "Woran eine Änderung erkannt wird: standard = Größe + Änderungszeit (Standard), size = nur Größe (am schnellsten), checksum = Prüfsumme (am sichersten, liest jede Datei), tolerant = Änderungszeit mit großzügiger Toleranz (z. B. SMB, FAT, Zeitumstellung)"},
+                "compare_window": {"type": "integer", "description": "bei compare=tolerant: erlaubte Abweichung der Änderungszeit in Sekunden (1–86400, Standard 2)"},
+                "speed": {"type": "string", "enum": ["gentle", "normal", "fast", "max"],
+                          "description": "Tempo: gentle = 2 parallele Übertragungen (schont Server und Leitung), normal = rclone-Standard (4), fast = 8 und schnelles Auflisten, max = 16 und schnelles Auflisten. Eigene --transfers/--checkers in extra_flags haben Vorrang"},
                 "delete_excluded": {"type": "boolean"}, "max_delete": {"type": "string", "example": "500"},
                 "paused": {"type": "boolean"}, "notify_mode": {"type": "string", "enum": ["global", "custom", "off"]},
                 "notify_when": {"type": "string", "enum": ["fail", "always"]},

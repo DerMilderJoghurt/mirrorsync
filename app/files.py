@@ -482,6 +482,8 @@ def _run_task(t, jobs, move, ip):
                "--stats", "1s", "--stats-one-line", "--stats-log-level", "NOTICE"]
         if move and is_dir:
             cmd.append("--delete-empty-src-dirs")
+        if is_dir:
+            cmd += core.SPEED_FLAGS[core.speed_of(core.load_settings(), "files_speed")]
         p = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True, errors="replace")
         t["proc"] = p
         tail = []

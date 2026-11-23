@@ -3,7 +3,8 @@ TEMPLATES = {
 <html lang="{{ lang_code() }}"{% if side_mini %} data-side="mini"{% endif %}><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{% block title %}MirrorSync{% endblock %} · MirrorSync</title><link rel="icon" href="/static/favicon.svg" type="image/svg+xml"><link rel="icon" href="/favicon.ico" sizes="any"><link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
-{% if auto_refresh %}<meta http-equiv="refresh" content="3">{% endif %}
+{% if auto_refresh %}<script>/* Seite alle 3 s neu laden, aber nicht, solange das Aufträge-Fenster, ein Menü oder ein Dialog offen ist oder Text markiert wird */
+setInterval(()=>{const tp=document.getElementById('taskpop');if((tp&&!tp.hidden)||document.querySelector('details[open].pausemenu,dialog[open],.fmmenu[open]')||String(window.getSelection&&getSelection())!==''||document.hidden)return;location.reload()},3000);</script>{% endif %}
 <script>try{const t=localStorage.getItem('ms-theme');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
 <style>
 :root{--bg:#f6f7f9;--side:#ffffff;--card:#ffffff;--card2:#f9fafb;--fg:#0f172a;--mut:#64748b;--bd:#e5e7eb;--bd2:#d1d5db;
@@ -219,9 +220,11 @@ async function poll(){clearTimeout(TT);const jr=await jobsPoll();
   TT=setTimeout(poll,run?800:(jr?2000:(open?3000:10000)));}
 window.msPoll=()=>{wasRun=true;poll()};
 window.msTasksClear=async()=>{await op('remove_tasks',{finished:true});poll()};
-window.msTasksToggle=(ev)=>{if(ev)ev.stopPropagation();const p=document.getElementById('taskpop');open=p.hidden;p.hidden=!open;if(open)poll()};
-document.addEventListener('click',e=>{const p=document.getElementById('taskpop');if(!p.hidden&&!p.contains(e.target)&&!e.target.closest('#taskbtn')){p.hidden=true;open=false}});
-document.addEventListener('keydown',e=>{if(e.key==='Escape'){const p=document.getElementById('taskpop');if(!p.hidden){p.hidden=true;open=false}}});
+const tpKeep=v=>{try{v?sessionStorage.setItem('ms_taskpop','1'):sessionStorage.removeItem('ms_taskpop')}catch(e){}};
+window.msTasksToggle=(ev)=>{if(ev)ev.stopPropagation();const p=document.getElementById('taskpop');open=p.hidden;p.hidden=!open;tpKeep(open);if(open)poll()};
+try{if(sessionStorage.getItem('ms_taskpop')==='1'){document.getElementById('taskpop').hidden=false;open=true}}catch(e){}
+document.addEventListener('click',e=>{const p=document.getElementById('taskpop');if(!p.hidden&&e.target.isConnected&&!p.contains(e.target)&&!e.target.closest('#taskbtn,dialog')){p.hidden=true;open=false;tpKeep(false)}});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!document.querySelector('dialog[open]')){const p=document.getElementById('taskpop');if(!p.hidden){p.hidden=true;open=false;tpKeep(false)}}});
 poll();})();
 </script>{% endif %}
 <main>{% set fl = session.pop('flash', None) %}{% if fl %}<div class="msg info">{{ fl }}</div>{% endif %}{% block body %}{% endblock %}</main>
@@ -645,7 +648,30 @@ const TZN='{{ tz }}';
 <div style="flex:0 0 220px"><label>Versionen behalten</label><input type="text" name="versions_keep" inputmode="numeric" value="{{ job.versions_keep or '' }}" placeholder="alle"><div class="hint">Anzahl Stände, z. B. 10. Leer = alle.</div></div>
 <div style="flex:0 0 220px"><label>Höchstens so alt (Tage)</label><input type="text" name="versions_days" inputmode="numeric" value="{{ job.versions_days or '' }}" placeholder="unbegrenzt"><div class="hint">z. B. 30. Leer = unbegrenzt.</div></div>
 <div><div class="hint" style="margin-top:28px">Jeder Lauf, der etwas überschreibt oder löscht, legt einen Stand (Ordner mit Datum) an. Nach jedem erfolgreichen Lauf werden ältere Stände entfernt.</div></div></div>
-<label class="check"><input type="checkbox" name="checksum" {{ "checked" if job.checksum }}> Vergleich per Prüfsumme statt Größe + Änderungszeit (langsamer, genauer)</label>
+<div class="row" style="margin:4px 0 10px">
+<div style="flex:1 1 300px"><label for="compare">Änderung erkennen an</label><select name="compare" id="compare" onchange="cmpShow()">
+<option value="standard" {{ "selected" if job.compare == "standard" }}>Größe und Änderungszeit (Standard)</option>
+<option value="size" {{ "selected" if job.compare == "size" }}>Nur Größe (am schnellsten)</option>
+<option value="checksum" {{ "selected" if job.compare == "checksum" }}>Prüfsumme (am sichersten, langsam)</option>
+<option value="tolerant" {{ "selected" if job.compare == "tolerant" }}>Größe und Änderungszeit mit Toleranz</option></select>
+<div class="hint" id="cmphint"></div></div>
+<div style="flex:0 0 200px" id="cmpwin"><label for="compare_window">Toleranz (Sekunden)</label><input type="text" inputmode="numeric" name="compare_window" id="compare_window" value="{{ job.compare_window or '2' }}">
+<div class="hint">2 = FAT/exFAT, 3600 = Zeitumstellung</div></div>
+<div style="flex:1 1 260px"><label for="speed">Tempo</label><select name="speed" id="speed" onchange="cmpShow()">
+<option value="gentle" {{ "selected" if job.speed == "gentle" }}>Schonend (2 parallel)</option>
+<option value="normal" {{ "selected" if job.speed == "normal" }}>Normal (4 parallel)</option>
+<option value="fast" {{ "selected" if job.speed == "fast" }}>Schnell (8 parallel)</option>
+<option value="max" {{ "selected" if job.speed == "max" }}>Sehr schnell (16 parallel)</option></select>
+<div class="hint" id="spdhint"></div></div></div>
+<script>function cmpShow(){const c=document.getElementById('compare').value,sp=document.getElementById('speed').value;
+document.getElementById('cmpwin').style.display=c==='tolerant'?'':'none';
+document.getElementById('cmphint').textContent={standard:'Eine Datei wird übertragen, wenn Größe oder Änderungszeit abweichen. Schnell und für die meisten Fälle richtig.',
+ size:'Nur die Größe zählt. Am schnellsten, übersieht aber Änderungen, bei denen die Größe gleich bleibt.',
+ checksum:'Vergleicht den Inhalt per Prüfsumme. Am sichersten, aber jede Datei wird gelesen. Ohne gemeinsame Prüfsumme beider Seiten wie Standard.',
+ tolerant:'Änderungszeiten dürfen um die Toleranz abweichen. Hilft bei SMB, FAT und USB-Platten, die Zeiten ungenau speichern.'}[c];
+document.getElementById('spdhint').textContent={gentle:'Schont Server, Platten und Leitung.',normal:'rclone-Standard: 4 Übertragungen und 8 Prüfungen gleichzeitig.',
+ fast:'8 Übertragungen, 16 Prüfungen, Ordner in einem Rutsch auflisten. Gut bei vielen kleinen Dateien.',
+ max:'16 Übertragungen, 32 Prüfungen. Braucht mehr Speicher und Leistung auf beiden Seiten.'}[sp]}cmpShow()</script>
 <label class="check"><input type="checkbox" name="dry_run" {{ "checked" if job.dry_run }}> Immer nur Testlauf (nichts wird verändert)</label>
 <div class="row"><div class="ow-only"><label>Max. Löschungen pro Lauf</label><input type="text" name="max_delete" value="{{ job.max_delete }}">
 <div class="hint">Schutz, falls die Quelle plötzlich leer ist. Leer = kein Limit.</div></div>
@@ -1999,6 +2025,14 @@ scope();
 <div class="row"><div><label>Standardsprache</label><select name="language">{% for c, n in LANGS() %}<option value="{{ c }}" {{ "selected" if c == s.language }}>{{ n }}</option>{% endfor %}</select></div>
 <div style="align-self:end"><button class="btn pri">Speichern</button></div></div>
 <div class="hint">Gilt für die Anmeldeseite, Benachrichtigungen, API-Meldungen und alle Benutzer ohne eigene Auswahl. Jeder Benutzer stellt seine Sprache unter <a href="/account">Mein Konto</a> ein.</div></form>
+<form method="post" class="card"><input type="hidden" name="section" value="files"><h2>Dateimanager</h2>
+<div class="row"><div style="flex:0 0 300px"><label for="files_speed">Tempo beim Kopieren und Verschieben</label><select name="files_speed" id="files_speed">
+{% set fsp = s.files_speed or "normal" %}<option value="gentle" {{ "selected" if fsp == "gentle" }}>Schonend (2 parallel)</option>
+<option value="normal" {{ "selected" if fsp == "normal" }}>Normal (4 parallel)</option>
+<option value="fast" {{ "selected" if fsp == "fast" }}>Schnell (8 parallel)</option>
+<option value="max" {{ "selected" if fsp == "max" }}>Sehr schnell (16 parallel)</option></select></div>
+<div style="align-self:end"><button class="btn pri">Speichern</button></div></div>
+<div class="hint">Wie viele Dateien der Dateimanager gleichzeitig überträgt. Mehr parallel lohnt sich vor allem bei vielen kleinen Dateien und bei Clouds. Aufgaben haben ihr eigenes Tempo unter „Optionen“.</div></form>
 <form method="post" class="card"><input type="hidden" name="section" value="update"><h2>Updates</h2>
 <label class="check"><input type="checkbox" name="update_check" {{ "checked" if upd.enabled }}> Nach neuen Versionen suchen</label>
 {% set upd_h = upd.interval_minutes % 60 == 0 %}<div class="row" style="margin-top:8px"><div style="flex:0 0 300px"><label>Prüfen alle</label><div style="display:flex;gap:8px"><input type="number" name="update_interval_value" min="1" max="43200" value="{{ (upd.interval_minutes // 60) if upd_h else upd.interval_minutes }}" style="width:110px"><select name="update_interval_unit"><option value="min" {{ "selected" if not upd_h }}>Minuten</option><option value="h" {{ "selected" if upd_h }}>Stunden</option></select></div></div></div>

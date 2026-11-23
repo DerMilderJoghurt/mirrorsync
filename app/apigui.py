@@ -499,6 +499,9 @@ PREVIEW_PROPS = {
     "selection": dict(STRS, description="nur diese Dateien/Ordner (relativ zur Quelle, Ordner mit / am Ende)"),
     "excludes": dict(STRS, description="Ausschlüsse"), "include_source_dir": S(BOOL, "Quellordner selbst mitkopieren"),
     "direction": S(STR, "mirror oder bisync", enum=["mirror", "bisync"]), "delete_excluded": S(BOOL, "Ausgeschlossenes im Ziel löschen"),
+    "compare": S(STR, "woran eine Änderung erkannt wird (überschreibt die gespeicherte Einstellung): standard, size, checksum oder tolerant",
+                 enum=["standard", "size", "checksum", "tolerant"]),
+    "compare_window": S(INT, "bei compare=tolerant: erlaubte Abweichung der Änderungszeit in Sekunden"),
     "tree": S(BOOL, "zusätzlich den Baum als JSON liefern (sonst nur Text und Zusammenfassung)"),
     "path": S(STR, "Ordner im Ziel wie im Datei-Browser öffnen (relativ zum Ziel, z. B. Fotos/2024): liefert entries mit "
                    "name, dir, status, size, modified und bei Ordnern counts; leer = oberste Ebene. Mit ../ geht es über "
@@ -601,6 +604,10 @@ def _preview(path, a):
                 "selection": _lines(base.get("selection")), "excludes": _lines(base.get("excludes")),
                 "include_source_dir": _bool(base.get("include_source_dir") or False),
                 "direction": base.get("direction") or "mirror", "delete_excluded": _bool(base.get("delete_excluded") or False)}
+    if "compare" in a or "compare_window" in a:
+        if a.get("compare") is not None and a.get("compare") not in core.COMPARE_MODES:
+            raise ApiError(400, _t("compare: nur {0}.").replace("{0}", ", ".join(core.COMPARE_MODES)))
+        form = dict(form or {}, compare=a.get("compare") or "", compare_window=str(a.get("compare_window") or ""))
     r = gui("POST", path, form=form or {})
     body = r["resp"].get_json(silent=True) or {}
     if r["status"] in (400, 404) and body.get("error"):
@@ -652,14 +659,15 @@ SEC_KEYS = ("lock_attempts", "lock_minutes", "fail_notify", "fail_notify_minutes
 
 
 @action("get_settings", "GET", "/settings/general", "system.settings", "Einstellungen",
-        "Allgemeine Einstellungen: Logs, Sperre nach Fehlversuchen, Reverse-Proxy, öffentliche Adresse, Sprache, GeoIP.", ro=True)
+        "Allgemeine Einstellungen: Logs, Sperre nach Fehlversuchen, Reverse-Proxy, öffentliche Adresse, Sprache, GeoIP, Tempo des Dateimanagers (files.speed).", ro=True)
 def a_get_general(a):
     need("system.settings")
     s = core.load_settings()
     return {"logs": {k: s.get(k) for k in LOG_KEYS}, "security": {k: s.get(k) for k in SEC_KEYS},
             "language": s.get("language") or core.i18n.default_lang,
             "languages": [{"code": c, "name": n} for c, n in core.i18n.languages()],
-            "geoip": core.geoip.status(), "update": core.update_status()}
+            "geoip": core.geoip.status(), "update": core.update_status(),
+            "files": {"speed": core.speed_of(s, "files_speed")}}
 
 
 @action("get_update", "GET", "/update", None, "System",
@@ -698,6 +706,18 @@ def a_self_update(a):
     if st != "started":
         raise ApiError(409 if st == "busy" else 400, _t(text))
     return {"ok": True, "status": st, "message": _t(text)}
+
+
+@action("update_files_settings", "PATCH", "/settings/files", "system.settings", "Einstellungen",
+        "Tempo des Dateimanagers beim Kopieren und Verschieben (speed): gentle = 2 Dateien gleichzeitig, normal = 4 "
+        "(rclone-Standard), fast = 8 und schnelles Auflisten, max = 16 und schnelles Auflisten.",
+        {"speed": S(STR, "gentle, normal, fast oder max", enum=["gentle", "normal", "fast", "max"])}, ["speed"])
+def a_update_files_settings(a):
+    _check_keys(a, ("speed",))
+    if a.get("speed") not in core.SPEEDS:
+        raise ApiError(400, _t("Unbekanntes Tempo."))
+    msg = done(gui("POST", "/settings/general", form={"section": "files", "files_speed": a["speed"]}))
+    return {"ok": True, "message": msg, "files": {"speed": core.speed_of(core.load_settings(), "files_speed")}}
 
 
 @action("update_update_settings", "PATCH", "/settings/update", "system.settings", "Einstellungen",

@@ -4,7 +4,7 @@
 
 # MirrorSync – 1:1-Spiegelung mit Web-GUI und Zeitplänen
 
-Version **1.49.0** · Änderungen siehe [CHANGELOG.md](CHANGELOG.md) (englisch) · [English version](README.md)
+Version **1.50.0** · Änderungen siehe [CHANGELOG.md](CHANGELOG.md) (englisch) · [English version](README.md)
 
 Ein Docker-Container, der Ordner **einweg 1:1 spiegelt** (wie FreeFileSync „Spiegeln"):
 Das Ziel wird exakt wie die Quelle, inklusive Löschungen. Als Sync-Motor dient
@@ -68,7 +68,7 @@ Geänderte Dateien werden komplett neu übertragen (kein Delta wie bei rsync).
 
 ## Installation
 Das fertige Image liegt in der GitHub Container Registry: `ghcr.io/dermilderjoghurt/mirrorsync`
-(für amd64 und arm64, z. B. Raspberry Pi). Tags: `latest` (neueste Version), `1.49.0` (feste Version),
+(für amd64 und arm64, z. B. Raspberry Pi). Tags: `latest` (neueste Version), `1.50.0` (feste Version),
 `1.40` (neuester Patch dieser Version). Das Image wird nur veröffentlicht, wenn sich die Versionsnummer ändert.
 Update-Prüfer wie Dockhand oder Watchtower melden deshalb nur dann ein Update, wenn es wirklich eine neue Version gibt.
 
@@ -277,6 +277,29 @@ bleibt sie Basisordner, sonst wird der gemeinsame Elternordner zur Quelle.
   Auswahl aus** (seit 1.27.0): Die gewählten Ordner und Dateien landen direkt im Ziel, z. B. Quelle
   `NAS:share` mit Auswahl `10-Temp/` und Ziel `Familie-NAS:share` ergibt `Familie-NAS:share/10-Temp`.
 - Leeres Feld = der ganze Quellordner wie bisher.
+
+## Änderungen erkennen und Tempo (seit 1.50.0)
+Unter **Optionen** jeder Aufgabe:
+
+- **Änderung erkennen an:** woran MirrorSync merkt, dass eine Datei neu übertragen werden muss.
+  - *Größe und Änderungszeit* (Standard): schnell und für die meisten Fälle richtig.
+  - *Nur Größe:* am schnellsten, übersieht aber Änderungen bei gleicher Größe.
+  - *Prüfsumme:* vergleicht den Inhalt, am sichersten, liest dafür jede Datei. Haben beide Seiten keine
+    gemeinsame Prüfsumme, gilt Größe und Änderungszeit.
+  - *Größe und Änderungszeit mit Toleranz:* Zeiten dürfen um die angegebenen Sekunden abweichen (2 für FAT/exFAT
+    und manche SMB-Freigaben, 3600 gegen Kopien nach der Zeitumstellung).
+  Die Vorschau der Ordnerstruktur rechnet mit derselben Einstellung. Die frühere Option „Vergleich per Prüfsumme“
+  wird übernommen.
+- **Tempo:** wie viele Dateien gleichzeitig übertragen und geprüft werden. *Schonend* 2, *Normal* 4
+  (rclone-Standard), *Schnell* 8 mit schnellem Auflisten (`--fast-list`), *Sehr schnell* 16. Mehr parallel hilft
+  vor allem bei vielen kleinen Dateien und bei Clouds. Eigene `--transfers`/`--checkers` unter „Zusätzliche
+  rclone-Optionen“ haben Vorrang.
+- Das Tempo des Dateimanagers steht unter **Einstellungen → Allgemein → Dateimanager**.
+- Eine eigene Index-Datenbank gibt es bewusst nicht: Sie würde nur den Vergleich beschleunigen, nicht die Kopie, und
+  eine veraltete Datenbank könnte Änderungen übersehen.
+- API/MCP: Felder `compare` (`standard`, `size`, `checksum`, `tolerant`), `compare_window` (Sekunden) und `speed`
+  (`gentle`, `normal`, `fast`, `max`) bei `create_job`/`update_job`; `compare` auch bei `preview_job`.
+  Dateimanager: `update_files_settings` (`PATCH /api/v1/settings/files`, Recht „Einstellungen“).
 
 ## Ausschlüsse
 Ein Eintrag pro Zeile, relativ zur Quelle:
@@ -826,7 +849,7 @@ MirrorSync kann sich selbst aktualisieren, wenn du den Docker-Socket in den Cont
   sie entfernt und die bisherige läuft wieder. Ergebnis und Ablauf stehen in der GUI, im Audit-Log
   („Update gestartet / abgeschlossen / fehlgeschlagen“) und in `config/selfupdate.json`.
 - **Voraussetzungen:** Das Image muss aus einem Registry kommen (`image: ghcr.io/dermilderjoghurt/mirrorsync:latest`).
-  Mit `build: .` gebaute Images kann MirrorSync nicht neu holen. Mit festem Versions-Tag (`:1.49.0`) wird nur dieser
+  Mit `build: .` gebaute Images kann MirrorSync nicht neu holen. Mit festem Versions-Tag (`:1.50.0`) wird nur dieser
   Tag neu geholt. `/config` muss als Volume oder Ordner eingebunden sein (ist es in der Beispiel-Compose).
 - **Recht:** `system.update` („MirrorSync aktualisieren“, Admins haben es automatisch). Automatik und Uhrzeit
   ändern braucht `system.settings`.

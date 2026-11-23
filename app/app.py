@@ -276,7 +276,7 @@ def effective_dest(job):
 
 BISYNC_DIR = os.path.join(CONFIG_DIR, "bisync")
 BISYNC_CONFLICTS = ("newer", "path1", "path2", "none")
-BISYNC_RESET_KEYS = ("source", "dest", "excludes", "direction", "checksum", "selection", "include_source_dir")
+BISYNC_RESET_KEYS = ("source", "dest", "excludes", "direction", "checksum", "compare", "selection", "include_source_dir")
 
 
 def is_bisync(job):
@@ -328,8 +328,7 @@ def build_bisync_cmd(job, job_id, dry_run, resync=False):
     if job.get("versioning"):
         cmd += ["--backup-dir1", job["source"].rstrip("/") + ".versions/" + stamp,
                 "--backup-dir2", side_b.rstrip("/") + ".versions/" + stamp]
-    if job.get("checksum"):
-        cmd += ["--compare", "size,modtime,checksum"]
+    cmd += compare_flags(job, bisync=True)
     if selection_list(job):   # nur die Auswahl wird abgeglichen, auf beiden Seiten bleibt alles andere unberuehrt
         for rule in selection_filters(job):
             cmd += ["--filter", rule]
@@ -339,7 +338,48 @@ def build_bisync_cmd(job, job_id, dry_run, resync=False):
     return _cmd_tail(job, cmd)
 
 
+# Woran eine Aenderung erkannt wird (pro Aufgabe)
+COMPARE_MODES = ("standard", "size", "checksum", "tolerant")
+COMPARE_WINDOW_MAX = 86400
+# Tempo: parallele Uebertragungen/Pruefungen; --fast-list liest Ordner in einem Rutsch (spart viele Abfragen bei S3/Clouds)
+SPEEDS = ("gentle", "normal", "fast", "max")
+SPEED_FLAGS = {"gentle": ["--transfers", "2", "--checkers", "4"], "normal": [],
+               "fast": ["--transfers", "8", "--checkers", "16", "--fast-list"],
+               "max": ["--transfers", "16", "--checkers", "32", "--fast-list"]}
+
+
+def compare_of(job):
+    m = (job or {}).get("compare")
+    if m in COMPARE_MODES:
+        return m
+    return "checksum" if (job or {}).get("checksum") else "standard"
+
+
+def compare_window(job):
+    try:
+        return max(1, min(COMPARE_WINDOW_MAX, int(str((job or {}).get("compare_window") or "2").strip())))
+    except ValueError:
+        return 2
+
+
+def speed_of(job_or_settings, key="speed"):
+    v = (job_or_settings or {}).get(key)
+    return v if v in SPEEDS else "normal"
+
+
+def compare_flags(job, bisync=False):
+    m = compare_of(job)
+    if m == "size":
+        return ["--compare", "size"] if bisync else ["--size-only"]
+    if m == "checksum":
+        return ["--compare", "size,modtime,checksum"] if bisync else ["--checksum"]
+    if m == "tolerant":
+        return ["--modify-window", f"{compare_window(job)}s"]
+    return []
+
+
 def _cmd_tail(job, cmd):
+    cmd = cmd + SPEED_FLAGS[speed_of(job)]   # eigene Optionen stehen danach und haben damit Vorrang
     extra = shlex.split(job.get("extra_flags", "") or "")
     if not any(a == "--bwlimit" or a.startswith("--bwlimit=") for a in extra):   # eigene Option hat Vorrang
         tt = bwlimit.timetable(bwlimit.for_job(load_settings(), job))
@@ -367,8 +407,7 @@ def build_sync_cmd(job, dry_run, mode="full", max_age=None):
         cmd += ["--max-delete", str(job["max_delete"]).strip()]
     if job.get("versioning"):
         cmd += ["--backup-dir", effective_dest(job).rstrip("/") + ".versions/" + stamp]
-    if job.get("checksum"):
-        cmd.append("--checksum")
+    cmd += compare_flags(job)
     if selection_list(job):   # nur ausgewaehlte Dateien/Ordner; im Ziel bleibt alles andere unberuehrt
         for rule in selection_filters(job):
             cmd += ["--filter", rule]
@@ -2270,7 +2309,7 @@ def cron_text(expr):
 
 
 EMPTY_JOB = dict(name="", source="", dest="", schedule="0 3 * * *", enabled=True,
-                 dry_run=False, versioning=False, versions_keep="", versions_days="", checksum=False, max_delete="500", extra_flags="",
+                 dry_run=False, versioning=False, versions_keep="", versions_days="", checksum=False, compare="standard", compare_window="2", speed="normal", max_delete="500", extra_flags="",
                  excludes="", delete_excluded=False, notify_mode="global", notify_when="fail",
                  notify_webhook=False, notify_webhook_url="", notify_smtp=False, notify_smtp_to="",
                  notify_telegram=False, notify_telegram_chat_id="", notify_telegram_token="")
@@ -2304,7 +2343,7 @@ def apply_job_form(f, job, old, job_id, jobs, api=False):
         dest=f.get("dest", "").strip(), schedule=f.get("schedule", "").strip(),
         enabled="enabled" in f, dry_run="dry_run" in f, versioning="versioning" in f,
         versions_keep=str(f.get("versions_keep", "") or "").strip(), versions_days=str(f.get("versions_days", "") or "").strip(),
-        checksum="checksum" in f, max_delete=f.get("max_delete", "").strip(),
+        max_delete=f.get("max_delete", "").strip(),
         extra_flags=f.get("extra_flags", "").strip(),
         excludes=f.get("excludes", "").replace("\r\n", "\n").strip(),
         selection=f.get("selection", "").replace("\r\n", "\n").strip()[:20000],
@@ -2314,6 +2353,15 @@ def apply_job_form(f, job, old, job_id, jobs, api=False):
         direction="bisync" if f.get("direction") == "bisync" else "mirror",
         after_job=f.get("after_job", "").strip(), after_when="always" if f.get("after_when") == "always" else "ok",
     )
+    cmp = f.get("compare")
+    job["compare"] = cmp if cmp in COMPARE_MODES else ("checksum" if "checksum" in f else "standard")
+    job["checksum"] = job["compare"] == "checksum"   # alte Einstellung, fuer Kompatibilitaet
+    cw_err = None
+    cw = str(f.get("compare_window", "") or "2").strip()
+    if job["compare"] == "tolerant" and (not cw.isdigit() or not 1 <= int(cw) <= COMPARE_WINDOW_MAX):
+        cw_err = i18n.t("Toleranz: bitte 1 bis {0} Sekunden angeben.", COMPARE_WINDOW_MAX)
+    job["compare_window"] = cw if cw.isdigit() else "2"
+    job["speed"] = f.get("speed") if f.get("speed") in SPEEDS else "normal"
     if job["trigger"] != "time":
         job["schedule"] = old.get("schedule", "") if job_id else ""
     if job["trigger"] != "after":
@@ -2384,6 +2432,8 @@ def apply_job_form(f, job, old, job_id, jobs, api=False):
         error = live_err
     elif twoway_err:
         error = twoway_err
+    elif cw_err:
+        error = cw_err
     elif not g.access.path_ok(job["source"]) or not g.access.path_ok(job["dest"]):
         error = "Deine Rolle darf diesen Speicherort bzw. lokale Ordner nicht verwenden."
     elif any(".." in x.strip().split("/") for x in f.get("selection", "").splitlines()):
@@ -2458,6 +2508,7 @@ def edit_job(job_id=None):
     job.setdefault("live_interval", 1)
     job["live_mode"] = live_mode(job)
     job["direction"] = "bisync" if is_bisync(job) else "mirror"
+    job["compare"], job["compare_window"], job["speed"] = compare_of(job), str(compare_window(job)), speed_of(job)
     if "live_full" not in job:
         job["live_full"] = LIVE_FULL_DEFAULT
     others = [{"id": jid, "name": j["name"], "trig": trigger_of(j),
@@ -2478,7 +2529,7 @@ def parse_bw(raw):
     return data if isinstance(data, dict) else {}
 
 
-PREVIEW_KEYS = ("source", "dest", "selection", "excludes", "include_source_dir", "direction", "delete_excluded")
+PREVIEW_KEYS = ("source", "dest", "selection", "excludes", "include_source_dir", "direction", "delete_excluded", "compare", "compare_window", "checksum")
 
 
 def preview_job_from(f, saved=None):
@@ -2493,6 +2544,10 @@ def preview_job_from(f, saved=None):
                    delete_excluded=f.get("delete_excluded") not in (None, "", False, "0", "false", "off"))
         if has_selection(job):
             job["include_source_dir"] = False
+    if f is not None and f.get("compare") in COMPARE_MODES:
+        job["compare"] = f.get("compare")
+    if f is not None and f.get("compare_window"):
+        job["compare_window"] = str(f.get("compare_window")).strip()
     job["source"], job["dest"] = (job.get("source") or "").strip(), (job.get("dest") or "").strip()
     return job
 
@@ -2520,8 +2575,11 @@ def preview_job(job):
     dst_flt = [] if (job.get("delete_excluded") and not bis and not selection_list(job)) else flt
     res = {}
 
+    cmp = compare_of(job)
+    hash_args = ["--hash"] if cmp == "checksum" else []   # Pruefsumme: wie beim Lauf, liest dafuer alle Dateien
+
     def ls(key, path, args):
-        res[key] = rclone("lsjson", "-R", "--no-mimetype", *args, path, timeout=300)
+        res[key] = rclone("lsjson", "-R", "--no-mimetype", *hash_args, *args, path, timeout=1800 if hash_args else 300)
     t = threading.Thread(target=ls, args=("dst", dest, dst_flt))
     t.start()
     ls("src", job["source"], flt)
@@ -2549,7 +2607,7 @@ def preview_job(job):
             dst_items = json.loads(out or "[]")
         except ValueError:
             return None, "Ziel: unerwartete Antwort von rclone."
-    entries = preview.compute(src_items, dst_items, "bisync" if bis else "mirror")
+    entries = preview.compute(src_items, dst_items, "bisync" if bis else "mirror", compare=cmp, window=compare_window(job))
     tree, truncated = preview.build_tree(entries)
     return {"source": job["source"], "dest": dest, "mode": "bisync" if bis else "mirror", "dest_missing": dest_missing,
             "selection": selection_list(job), "summary": preview.summary(entries), "truncated": truncated,
@@ -3091,6 +3149,14 @@ def general_settings():
                 purge = {"before": before, "runs": n}
                 msg = (i18n.t("Vor dem {0} gestartet: {1} Läufe in {2} Aufgaben. Zum Löschen unten bestätigen.", day, n, nj)
                        if n else i18n.t("Vor dem {0} gibt es keine Läufe.", day))
+    elif request.method == "POST" and request.form.get("section") == "files":
+        sp = request.form.get("files_speed")
+        if sp not in SPEEDS:
+            err = "Unbekanntes Tempo."
+        else:
+            s["files_speed"] = sp
+            save_settings(s)
+            msg = "Gespeichert."
     elif request.method == "POST" and request.form.get("section") == "selfupdate":
         tm = (request.form.get("selfupdate_time") or "").strip()
         if not re.fullmatch(r"([01]\d|2[0-3]):[0-5]\d", tm):

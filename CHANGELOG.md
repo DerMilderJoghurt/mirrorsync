@@ -3,6 +3,22 @@
 Version numbers follow [SemVer](https://semver.org/): MAJOR.MINOR.PATCH
 (MAJOR = incompatible change, MINOR = new feature, PATCH = bug fix).
 
+## 1.50.0 – 2026-11-23
+- **Tasks window stays open.** While a job was running, the overview (and a job's pages and its live log) reloaded
+  every 3 seconds and closed the "Tasks" window at the top right. Reloading now pauses while that window, a menu or
+  a dialog is open or text is selected. The window also stays open when switching pages until you close it (✕,
+  click outside or Esc).
+- **How a change is detected, per job:** size and modification time (default), size only, checksum, or modification
+  time with a tolerance in seconds (e.g. 2 for FAT/exFAT, 3600 after a daylight saving change). Replaces the
+  "compare by checksum" checkbox (carried over). The preview uses the same setting.
+- **Speed per job:** Gentle (2 parallel), Normal (4), Fast (8, with `--fast-list`), Very fast (16). For the file
+  manager under Settings → General → File manager. There is deliberately no separate index database, because it
+  only speeds up the comparison and could miss changes when outdated.
+- API/MCP: `compare`, `compare_window`, `speed` on jobs (`checksum` stays as a deprecated switch), `compare` for
+  `preview_job`, new `update_files_settings` and `files.speed` in `get_settings`. Permissions: like the other
+  options (`jobs.edit`), file manager speed with `system.settings`. The audit log names the new fields. All 5
+  languages.
+
 ## 1.49.0 – 2026-11-23
 - **Files: overall progress for copy and move.** While a transfer runs, a card above the lists shows the progress
   across all entries: percent and bar, bytes "x of y", files "x of y", speed, time left and the current entry
