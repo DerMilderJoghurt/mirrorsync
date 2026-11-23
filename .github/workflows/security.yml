@@ -4,7 +4,7 @@ name: Hourly security scan
 # so vulnerabilities found after a release also show up under Security → Code scanning.
 on:
   schedule:
-    - cron: "17 * * * *"   # every hour at minute 17 (UTC)
+    - cron: "0 * * * *"    # every full hour
   workflow_dispatch:
 
 permissions:

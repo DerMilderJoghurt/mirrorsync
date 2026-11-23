@@ -3,6 +3,9 @@
 Version numbers follow [SemVer](https://semver.org/): MAJOR.MINOR.PATCH
 (MAJOR = incompatible change, MINOR = new feature, PATCH = bug fix).
 
+## 1.37.3 – 2026-11-23
+- The hourly security scan now runs on the full hour.
+
 ## 1.37.2 – 2026-11-23
 - The security scan of the published image (`:latest`) now runs once an hour instead of once a week, so new
   vulnerabilities show up under "Security" within an hour. The app itself is unchanged.

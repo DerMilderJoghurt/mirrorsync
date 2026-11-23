@@ -23,7 +23,7 @@ RUN pip uninstall -y pip setuptools wheel >/dev/null 2>&1; \
            /usr/local/lib/python3*/site-packages/pip* /usr/local/bin/pip*
 COPY app/ .
 
-ARG VERSION=1.37.2
+ARG VERSION=1.37.3
 LABEL org.opencontainers.image.title="MirrorSync" org.opencontainers.image.version=$VERSION
 ENV TZ=Europe/Berlin CONFIG_DIR=/config LOG_DIR=/logs PORT=8080 PYTHONUNBUFFERED=1
 VOLUME ["/config", "/logs"]
