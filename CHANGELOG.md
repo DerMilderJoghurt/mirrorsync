@@ -3,6 +3,17 @@
 Version numbers follow [SemVer](https://semver.org/): MAJOR.MINOR.PATCH
 (MAJOR = incompatible change, MINOR = new feature, PATCH = bug fix).
 
+## 1.46.0 – 2026-11-23
+- **Open result in browser:** New button next to "Preview folder structure" (and in the preview window). It opens a
+  page in a new tab that looks like **Files** (path bar, "Up", name, size with file count, modified, permissions)
+  but shows the destination after the run, read-only. Anything that gets deleted is missing. "Mark changes" also
+  shows new, will be updated and will be deleted. Permission `jobs.preview`.
+- **Notification for a new version:** Under Settings → General → Updates you can turn on a message as soon as a new
+  MirrorSync version is available, exactly once per version, optionally only via certain channels. Custom text
+  under "Notification texts" (event "New MirrorSync version available"). API/MCP: `update_notify`,
+  `update_notify_channels` in `update_update_settings`, `get_update` returns `notify`, `notify_channels`,
+  `notified`. Permission `system.settings`, audit log and all 5 languages updated.
+
 ## 1.45.0 – 2026-11-23
 - **Preview "✅ Result":** shows the destination exactly as it will look after the run, almost like the file
   browser (browsable folders, name, size, modified). Anything that gets deleted is no longer shown there. This is

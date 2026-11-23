@@ -71,6 +71,14 @@ EVENTS = {
         "title": "❌ MirrorSync: Sicherung fehlgeschlagen",
         "body": "{titel}\nZiel: {ordner}\nFehler: {fehler_text}",
     },
+    "update_available": {
+        "label": "Neue MirrorSync-Version verfügbar",
+        "vars": [("neu", "neue Version", "1.46.0"), ("url", "Link zu den Versionshinweisen",
+                 "https://github.com/DerMilderJoghurt/mirrorsync/releases/tag/v1.46.0"),
+                 ("veroeffentlicht", "veröffentlicht am", "2026-11-23")],
+        "title": "⬆️ MirrorSync: Version {neu} verfügbar",
+        "body": "{titel}\nInstalliert ist {version}.\nVersionshinweise: {url}",
+    },
     "test": {
         "label": "Testnachricht",
         "vars": [("job", "Aufgabe (beim Test aus einer Aufgabe) oder „Test“", "Test")],

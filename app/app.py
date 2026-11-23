@@ -386,7 +386,7 @@ SETTINGS_FILE = os.path.join(CONFIG_DIR, "settings.json")
 LOG_DEFAULTS = {"log_keep_runs": "50", "log_keep_days": "30", "log_keep_unit": "d", "trust_proxy": False, "geoip_auto": True, "geoip_days": "30",
                 "geoip_mode": "interval", "geoip_time": "03:00", "geoip_dow": "mon",
                 "lock_attempts": "5", "lock_minutes": "15", "lock_notify": True, "require_2fa_mode": "off",
-                "fail_notify": "", "fail_notify_minutes": "15", "audit_keep_days": "365", "update_check": True, "update_interval": "60",
+                "fail_notify": "", "fail_notify_minutes": "15", "audit_keep_days": "365", "update_check": True, "update_interval": "60", "update_notify": False, "update_notify_channels": [],
                 "selfupdate_auto": False, "selfupdate_time": "04:00"}
 RUN_ID_RE = re.compile(r"^[A-Za-z0-9_.-]{1,64}$")
 
@@ -405,7 +405,9 @@ def save_settings(data):
 def update_status():
     """Ergebnis der Pruefung auf eine neuere Version (siehe update.py)."""
     s = load_settings()
-    return update.status(s.get("update_check", True), s.get("update_interval", "60"))
+    return dict(update.status(s.get("update_check", True), s.get("update_interval", "60")),
+                notify=bool(s.get("update_notify")), notify_channels=list(s.get("update_notify_channels") or []),
+                notified=s.get("update_notified") or "")
 
 
 _selfupdate_lock = threading.Lock()
@@ -512,9 +514,37 @@ def _update_loop():
                     print(f"Update-Prüfung: {st['error']}", flush=True)
                 elif update.newer(st.get("latest"), VERSION):
                     print(f"Neue MirrorSync-Version {st['latest']} verfügbar: {st.get('url')}", flush=True)
+                    notify_update(st)
         except Exception as e:  # noqa: BLE001
             print(f"Update-Prüfung: {e}", flush=True)
         time.sleep(60)   # der eingestellte Abstand kann bis 5 Minuten herunter gehen
+
+
+def notify_update(st, force=False):
+    """Benachrichtigung 'neue Version verfuegbar', je Version nur einmal (force: trotzdem, z. B. Test)."""
+    s = load_settings()
+    latest = st.get("latest")
+    if not s.get("update_notify") or not update.newer(latest, VERSION) or (s.get("update_notified") == latest and not force):
+        return None
+    eff = dict(s)
+    chans = s.get("update_notify_channels") or []
+    if chans:
+        for c in notify.CHANNELS:
+            eff[f"{c}_enabled"] = c in chans and s.get(f"{c}_enabled")
+    ev = notify.event(eff, "update_available", {"neu": latest, "url": st.get("url") or update_status().get("url") or "",
+                                                "veroeffentlicht": st.get("published") or ""},
+                      status="update", ok=True, job="Update", source=VERSION, dest=latest)
+    res = notify.send(eff, ev)
+    s = load_settings()
+    s["update_notified"] = latest
+    save_settings(s)
+    return res
+
+
+def _notify_channel_list():
+    st = load_settings()
+    return [(c, n, bool(st.get(f"{c}_enabled"))) for c, n in
+            (("webhook", "Webhook"), ("smtp", "E-Mail"), ("telegram", "Telegram"), ("apprise", "Apprise"))]
 
 
 LOG_UNITS = {"d": 1, "w": 7, "m": 30}   # Tage, Wochen, Monate (30 Tage)
@@ -1300,7 +1330,7 @@ def bootstrap_users():
 
 # Endpunkt -> benoetigtes Recht. None = nur angemeldet. Fehlende Endpunkte = nur angemeldet.
 ENDPOINT_PERMS = {
-    "job_preview": "jobs.preview", "update_apply": "system.update", "update_state": "system.update", "index": "jobs.view", "jobs_running": "jobs.view", "schedules": "jobs.view", "schedules_json": "jobs.view", "schedule_job": "jobs.edit", "schedule_chains": "jobs.edit", "show_log": "jobs.logs", "show_run": "jobs.logs", "download_run": "jobs.logs", "delete_job": "jobs.delete", "stop": "jobs.run",
+    "job_preview": "jobs.preview", "job_preview_page": "jobs.preview", "update_apply": "system.update", "update_state": "system.update", "index": "jobs.view", "jobs_running": "jobs.view", "schedules": "jobs.view", "schedules_json": "jobs.view", "schedule_job": "jobs.edit", "schedule_chains": "jobs.edit", "show_log": "jobs.logs", "show_run": "jobs.logs", "download_run": "jobs.logs", "delete_job": "jobs.delete", "stop": "jobs.run",
     "job_notify_test": "jobs.notify", "job_pause": "jobs.edit",
     "remotes": "remotes.view", "test_remote": "remotes.test", "delete_remote": "remotes.delete",
     "auth_remote": "remotes.edit", "browse": "remotes.browse", "browse_list": "remotes.browse",
@@ -2539,6 +2569,17 @@ def job_preview(job_id=None):
     return dict(data, ok=True)
 
 
+@app.post("/job/preview/page")
+@app.post("/job/<job_id>/preview/page")
+def job_preview_page(job_id=None):
+    """Ergebnis-Vorschau als eigene Seite im Stil von „Dateien“ (schreibgeschuetzt)."""
+    saved = load_jobs().get(job_id) if job_id else None
+    if job_id and saved is None:
+        return render_template("preview_page.html", err=i18n.t("Aufgabe nicht gefunden."), job_id=None, data={}), 404
+    data, err = preview_job(preview_job_from(request.form, saved))
+    return render_template("preview_page.html", err=i18n.t(err) if err else "", job_id=job_id, data=data or {})
+
+
 @app.post("/job/notify-test")
 @app.post("/job/<job_id>/notify-test")
 def job_notify_test(job_id=None):
@@ -3057,6 +3098,8 @@ def general_settings():
             msg = "Gespeichert."
     elif request.method == "POST" and request.form.get("section") == "update":
         s["update_check"] = "update_check" in request.form
+        s["update_notify"] = "update_notify" in request.form
+        s["update_notify_channels"] = [c for c in notify.CHANNELS if request.form.get(f"update_ch_{c}")]
         iv = (request.form.get("update_interval_value") or "").strip()
         if iv:
             try:
@@ -3072,6 +3115,8 @@ def general_settings():
             msg = "Gespeichert."
         if not err and request.form.get("check_now"):
             st = update.check()
+            if not st.get("error") and update.newer(st.get("latest"), VERSION):
+                threading.Thread(target=notify_update, args=(st,), daemon=True).start()
             msg = (i18n.t("Prüfung fehlgeschlagen: {0}", st["error"]) if st.get("error") else
                    i18n.t("Neue Version {0} verfügbar.", st["latest"]) if update.newer(st.get("latest"), VERSION) else
                    i18n.t("MirrorSync ist aktuell ({0}).", VERSION))
@@ -3123,7 +3168,7 @@ def general_settings():
     pk_rp_id, _, _pk_prob = _pk_rp()
     return render_template("general.html", s=s, msg=msg, err=err, usage=usage, bw_cfg=bw, geo=geoip.status(), pk_now=pk_rp_id,
                            attribution=Markup(geoip.ATTRIBUTION), my_ip=_client_ip(), my_loc=geoip.locate(_client_ip()),
-                           next_geoip=next_run("_geoip"), tz=TZ, upd=update_status(), purge=purge,
+                           next_geoip=next_run("_geoip"), tz=TZ, upd=update_status(), purge=purge, upd_channels=_notify_channel_list(),
                            selfupd=selfupdate_status() if g.access.has("system.update") or g.access.has("system.settings") else None,
                            fwd=request.headers.get("X-Forwarded-For", ""),
                            bw_desc=bwlimit.describe(bw, s.get("bw_unit") or "MB/s"), bw_tt=bwlimit.timetable(bw))

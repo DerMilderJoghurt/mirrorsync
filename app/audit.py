@@ -20,7 +20,7 @@ SECRET_RE = re.compile(r"(pass|secret|token|apprise_urls|hash|backup_codes|priva
 NOISE = {
     "job": {"history", "last_status", "last_run", "live_last", "live_checked", "live_failing", "live_fail_count", "bisync_ready", "bisync_need_resync"},
     "user": {"last_login", "last_ip", "last_country", "last_flag", "fail_count", "auto_lock_until", "sv", "created", "totp_last", "passkeys", "webauthn_id"},
-    "remote": set(), "role": set(), "group": set(), "apikey": set(), "settings": {"selfupdate_last_auto"}, "access": set(),
+    "remote": set(), "role": set(), "group": set(), "apikey": set(), "settings": {"selfupdate_last_auto", "update_notified"}, "access": set(),
 }
 
 LABELS = {
@@ -41,7 +41,7 @@ LABELS = {
     "auto_minutes": "Auto-Sperre Minuten", "auto_window": "Zeitfenster Fehlversuche", "auto_exempt_lan": "LAN ausnehmen",
     "notify": "Benachrichtigen", "trust_proxy": "Reverse-Proxy vertrauen", "public_url": "Öffentliche Adresse", "log_keep_runs": "Logs behalten (Läufe)", "log_keep_unit": "Logs behalten (Einheit)",
     "log_keep_days": "Logs behalten (Tage)", "audit_keep_days": "Audit-Log behalten (Tage)", "lock_attempts": "Sperre nach Fehlversuchen",
-    "lock_minutes": "Sperrdauer", "lock_notify": "Sperre melden", "fail_notify": "Fehlversuche melden", "geoip_auto": "Länder-Datenbank automatisch", "update_check": "Nach neuen Versionen suchen", "update_interval": "Update-Prüfung alle (Minuten)", "geoip_days": "Länder-Datenbank erneuern alle (Tage)", "geoip_mode": "Länder-Datenbank erneuern", "geoip_time": "Länder-Datenbank: Uhrzeit", "geoip_dow": "Länder-Datenbank: Wochentage", "visible_to": "Sichtbar für", "windows": "aktiv nur zu Zeiten", "versions_keep": "Versionen behalten", "versions_days": "Versionen höchstens Tage", "expires": "gültig bis", "ips": "erlaubte IPs", "members": "Mitglieder", "keys": "API-Keys", "bw_unit": "Einheit der Bandbreite",
+    "lock_minutes": "Sperrdauer", "lock_notify": "Sperre melden", "fail_notify": "Fehlversuche melden", "geoip_auto": "Länder-Datenbank automatisch", "update_check": "Nach neuen Versionen suchen", "update_interval": "Update-Prüfung alle (Minuten)", "update_notify": "Neue Version melden", "update_notify_channels": "Neue Version: Kanäle", "geoip_days": "Länder-Datenbank erneuern alle (Tage)", "geoip_mode": "Länder-Datenbank erneuern", "geoip_time": "Länder-Datenbank: Uhrzeit", "geoip_dow": "Länder-Datenbank: Wochentage", "visible_to": "Sichtbar für", "windows": "aktiv nur zu Zeiten", "versions_keep": "Versionen behalten", "versions_days": "Versionen höchstens Tage", "expires": "gültig bis", "ips": "erlaubte IPs", "members": "Mitglieder", "keys": "API-Keys", "bw_unit": "Einheit der Bandbreite",
     "hash": "Passwort", "pass": "Passwort", "token": "Token", "smtp_pass": "SMTP-Passwort", "telegram_token": "Telegram-Token",
     "notify_telegram_token": "Telegram-Token", "smtp_user": "SMTP-Benutzer", "host": "Server", "user": "Benutzer", "totp_secret": "2FA-Schlüssel", "backup_codes": "Backup-Codes",
     "paused": "pausiert", "paused_until": "pausiert bis", "paused_by": "pausiert von", "pause_chain": "pausiert in Kette",

@@ -4,7 +4,7 @@
 
 # MirrorSync – 1:1-Spiegelung mit Web-GUI und Zeitplänen
 
-Version **1.45.0** · Änderungen siehe [CHANGELOG.md](CHANGELOG.md) (englisch) · [English version](README.md)
+Version **1.46.0** · Änderungen siehe [CHANGELOG.md](CHANGELOG.md) (englisch) · [English version](README.md)
 
 Ein Docker-Container, der Ordner **einweg 1:1 spiegelt** (wie FreeFileSync „Spiegeln"):
 Das Ziel wird exakt wie die Quelle, inklusive Löschungen. Als Sync-Motor dient
@@ -68,7 +68,7 @@ Geänderte Dateien werden komplett neu übertragen (kein Delta wie bei rsync).
 
 ## Installation
 Das fertige Image liegt in der GitHub Container Registry: `ghcr.io/dermilderjoghurt/mirrorsync`
-(für amd64 und arm64, z. B. Raspberry Pi). Tags: `latest` (neueste Version), `1.45.0` (feste Version),
+(für amd64 und arm64, z. B. Raspberry Pi). Tags: `latest` (neueste Version), `1.46.0` (feste Version),
 `1.40` (neuester Patch dieser Version). Das Image wird nur veröffentlicht, wenn sich die Versionsnummer ändert.
 Update-Prüfer wie Dockhand oder Watchtower melden deshalb nur dann ein Update, wenn es wirklich eine neue Version gibt.
 
@@ -231,6 +231,10 @@ nimmt die Werte, die gerade im Formular stehen, du musst also nicht erst speiche
   Datei-Browser (Name, Größe, Geändert). Was gelöscht wird, ist hier nicht mehr zu sehen.
 - **„📂 Änderungen“** (seit 1.44.0): dieselbe Ansicht zum Durchklicken, aber mit Spalte Änderung, auch mit dem, was
   gelöscht wird, und **„Nur Änderungen zeigen“**.
+- **„📂 Ergebnis im Browser öffnen“** (seit 1.46.0, neben dem Vorschau-Knopf und im Vorschau-Fenster): öffnet in
+  einem neuen Tab eine eigene Seite, die aussieht wie **Dateien** (Pfadzeile, „Nach oben“, Name, Größe mit Anzahl
+  Dateien, Geändert, Rechte), aber das Ziel **nach dem Lauf** zeigt und nur zum Ansehen ist. Gelöschtes fehlt dort;
+  mit „Änderungen markieren“ siehst du zusätzlich, was neu ist, aktualisiert oder gelöscht wird.
 - In beiden Ansichten Ordner anklicken, über die Pfadleiste oder „⬆ ..“ zurück und im Ordner suchen. Mit
   **„🌳 Baum“** wechselst du zur aufklappbaren Baumansicht, die Wahl merkt sich der Browser.
 - Jeder Eintrag ist markiert: **neu**, **wird aktualisiert**
@@ -774,6 +778,11 @@ Release mit allen Änderungen. Übertragen wird dabei nur die eigene Versionsnum
 - API/MCP: `GET /api/v1/update` (`get_update`), `POST /api/v1/update/check` (`check_update`),
   `PATCH /api/v1/settings/update` mit `{"update_check": false}` und/oder `{"update_interval": 120}` (Minuten)
   (`update_update_settings`); `/status` enthält `update` mit `interval_minutes`.
+- **Benachrichtigung bei neuer Version** (seit 1.46.0): unter Einstellungen → Allgemein → Updates „Benachrichtigung
+  schicken, wenn eine neue Version verfügbar ist“ anhaken und optional die Kanäle wählen (keiner = alle
+  eingeschalteten). Je neue Version kommt genau eine Nachricht. Den Text änderst du unter Benachrichtigungen →
+  Texte der Benachrichtigungen („Neue MirrorSync-Version verfügbar“, Variablen `{neu}`, `{url}`,
+  `{veroeffentlicht}`). API/MCP: `update_notify` und `update_notify_channels` bei `update_update_settings`.
 - Ein anderes Repo (z. B. ein eigener Fork) lässt sich per `UPDATE_REPO=besitzer/repo` einstellen.
 
 ## Selbst-Update über den Docker-Socket (seit 1.42.0, optional)
@@ -805,7 +814,7 @@ MirrorSync kann sich selbst aktualisieren, wenn du den Docker-Socket in den Cont
   sie entfernt und die bisherige läuft wieder. Ergebnis und Ablauf stehen in der GUI, im Audit-Log
   („Update gestartet / abgeschlossen / fehlgeschlagen“) und in `config/selfupdate.json`.
 - **Voraussetzungen:** Das Image muss aus einem Registry kommen (`image: ghcr.io/dermilderjoghurt/mirrorsync:latest`).
-  Mit `build: .` gebaute Images kann MirrorSync nicht neu holen. Mit festem Versions-Tag (`:1.45.0`) wird nur dieser
+  Mit `build: .` gebaute Images kann MirrorSync nicht neu holen. Mit festem Versions-Tag (`:1.46.0`) wird nur dieser
   Tag neu geholt. `/config` muss als Volume oder Ordner eingebunden sein (ist es in der Beispiel-Compose).
 - **Recht:** `system.update` („MirrorSync aktualisieren“, Admins haben es automatisch). Automatik und Uhrzeit
   ändern braucht `system.settings`.

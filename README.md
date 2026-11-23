@@ -4,7 +4,7 @@
 
 # MirrorSync – 1:1 mirroring with a web GUI and schedules
 
-Version **1.45.0** · Changes: [CHANGELOG.md](CHANGELOG.md) · [Deutsche Version](README.de.md)
+Version **1.46.0** · Changes: [CHANGELOG.md](CHANGELOG.md) · [Deutsche Version](README.de.md)
 
 A Docker container that **mirrors folders one-way, 1:1** (like FreeFileSync "Mirror"):
 the destination becomes an exact copy of the source, including deletions. The sync engine is
@@ -67,7 +67,7 @@ Changed files are transferred completely (no delta transfer like rsync).
 
 ## Installation
 The ready-made image is in the GitHub Container Registry: `ghcr.io/dermilderjoghurt/mirrorsync`
-(for amd64 and arm64, e.g. Raspberry Pi). Tags: `latest` (newest version), `1.45.0` (fixed version),
+(for amd64 and arm64, e.g. Raspberry Pi). Tags: `latest` (newest version), `1.46.0` (fixed version),
 `1.40` (newest patch of this version). The image is only published when the version number changes, so
 update checkers such as Dockhand or Watchtower only report an update when there really is a new version.
 
@@ -225,6 +225,10 @@ values currently in the form, so you don't have to save first.
   file browser (name, size, modified). Anything that gets deleted is no longer shown here.
 - **"📂 Changes"** (since 1.44.0): the same browsable view, but with a change column, including what gets deleted,
   and **"Show changes only"**.
+- **"📂 Open result in browser"** (since 1.46.0, next to the preview button and in the preview window): opens a
+  page of its own in a new tab that looks like **Files** (path bar, "Up", name, size with file count, modified,
+  permissions) but shows the destination **after the run** and is view-only. Deleted items are missing there; with
+  "Mark changes" you also see what is new, updated or deleted.
 - In both views click folders, go back via the path bar or "⬆ .." and search in the folder. **"🌳 Tree"** switches
   to the collapsible tree view, the browser remembers your choice.
 - Every entry is marked: **new**, **will be updated** (different
@@ -753,6 +757,11 @@ release with all changes. Only the installed version number is sent.
 - API/MCP: `GET /api/v1/update` (`get_update`), `POST /api/v1/update/check` (`check_update`),
   `PATCH /api/v1/settings/update` with `{"update_check": false}` and/or `{"update_interval": 120}` (minutes)
   (`update_update_settings`); `/status` contains `update` with `interval_minutes`.
+- **Notification for a new version** (since 1.46.0): under Settings → General → Updates tick "Send a notification
+  when a new version is available" and optionally pick channels (none = all enabled ones). Exactly one message per
+  new version. Change the text under Notifications → Notification texts ("New MirrorSync version available",
+  variables `{neu}`, `{url}`, `{veroeffentlicht}`). API/MCP: `update_notify` and `update_notify_channels` in
+  `update_update_settings`.
 - Another repository (e.g. your own fork) can be set with `UPDATE_REPO=owner/repo`.
 
 ## Self-update via the Docker socket (since 1.42.0, optional)
@@ -782,7 +791,7 @@ MirrorSync can update itself if you mount the Docker socket into the container:
   previous one runs again. Result and steps are shown in the GUI, in the audit log ("Update started / completed /
   failed") and in `config/selfupdate.json`.
 - **Requirements:** the image has to come from a registry (`image: ghcr.io/dermilderjoghurt/mirrorsync:latest`).
-  MirrorSync cannot pull images built with `build: .`. With a fixed version tag (`:1.45.0`) only that tag is pulled
+  MirrorSync cannot pull images built with `build: .`. With a fixed version tag (`:1.46.0`) only that tag is pulled
   again. `/config` has to be a volume or bind mount (it is in the example compose file).
 - **Permission:** `system.update` ("Update MirrorSync", admins have it automatically). Changing the automatic
   update and its time needs `system.settings`.

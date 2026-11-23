@@ -328,7 +328,7 @@ Vorhanden: {% for r in remotes %}<code>{{ r.name }}:</code> ({{ r.type }}) {% el
 <label class="check" style="margin-top:14px"><input type="checkbox" name="include_source_dir" id="incdir" {{ "checked" if job.include_source_dir }} onchange="destPreview()"> Quellordner selbst mitkopieren (im Ziel wird ein Ordner mit dem Namen der Quelle angelegt)</label>
 <div class="hint" id="incoff" style="display:none">Bei einer Auswahl aus: Die gewählten Ordner und Dateien landen direkt im Ziel, ohne den Quellordner darüber.</div>
 <div class="hint" id="destprev"></div>
-{% if can("jobs.preview") %}<p style="margin:10px 0 0"><button type="button" class="btn" onclick="pvOpen()">🗂 Vorschau der Ordnerstruktur</button> <span class="hint" style="display:inline">Zeigt, wie das Ziel nach dem nächsten Lauf aussieht. Es wird nichts kopiert oder gelöscht.</span></p>
+{% if can("jobs.preview") %}<p style="margin:10px 0 0"><button type="button" class="btn" onclick="pvOpen()">🗂 Vorschau der Ordnerstruktur</button> <button type="submit" form="jobform" class="btn" formaction="{{ "/job/" ~ job_id ~ "/preview/page" if job_id else "/job/preview/page" }}" formmethod="post" formtarget="_blank" formnovalidate>📂 Ergebnis im Browser öffnen</button> <span class="hint" style="display:inline">Zeigt, wie das Ziel nach dem nächsten Lauf aussieht. Es wird nichts kopiert oder gelöscht.</span></p>
 <dialog id="pvdlg" class="pvdlg"><div style="display:flex;align-items:center;gap:10px"><h3 style="margin:0;flex:1">Vorschau der Ordnerstruktur</h3><button type="button" class="btn sm" onclick="document.getElementById('pvdlg').close()">Schließen</button></div>
 <div id="pvbody" style="margin-top:12px"></div></dialog>
 <style>.pvdlg{width:min(980px,96vw);max-height:88vh;border:1px solid var(--bd);border-radius:12px;background:var(--card);color:var(--fg);padding:18px 20px}.pvdlg::backdrop{background:rgba(0,0,0,.35)}.pvt{font-size:14px;line-height:1.7}.pvt ul{list-style:none;margin:0;padding-left:18px}.pvt>ul{padding-left:0}.pvt summary{cursor:pointer}.pvt .pf{white-space:nowrap}
@@ -363,6 +363,7 @@ async function pvOpen(){const d=document.getElementById('pvdlg'),b=document.getE
   if(!(j.tree.ch||[]).length){b.innerHTML=h+'<p class="mut">'+'Nach dem Lauf ist das Ziel leer.'+'</p>';return}
   h+='<div class="pvbar"><span class="pvseg"><button type="button" data-v="result" onclick="pvSetView(\'result\')" title="'+'So sieht das Ziel nach dem Lauf aus. Was gelöscht wird, ist nicht mehr zu sehen.'+'">'+'✅ Ergebnis'+'</button><button type="button" data-v="browse" onclick="pvSetView(\'browse\')" title="'+'Zeigt, was sich ändert: neu, wird aktualisiert, wird gelöscht.'+'">'+'📂 Änderungen'+'</button><button type="button" data-v="tree" onclick="pvSetView(\'tree\')">'+'🌳 Baum'+'</button></span>'+
    '<label class="check" id="pvonlyl" style="margin:0"><input type="checkbox" id="pvonly" onchange="pvRender()"> '+'Nur Änderungen zeigen'+'</label><span style="flex:1"></span>'+
+   '<button type="submit" form="jobform" class="btn sm" formaction="{{ "/job/" ~ job_id ~ "/preview/page" if job_id else "/job/preview/page" }}" formmethod="post" formtarget="_blank" formnovalidate>'+'📂 Im Browser öffnen'+'</button>'+
    '<input type="text" id="pvq" placeholder="'+'Im Ordner suchen'+'" autocomplete="off" oninput="pvRender()"></div><div id="pvview"></div>';
   b.innerHTML=h;pvRender()}catch(e){b.innerHTML='<div class="msg err">'+pvEsc(e.message||e)+'</div>'}}
 const PV={data:null,path:[],view:'result'};try{PV.view=localStorage.getItem('pvView')||'result'}catch(e){}
@@ -808,6 +809,59 @@ document.addEventListener('DOMContentLoaded',()=>{
 <p class="hint" style="padding:0 10px 8px">Alle rclone-Speicherarten werden unterstützt (SMB, WebDAV, SFTP, FTP, S3, B2, Azure, Google Drive, OneDrive, Dropbox, pCloud, MEGA, crypt und rund 45 weitere).
 Lokale Ordner brauchen keinen Eintrag: Sie werden in der docker-compose.yml unter <code>/data</code> eingebunden.</p>
 </div>
+{% endblock %}""",
+
+"preview_page.html": r"""{% extends "base.html" %}{% block title %}Vorschau: Ziel nach dem Lauf{% endblock %}
+{% block subtitle %}<p>So sieht das Ziel nach dem nächsten Lauf aus. Nur zum Ansehen, es wird nichts kopiert oder gelöscht.</p>{% endblock %}
+{% block actions %}{% if job_id %}<a class="btn" href="/job/{{ job_id }}">Zur Aufgabe</a>{% endif %}{% endblock %}
+{% block body %}
+<style>
+.fm{padding:14px}.fm-head{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
+.fm-crumb{font-family:var(--mono,monospace);font-size:13px;word-break:break-all;margin:6px 0}.fm-crumb a{cursor:pointer;color:var(--acc)}
+.fm-tools{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0;align-items:center}.fm-tools input{height:32px;width:min(240px,50vw);margin-left:auto}
+.fm table{width:100%}.fm td,.fm th{padding:6px 8px;vertical-align:middle}.fm td.nw,.fm th.nw{white-space:nowrap}
+.fm .nm{overflow-wrap:anywhere;min-width:140px}.fm tr.d .nm{cursor:pointer}.fm tr.d .nm:hover{color:var(--acc)}
+.fm .ico{display:inline-block;width:18px;vertical-align:-3px;margin-right:4px}.fm .ico svg{width:16px;height:16px}
+.fm-scroll{overflow:auto;min-height:220px;max-height:calc(100vh - 330px);border:1px solid var(--bd);border-radius:8px}
+.fm .st{font-size:12px;white-space:nowrap;margin-left:8px}.st.s-new{color:var(--ok)}.st.s-update{color:var(--run,#2563eb)}.st.s-delete{color:var(--err)}.st.s-to_a{color:var(--warn,#d97706)}
+.fm tr.s-delete td.nm{text-decoration:line-through;opacity:.7}.fm-sum span{margin-right:14px;white-space:nowrap}
+</style>
+{% if err %}<div class="msg err">{{ err }}</div>{% else %}
+<div class="card fm" id="fm">
+<div class="fm-head"><b>Ziel</b> <code>{{ data.dest }}</code>{% if data.dest_missing %} <span class="tag">wird angelegt</span>{% endif %}
+{% if data.mode == "bisync" %}<span class="tag">Zwei-Wege</span>{% endif %}<span style="flex:1"></span>
+<label class="check" style="margin:0"><input type="checkbox" id="mark" onchange="R.render()"> Änderungen markieren</label></div>
+<div class="fm-sum mut" style="font-size:13px"><span>{{ data.summary.files.new }} <span>neu</span></span><span>{{ data.summary.files["update"] }} <span>werden aktualisiert</span></span><span>{{ data.summary.files.delete }} <span>werden gelöscht</span></span>{% if data.mode == "bisync" %}<span>{{ data.summary.files.to_a }} <span>kommen nach A</span></span>{% endif %}<span>{{ data.summary.files.same }} <span>bleiben gleich</span></span></div>
+{% if data.truncated %}<div class="hint">Sehr viele Dateien: Einzeln gezeigt werden nur die ersten Dateien, die Zähler an den Ordnern stimmen trotzdem.</div>{% endif %}
+<div class="fm-crumb"></div>
+<div class="fm-tools"><button type="button" class="btn sm" onclick="R.up()">Nach oben</button><input type="text" id="q" placeholder="Im Ordner suchen" autocomplete="off" oninput="R.render()"></div>
+<div class="fm-scroll"><table><thead><tr><th>Name</th><th class="nw">Größe</th><th class="hide-sm nw">Geändert</th><th class="hide-sm nw">Rechte</th></tr></thead><tbody></tbody></table></div>
+<p class="hint" style="margin:8px 0 0">Ordner anklicken zum Öffnen. Ohne „Änderungen markieren“ siehst du das Ziel genau so, wie es nach dem Lauf aussieht: Was gelöscht wird, fehlt.</p>
+</div>
+<script>
+const I_DIR={{ ICON.folder|tojson }},TREE={{ data.tree|tojson }},DEST={{ data.dest|tojson }};
+const LBL={new:'neu',update:'wird aktualisiert',delete:'wird gelöscht',to_a:'kommt nach A',same:''};
+function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+function fmt(b){const u=['B','KB','MB','GB','TB'];let i=0;while(b>=1024&&i<4){b/=1024;i++}return (i?b.toFixed(b<10?1:0):b)+' '+u[i]}
+function dt(s){return s?s.slice(0,10)+' '+s.slice(11,16):''}
+function strip(n){if(!n.d)return n;const c=Object.assign({},n.c,{delete:0}),b=Object.assign({},n.b,{delete:0});return Object.assign({},n,{c,b,ch:n.ch.filter(k=>k.s!=='delete').map(strip)})}
+const R={path:[],
+ root(){return document.getElementById('mark').checked?TREE:strip(TREE)},
+ node(){let n=this.root(),ok=[];for(const p of this.path){const k=n.ch.find(x=>x.d&&x.n===p);if(!k)break;n=k;ok.push(p)}this.path=ok;return n},
+ up(){if(this.path.length){this.path.pop();document.getElementById('q').value='';this.render()}},
+ go(i){this.path=this.path.slice(0,i);document.getElementById('q').value='';this.render()},
+ render(){const mark=document.getElementById('mark').checked,n=this.node(),q=document.getElementById('q').value.trim().toLowerCase();
+  let h='<a data-i="0">'+esc(DEST.replace(/\/+$/,''))+'/</a>';this.path.forEach((p,i)=>{h+='<a data-i="'+(i+1)+'">'+esc(p)+'</a>/'});
+  const c=document.querySelector('.fm-crumb');c.innerHTML=h;c.querySelectorAll('a').forEach(a=>a.onclick=()=>this.go(+a.dataset.i));
+  const rows=n.ch.filter(k=>!q||k.n.toLowerCase().includes(q)),tb=document.querySelector('#fm tbody');
+  if(!rows.length){tb.innerHTML='<tr><td colspan="4" class="mut">'+'Ordner ist leer.'+'</td></tr>';return}
+  tb.innerHTML=rows.map((k,i)=>{const st=mark&&LBL[k.s]?'<span class="st s-'+k.s+'">'+LBL[k.s]+'</span>':'';
+   if(k.d){const b=k.b,c=k.c,sz=b.new+b.update+b.same+b.to_a+(mark?b.delete:0),cnt=c.new+c.update+c.same+c.to_a+(mark?c.delete:0);
+    return '<tr class="d s-'+(mark?k.s:'same')+'" data-i="'+i+'"><td class="nm"><span class="ico">'+I_DIR+'</span>'+esc(k.n)+st+'</td><td class="nw">'+fmt(sz)+'<br><small class="mut">'+cnt+' '+'Dateien'+'</small></td><td class="hide-sm nw"><span class="mut">–</span></td><td class="hide-sm nw"><span class="mut">–</span></td></tr>'}
+   return '<tr class="s-'+(mark?k.s:'same')+'"><td class="nm"><span class="ico"></span>'+esc(k.n)+st+'</td><td class="nw">'+fmt(k.size||0)+'</td><td class="hide-sm nw"><small>'+(k.m?esc(dt(k.m)):'<span class="mut">–</span>')+'</small></td><td class="hide-sm nw"><small><span class="mut" title="'+'Die Vorschau kennt keine Berechtigungen.'+'">–</span></small></td></tr>'}).join('');
+  tb.querySelectorAll('tr.d').forEach(tr=>tr.querySelector('.nm').onclick=()=>{this.path.push(rows[+tr.dataset.i].n);document.getElementById('q').value='';this.render()})}};
+R.render();
+</script>{% endif %}
 {% endblock %}""",
 
 "files.html": r"""{% extends "base.html" %}{% block title %}Dateien{% endblock %}
@@ -1866,6 +1920,9 @@ scope();
 <label class="check"><input type="checkbox" name="update_check" {{ "checked" if upd.enabled }}> Nach neuen Versionen suchen</label>
 {% set upd_h = upd.interval_minutes % 60 == 0 %}<div class="row" style="margin-top:8px"><div style="flex:0 0 300px"><label>Prüfen alle</label><div style="display:flex;gap:8px"><input type="number" name="update_interval_value" min="1" max="43200" value="{{ (upd.interval_minutes // 60) if upd_h else upd.interval_minutes }}" style="width:110px"><select name="update_interval_unit"><option value="min" {{ "selected" if not upd_h }}>Minuten</option><option value="h" {{ "selected" if upd_h }}>Stunden</option></select></div></div></div>
 <div class="hint">Fragt im eingestellten Abstand bei GitHub nach, ob es eine neuere Version gibt, und zeigt sie unten links neben der Versionsnummer an. Übertragen wird dabei nur die eigene Versionsnummer. Erlaubt sind 5 Minuten bis 720 Stunden, Standard 1 Stunde.</div>
+<label class="check" style="margin-top:12px"><input type="checkbox" name="update_notify" {{ "checked" if upd.notify }}> Benachrichtigung schicken, wenn eine neue Version verfügbar ist</label>
+<div style="display:flex;gap:14px;flex-wrap:wrap;padding:4px 0 0 26px"><span class="mut">Kanäle:</span>{% for c, n, on in upd_channels %}<label class="check" style="margin:0"><input type="checkbox" name="update_ch_{{ c }}" {{ "checked" if c in upd.notify_channels }}> {{ n }}{% if not on %} <small class="mut">(global aus)</small>{% endif %}</label>{% endfor %}</div>
+<div class="hint" style="margin-left:26px">Je neue Version kommt genau eine Nachricht. Kein Kanal angehakt = alle eingeschalteten Kanäle. Den Text kannst du unter Benachrichtigungen → Texte der Benachrichtigungen anpassen („Neue MirrorSync-Version verfügbar“).</div>
 <p style="margin:10px 0 0"><span class="mut">Installiert:</span> <b>v{{ upd.current }}</b>{% if upd.latest %} &nbsp;·&nbsp; <span class="mut">Neueste Version:</span> <a href="{{ upd.url }}" target="_blank" rel="noopener">v{{ upd.latest }}</a>{% if upd.update_available %} <span class="tag ok">Neue Version verfügbar</span>{% elif upd.enabled %} <span class="tag">aktuell</span>{% endif %}{% endif %}</p>
 {% if upd.checked %}<p class="mut" style="margin:4px 0 0"><small>Zuletzt geprüft: {{ upd.checked }}</small></p>{% endif %}
 {% if upd.error %}<p style="margin:4px 0 0;color:var(--err)"><small>Fehler bei der letzten Prüfung: {{ upd.error }}</small></p>{% endif %}

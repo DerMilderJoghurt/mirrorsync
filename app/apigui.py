@@ -640,17 +640,27 @@ def a_self_update(a):
 @action("update_update_settings", "PATCH", "/settings/update", "system.settings", "Einstellungen",
         "Automatische Prüfung auf neue Versionen ein- oder ausschalten (update_check) und den Abstand in Minuten "
         "festlegen (update_interval, 5–43200, Standard 60). Selbst-Update: selfupdate_auto (einmal am Tag automatisch "
-        "aktualisieren, braucht den Docker-Socket) ab selfupdate_time (HH:MM). Nicht angegebene Felder bleiben unverändert.",
-        {"update_check": S(BOOL), "update_interval": S(INT), "selfupdate_auto": S(BOOL), "selfupdate_time": S(STR, "HH:MM")})
+        "aktualisieren, braucht den Docker-Socket) ab selfupdate_time (HH:MM). update_notify: Benachrichtigung schicken, "
+        "wenn eine neue Version verfügbar ist (je Version einmal), update_notify_channels: Kanäle (webhook, smtp, "
+        "telegram, apprise; leer = alle eingeschalteten). Nicht angegebene Felder bleiben unverändert.",
+        {"update_check": S(BOOL), "update_interval": S(INT), "selfupdate_auto": S(BOOL), "selfupdate_time": S(STR, "HH:MM"),
+         "update_notify": S(BOOL), "update_notify_channels": dict(STRS, description="webhook, smtp, telegram, apprise")})
 def a_update_update_settings(a):
-    _check_keys(a, ("update_check", "update_interval", "selfupdate_auto", "selfupdate_time"))
+    _check_keys(a, ("update_check", "update_interval", "selfupdate_auto", "selfupdate_time", "update_notify",
+                    "update_notify_channels"))
+    chans = ([x.strip() for x in _lines(a["update_notify_channels"]).replace(",", "\n").split("\n") if x.strip()]
+             if "update_notify_channels" in a else None)
+    if chans is not None:
+        bad = [c for c in chans if c not in core.notify.CHANNELS]
+        if bad:
+            raise ApiError(400, _t("Unbekannter Kanal.") + " " + ", ".join(bad))
     if "selfupdate_auto" in a or "selfupdate_time" in a:
         s = core.load_settings()
         form = {"section": "selfupdate", "selfupdate_time": str(a.get("selfupdate_time", s.get("selfupdate_time") or "04:00"))}
         if _bool(a["selfupdate_auto"]) if "selfupdate_auto" in a else s.get("selfupdate_auto"):
             form["selfupdate_auto"] = "on"
         done(gui("POST", "/settings/general", form=form))
-        if not ({"update_check", "update_interval"} & set(a)):
+        if not ({"update_check", "update_interval", "update_notify", "update_notify_channels"} & set(a)):
             return {"ok": True, "message": _t("Gespeichert."), "update": core.update_status(),
                     "selfupdate": {k: core.selfupdate_status()[k] for k in ("auto", "time")}}
     cur = core.update_status()
@@ -658,6 +668,10 @@ def a_update_update_settings(a):
             "update_interval_value": str(a.get("update_interval", cur["interval_minutes"]))}
     if _bool(a["update_check"]) if "update_check" in a else cur["enabled"]:
         form["update_check"] = "on"
+    if _bool(a["update_notify"]) if "update_notify" in a else cur["notify"]:
+        form["update_notify"] = "on"
+    for c in (chans if chans is not None else cur["notify_channels"]):
+        form[f"update_ch_{c}"] = "on"
     msg = done(gui("POST", "/settings/general", form=form))
     s = core.load_settings()
     return {"ok": True, "message": msg, "update": core.update_status(),
