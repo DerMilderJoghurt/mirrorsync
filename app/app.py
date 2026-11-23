@@ -35,6 +35,7 @@ import files as filemgr
 import geoip
 import i18n
 import update
+import selfupdate
 import ipguard
 import msgtpl
 import notify
@@ -119,6 +120,7 @@ app.jinja_env.globals.update(_=i18n.t, lang_code=i18n.current, LANGS=i18n.langua
                              bw_unit=lambda: load_settings().get("bw_unit") or "MB/s")
 app.jinja_env.filters["regex_cmd"] = lambda h: (re.search(r'rclone authorize "[^\n]*', h or "") or [None])[0]
 app.jinja_env.globals["VERSION"] = VERSION
+app.jinja_env.globals["SELFUPD_OK"] = lambda: os.path.exists(selfupdate.SOCK)
 app.jinja_env.globals["RELEASE_URL"] = f"https://github.com/{update.REPO}/releases/tag/v{VERSION}"
 app.jinja_env.globals["UPDATE"] = lambda: update_status() if g.get("user") else None
 notify.VERSION = VERSION
@@ -383,7 +385,8 @@ SETTINGS_FILE = os.path.join(CONFIG_DIR, "settings.json")
 LOG_DEFAULTS = {"log_keep_runs": "50", "log_keep_days": "30", "log_keep_unit": "d", "trust_proxy": False, "geoip_auto": True, "geoip_days": "30",
                 "geoip_mode": "interval", "geoip_time": "03:00", "geoip_dow": "mon",
                 "lock_attempts": "5", "lock_minutes": "15", "lock_notify": True, "require_2fa_mode": "off",
-                "fail_notify": "", "fail_notify_minutes": "15", "audit_keep_days": "365", "update_check": True, "update_interval": "60"}
+                "fail_notify": "", "fail_notify_minutes": "15", "audit_keep_days": "365", "update_check": True, "update_interval": "60",
+                "selfupdate_auto": False, "selfupdate_time": "04:00"}
 RUN_ID_RE = re.compile(r"^[A-Za-z0-9_.-]{1,64}$")
 
 
@@ -404,11 +407,103 @@ def update_status():
     return update.status(s.get("update_check", True), s.get("update_interval", "60"))
 
 
+_selfupdate_lock = threading.Lock()
+
+
+def selfupdate_status():
+    """Selbst-Update: Socket vorhanden? Welches Image? Letzter Stand. Fuer GUI und API."""
+    s = load_settings()
+    try:
+        _selfupdate_record()
+    except Exception as e:  # noqa: BLE001
+        print(f"Selbst-Update: {e}", flush=True)
+    out = selfupdate.info()
+    out.update(auto=bool(s.get("selfupdate_auto")), time=s.get("selfupdate_time") or "04:00",
+               jobs_running=sorted(_running))
+    return out
+
+
+def run_selfupdate(by, wait=False):
+    """Selbst-Update anstossen (Image holen, Hilfs-Container starten). Liefert (status, text).
+    status: started | current | busy | error. Laeuft im Hintergrund, ausser wait=True."""
+    ok, why = selfupdate.available()
+    if not ok:
+        return "error", ("Der Docker-Socket ist nicht eingebunden." if why == "socket" else f"Docker nicht erreichbar: {why}")
+    if _running:
+        return "busy", "Es laufen gerade Aufgaben. Bitte warten, bis sie fertig sind."
+    if not _selfupdate_lock.acquire(blocking=False):
+        return "busy", "Es läuft schon ein Update."
+
+    def work():
+        try:
+            _selfupdate_record()   # Ergebnis des vorigen Updates nicht verlieren
+            prev = selfupdate.read_state()
+            selfupdate.write_state({"state": "pulling", "by": by, "from_version": VERSION,
+                                    "started": time.strftime("%Y-%m-%d %H:%M:%S"), "log": ["Neues Image wird geladen."],
+                                    "recorded": prev.get("recorded") if prev.get("state") in ("ok", "failed") else True})
+            st, text = selfupdate.start(by, VERSION)
+            if st == "current":
+                selfupdate.write_state({"state": "current", "by": by, "image": text, "checked": time.strftime("%Y-%m-%d %H:%M:%S"),
+                                        "recorded": True})
+                print(f"Selbst-Update: {text} ist schon aktuell.", flush=True)
+            elif st == "error":
+                selfupdate.write_state({"state": "error", "by": by, "error": text, "finished": time.strftime("%Y-%m-%d %H:%M:%S"),
+                                        "recorded": True})
+                audit_add("system", "Update fehlgeschlagen", f"v{VERSION}", detail=text, user=by)
+                print(f"Selbst-Update: {text}", flush=True)
+            else:
+                audit_add("system", "Update gestartet", f"v{VERSION}", detail=text, user=by)
+                print(f"Selbst-Update gestartet ({text}), MirrorSync startet gleich neu.", flush=True)
+            return st, text
+        except Exception as e:  # noqa: BLE001
+            selfupdate.write_state({"state": "error", "by": by, "error": str(e), "finished": time.strftime("%Y-%m-%d %H:%M:%S"),
+                                    "recorded": True})
+            audit_add("system", "Update fehlgeschlagen", f"v{VERSION}", detail=str(e), user=by)
+            return "error", str(e)
+        finally:
+            _selfupdate_lock.release()
+
+    if wait:
+        return work()
+    threading.Thread(target=work, daemon=True).start()
+    return "started", "Das neue Image wird geladen. Ist es neuer, startet MirrorSync in etwa einer Minute neu."
+
+
+def _selfupdate_record():
+    """Ergebnis eines Updates (vom Hilfs-Container in selfupdate.json geschrieben) einmal ins Audit-Log uebernehmen."""
+    st = selfupdate.read_state()
+    if st.get("state") not in ("ok", "failed") or st.get("recorded"):
+        return
+    st["recorded"] = True
+    selfupdate.write_state(st)
+    fr, to = st.get("from_version", ""), st.get("to_version") or VERSION
+    if st["state"] == "ok":
+        audit_add("system", "Update abgeschlossen", f"v{fr} → v{to}", user=st.get("by"),
+                  info={"Image": st.get("image", ""), "Gestartet": st.get("started", ""), "Fertig": st.get("finished", "")})
+    else:
+        audit_add("system", "Update fehlgeschlagen", f"v{fr} → v{to}", detail=st.get("error", ""), user=st.get("by"),
+                  info={"Image": st.get("image", ""), "Ablauf": " | ".join(st.get("log") or [])[-1500:]})
+
+
+def _selfupdate_due(s):
+    """Automatisches Selbst-Update: einmal am Tag ab der eingestellten Uhrzeit, sobald keine Aufgabe laeuft."""
+    if not s.get("selfupdate_auto") or not os.path.exists(selfupdate.SOCK):
+        return False
+    now = time.strftime("%H:%M")
+    return now >= (s.get("selfupdate_time") or "04:00") and s.get("selfupdate_last_auto") != time.strftime("%Y-%m-%d") and not _running
+
+
 def _update_loop():
     """Beim Start (nach kurzer Pause) und danach regelmaessig bei GitHub nach einer neueren Version fragen."""
     time.sleep(30)
     while True:
         try:
+            _selfupdate_record()
+            s = load_settings()
+            if _selfupdate_due(s):
+                s["selfupdate_last_auto"] = time.strftime("%Y-%m-%d")
+                save_settings(s)
+                run_selfupdate("Zeitplan")
             s = load_settings()
             if s.get("update_check", True) and update.due(s.get("update_interval", "60")):
                 st = update.check()
@@ -1204,7 +1299,7 @@ def bootstrap_users():
 
 # Endpunkt -> benoetigtes Recht. None = nur angemeldet. Fehlende Endpunkte = nur angemeldet.
 ENDPOINT_PERMS = {
-    "index": "jobs.view", "jobs_running": "jobs.view", "schedules": "jobs.view", "schedules_json": "jobs.view", "schedule_job": "jobs.edit", "schedule_chains": "jobs.edit", "show_log": "jobs.logs", "show_run": "jobs.logs", "download_run": "jobs.logs", "delete_job": "jobs.delete", "stop": "jobs.run",
+    "update_apply": "system.update", "update_state": "system.update", "index": "jobs.view", "jobs_running": "jobs.view", "schedules": "jobs.view", "schedules_json": "jobs.view", "schedule_job": "jobs.edit", "schedule_chains": "jobs.edit", "show_log": "jobs.logs", "show_run": "jobs.logs", "download_run": "jobs.logs", "delete_job": "jobs.delete", "stop": "jobs.run",
     "job_notify_test": "jobs.notify", "job_pause": "jobs.edit",
     "remotes": "remotes.view", "test_remote": "remotes.test", "delete_remote": "remotes.delete",
     "auth_remote": "remotes.edit", "browse": "remotes.browse", "browse_list": "remotes.browse",
@@ -2807,7 +2902,7 @@ def settings_page():
 @app.route("/settings/general", methods=["GET", "POST"])
 def general_settings():
     s = load_settings()
-    msg = err = None
+    msg, err = session.pop("flash", None), session.pop("flash_err", None)
     purge = None
     if request.method == "POST" and request.form.get("section") == "security":
         f = request.form
@@ -2860,6 +2955,14 @@ def general_settings():
                 purge = {"before": before, "runs": n}
                 msg = (i18n.t("Vor dem {0} gestartet: {1} Läufe in {2} Aufgaben. Zum Löschen unten bestätigen.", day, n, nj)
                        if n else i18n.t("Vor dem {0} gibt es keine Läufe.", day))
+    elif request.method == "POST" and request.form.get("section") == "selfupdate":
+        tm = (request.form.get("selfupdate_time") or "").strip()
+        if not re.fullmatch(r"([01]\d|2[0-3]):[0-5]\d", tm):
+            err = "Uhrzeit bitte als HH:MM angeben."
+        else:
+            s.update(selfupdate_auto="selfupdate_auto" in request.form, selfupdate_time=tm)
+            save_settings(s)
+            msg = "Gespeichert."
     elif request.method == "POST" and request.form.get("section") == "update":
         s["update_check"] = "update_check" in request.form
         iv = (request.form.get("update_interval_value") or "").strip()
@@ -2929,6 +3032,7 @@ def general_settings():
     return render_template("general.html", s=s, msg=msg, err=err, usage=usage, bw_cfg=bw, geo=geoip.status(), pk_now=pk_rp_id,
                            attribution=Markup(geoip.ATTRIBUTION), my_ip=_client_ip(), my_loc=geoip.locate(_client_ip()),
                            next_geoip=next_run("_geoip"), tz=TZ, upd=update_status(), purge=purge,
+                           selfupd=selfupdate_status() if g.access.has("system.update") or g.access.has("system.settings") else None,
                            fwd=request.headers.get("X-Forwarded-For", ""),
                            bw_desc=bwlimit.describe(bw, s.get("bw_unit") or "MB/s"), bw_tt=bwlimit.timetable(bw))
 
@@ -3742,6 +3846,25 @@ def user_delete(name):
     return redirect(url_for("users_page"))
 
 
+@app.post("/update/apply")
+def update_apply():
+    st, text = run_selfupdate(g.user)
+    wants_json = request.headers.get("Accept", "").startswith("application/json")
+    if wants_json:
+        return {"ok": st == "started", "status": st, "message": i18n.t(text)}, (200 if st == "started" else 409)
+    if st == "started":
+        session["flash"] = text
+    else:
+        session["flash_err"] = text
+    back = request.form.get("back") or "/settings/general"
+    return redirect(back if back.startswith("/") and not back.startswith("//") else "/settings/general")
+
+
+@app.get("/update/state")
+def update_state():
+    return selfupdate_status()
+
+
 @app.route("/account", methods=["GET", "POST"])
 def account():
     if request.args.get("done"):
@@ -4180,6 +4303,19 @@ def main():
     if not store.load():
         print("Noch kein Benutzer angelegt: Beim ersten Aufruf der Web-GUI wird ein Admin eingerichtet.", flush=True)
         setup_token(show=True)
+    import signal
+
+    def _on_term(*_):
+        # "docker stop": laufende rclone-Prozesse beenden und sofort aussteigen, statt auf den harten Abbruch zu warten
+        print("Beende MirrorSync (SIGTERM).", flush=True)
+        for p in list(_running.values()):
+            try:
+                p.terminate()
+            except Exception:  # noqa: BLE001
+                pass
+        os._exit(0)
+
+    signal.signal(signal.SIGTERM, _on_term)
     # Proxy-Header durchreichen; ob sie gelten, entscheidet die Einstellung "Reverse-Proxy" (_client_ip)
     serve(app, host="0.0.0.0", port=port, threads=8, clear_untrusted_proxy_headers=False)
 

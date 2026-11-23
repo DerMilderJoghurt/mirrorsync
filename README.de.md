@@ -4,7 +4,7 @@
 
 # MirrorSync – 1:1-Spiegelung mit Web-GUI und Zeitplänen
 
-Version **1.41.0** · Änderungen siehe [CHANGELOG.md](CHANGELOG.md) (englisch) · [English version](README.md)
+Version **1.42.0** · Änderungen siehe [CHANGELOG.md](CHANGELOG.md) (englisch) · [English version](README.md)
 
 Ein Docker-Container, der Ordner **einweg 1:1 spiegelt** (wie FreeFileSync „Spiegeln"):
 Das Ziel wird exakt wie die Quelle, inklusive Löschungen. Als Sync-Motor dient
@@ -68,7 +68,7 @@ Geänderte Dateien werden komplett neu übertragen (kein Delta wie bei rsync).
 
 ## Installation
 Das fertige Image liegt in der GitHub Container Registry: `ghcr.io/dermilderjoghurt/mirrorsync`
-(für amd64 und arm64, z. B. Raspberry Pi). Tags: `latest` (neueste Version), `1.41.0` (feste Version),
+(für amd64 und arm64, z. B. Raspberry Pi). Tags: `latest` (neueste Version), `1.42.0` (feste Version),
 `1.40` (neuester Patch dieser Version). Das Image wird nur veröffentlicht, wenn sich die Versionsnummer ändert.
 Update-Prüfer wie Dockhand oder Watchtower melden deshalb nur dann ein Update, wenn es wirklich eine neue Version gibt.
 
@@ -741,11 +741,47 @@ Release mit allen Änderungen. Übertragen wird dabei nur die eigene Versionsnum
 
 - Ein- und ausschalten unter **Einstellungen → Allgemein → Updates**, dort auch „Speichern und jetzt prüfen“ und
   wann zuletzt geprüft wurde. Den **Abstand** stellst du dort ebenfalls ein: Zahl eingeben, Minuten oder Stunden
-  wählen (5 Minuten bis 720 Stunden, Standard 1 Stunde). Aktualisiert wird nicht automatisch, das bleibt bei dir (siehe unten).
+  wählen (5 Minuten bis 720 Stunden, Standard 1 Stunde). Aktualisiert wird nur, wenn du das Selbst-Update nutzt (siehe unten), sonst bleibt das bei dir.
 - API/MCP: `GET /api/v1/update` (`get_update`), `POST /api/v1/update/check` (`check_update`),
   `PATCH /api/v1/settings/update` mit `{"update_check": false}` und/oder `{"update_interval": 120}` (Minuten)
   (`update_update_settings`); `/status` enthält `update` mit `interval_minutes`.
 - Ein anderes Repo (z. B. ein eigener Fork) lässt sich per `UPDATE_REPO=besitzer/repo` einstellen.
+
+## Selbst-Update über den Docker-Socket (seit 1.42.0, optional)
+MirrorSync kann sich selbst aktualisieren, wenn du den Docker-Socket in den Container einbindest:
+
+```yaml
+    volumes:
+      - ./config:/config
+      - ./logs:/logs
+      - /var/run/docker.sock:/var/run/docker.sock   # optional: Selbst-Update
+```
+
+> **Sicherheit:** Wer den Docker-Socket hat, hat volle Kontrolle über alle Container auf dem Host (praktisch
+> Root-Rechte). Binde ihn nur ein, wenn du das willst, und gib das Recht „MirrorSync aktualisieren“ nur Admins.
+> Ohne Socket ist die Funktion ausgeschaltet und du aktualisierst wie bisher (Dockhand, Portainer,
+> `docker compose pull && docker compose up -d`).
+
+- **Jetzt aktualisieren:** unten links beim Hinweis „⬆ vX.Y.Z verfügbar“ und unter **Einstellungen → Allgemein →
+  Selbst aktualisieren**. Optional **automatisch einmal am Tag** ab einer Uhrzeit. Läuft gerade eine Aufgabe, wartet
+  das Update, bis sie fertig ist.
+- **So läuft es ab:** MirrorSync holt das Image neu (derselbe Name und Tag wie beim laufenden Container, z. B.
+  `:latest`). Ist es neuer, startet ein kurzlebiger Hilfs-Container aus dem neuen Image. Er stoppt den alten
+  Container, legt einen neuen mit **genau denselben Einstellungen** an (Name, Ports, Volumes, Umgebungsvariablen,
+  Netzwerke mit fester IP und MAC-Adresse, Neustart-Regel, Labels) und startet ihn. Die Labels von Docker Compose
+  bleiben erhalten und werden angepasst, daher erkennen `docker compose`, Dockhand und Portainer den Container
+  weiter als ihren und legen ihn nicht noch einmal neu an. Umgebungsvariablen, die aus dem Image stammen (z. B.
+  die Python-Version), kommen aus dem neuen Image, alles aus deiner Compose-Datei bleibt.
+- **Rollback:** Antwortet die neue Version nicht innerhalb von 2 Minuten auf `/health` oder beendet sie sich, wird
+  sie entfernt und die bisherige läuft wieder. Ergebnis und Ablauf stehen in der GUI, im Audit-Log
+  („Update gestartet / abgeschlossen / fehlgeschlagen“) und in `config/selfupdate.json`.
+- **Voraussetzungen:** Das Image muss aus einem Registry kommen (`image: ghcr.io/dermilderjoghurt/mirrorsync:latest`).
+  Mit `build: .` gebaute Images kann MirrorSync nicht neu holen. Mit festem Versions-Tag (`:1.42.0`) wird nur dieser
+  Tag neu geholt. `/config` muss als Volume oder Ordner eingebunden sein (ist es in der Beispiel-Compose).
+- **Recht:** `system.update` („MirrorSync aktualisieren“, Admins haben es automatisch). Automatik und Uhrzeit
+  ändern braucht `system.settings`.
+- **API/MCP:** `GET /api/v1/update/self` (`get_self_update`), `POST /api/v1/update/apply` (`self_update`),
+  `PATCH /api/v1/settings/update` mit `selfupdate_auto` und `selfupdate_time` (`update_update_settings`).
 
 ## Android-App (seit 1.40.0)
 Im GitHub-Repo liegt unter `android/` eine kleine Android-App (ab Android 7): die MirrorSync-Weboberfläche ohne

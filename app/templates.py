@@ -169,7 +169,7 @@ table,tbody,tr,td{display:block;width:100%}tr:first-child:has(th){display:none}t
 <button type="button" onclick="toggleTheme()" title="Design wechseln">{{ ICON.theme }}<span id="themeLabel" class="lbl">Design wechseln</span></button>
 {% if g.user %}<a href="/account" class="userchip" title="{{ g.user }}"><span class="avatar">{{ g.user[:1]|upper }}</span><span class="lbl"><b>{{ g.user }}</b><br><small>{{ role_name(g.role) }}</small></span></a>
 <a href="/logout" title="Abmelden">{{ ICON.logout }}<span class="lbl">Abmelden</span></a>{% endif %}
-<div class="ver"><a class="vlink" href="{{ RELEASE_URL }}" target="_blank" rel="noopener" title="Versionshinweise auf GitHub">MirrorSync v{{ VERSION }}</a>{% set upd_s = UPDATE() %}{% if upd_s and upd_s.update_available %}<br><a class="upd" href="{{ upd_s.url }}" target="_blank" rel="noopener" title="Neue Version verfügbar">⬆ v{{ upd_s.latest }} verfügbar</a>{% endif %}</div>
+<div class="ver"><a class="vlink" href="{{ RELEASE_URL }}" target="_blank" rel="noopener" title="Versionshinweise auf GitHub">MirrorSync v{{ VERSION }}</a>{% set upd_s = UPDATE() %}{% if upd_s and upd_s.update_available %}<br><a class="upd" href="{{ upd_s.url }}" target="_blank" rel="noopener" title="Neue Version verfügbar">⬆ v{{ upd_s.latest }} verfügbar</a>{% if can("system.update") and SELFUPD_OK() %}<form method="post" action="/update/apply" style="margin:4px 0 0" onsubmit="return confirm('MirrorSync jetzt aktualisieren? Der Container wird dabei neu gestartet, die Oberfläche ist etwa eine Minute nicht erreichbar.')"><input type="hidden" name="back" value="{{ request.path }}"><button class="btn sm">Jetzt aktualisieren</button></form>{% endif %}{% endif %}</div>
 </div>
 </aside>
 <div class="content">
@@ -1802,6 +1802,22 @@ scope();
 {% if upd.checked %}<p class="mut" style="margin:4px 0 0"><small>Zuletzt geprüft: {{ upd.checked }}</small></p>{% endif %}
 {% if upd.error %}<p style="margin:4px 0 0;color:var(--err)"><small>Fehler bei der letzten Prüfung: {{ upd.error }}</small></p>{% endif %}
 <p style="margin-top:12px"><button class="btn pri">Speichern</button> <button class="btn" name="check_now" value="1">Speichern und jetzt prüfen</button></p></form>
+{% if selfupd %}{% set su = selfupd %}{% set sst = su.state or {} %}<div class="card" id="selfupdate"><h2>Selbst aktualisieren</h2>
+{% if not su.available %}<p class="mut" style="margin-top:-4px">Ausgeschaltet. MirrorSync kann sich selbst aktualisieren, wenn der Docker-Socket in den Container eingebunden ist (in der Compose-Datei unter <code>volumes:</code> die Zeile <code>- /var/run/docker.sock:/var/run/docker.sock</code>). Achtung: Wer den Socket hat, hat volle Kontrolle über alle Container auf dem Host. Ohne Socket aktualisierst du wie bisher über Dockhand, Portainer oder <code>docker compose pull &amp;&amp; docker compose up -d</code>.</p>{% if su.reason and su.reason != "socket" %}<p class="hint fehler"><span>Socket gefunden, aber Docker antwortet nicht:</span> <code>{{ su.reason }}</code></p>{% endif %}
+{% else %}<p class="mut" style="margin-top:-4px">Holt das Image neu und legt den Container mit genau denselben Einstellungen neu an (Name, Ports, Volumes, Umgebungsvariablen, Netzwerke mit fester IP, Neustart-Regel, Labels von Docker Compose). Startet die neue Version nicht, läuft automatisch wieder die bisherige.</p>
+<p class="hint"><span>Container:</span> <b>{{ su.container }}</b> · <span>Image:</span> <code>{{ su.image }}</code>{% if su.compose_project %} · <span>Compose-Projekt:</span> <code>{{ su.compose_project }}</code>{% endif %}</p>
+{% if su.local_only %}<p class="hint fehler">Das Image wurde lokal gebaut (<code>build: .</code>) und liegt in keinem Registry, daher kann MirrorSync kein neues holen. Für Selbst-Updates in der Compose-Datei <code>image: ghcr.io/dermilderjoghurt/mirrorsync:latest</code> verwenden und <code>build: .</code> entfernen.</p>
+{% elif su.pinned %}<p class="hint">Hinweis: Das Image hat einen festen Versions-Tag. Aktualisieren holt nur diesen Tag neu. Für neue Versionen <code>:latest</code> verwenden.</p>{% endif %}
+{% if sst.state in ("pulling", "running") %}<div class="msg info"><span>Update läuft seit</span> {{ sst.started }} …{% if sst.log %} <small>{{ sst.log[-1] }}</small>{% endif %}</div>
+{% elif sst.state == "ok" %}<p><span class="tag ok">Letztes Update erfolgreich</span> <small class="mut">v{{ sst.from_version }} → v{{ sst.to_version }}, {{ sst.finished }}</small></p>
+{% elif sst.state in ("failed", "error") %}<p><span class="tag fehler">Letztes Update fehlgeschlagen</span> <small class="mut">{{ sst.finished }}: {{ sst.error }}</small></p>
+{% elif sst.state == "current" %}<p><span class="tag">aktuell</span> <small class="mut"><span>Zuletzt geprüft</span> {{ sst.checked }}</small></p>{% endif %}
+{% if can("system.update") %}<form method="post" action="/update/apply" onsubmit="return confirm('MirrorSync jetzt aktualisieren? Ist ein neueres Image da, wird der Container neu gestartet und die Oberfläche ist etwa eine Minute nicht erreichbar.')"><input type="hidden" name="back" value="/settings/general#selfupdate"><button class="btn pri" {{ "disabled" if su.local_only }}>Jetzt aktualisieren</button>{% if su.jobs_running %} <small class="mut">Es laufen gerade Aufgaben, das Update ist erst danach möglich.</small>{% endif %}</form>{% endif %}
+<form method="post" style="margin-top:16px"><input type="hidden" name="section" value="selfupdate">
+<label class="check"><input type="checkbox" name="selfupdate_auto" {{ "checked" if su.auto }}> Automatisch aktualisieren, einmal am Tag</label>
+<div class="row"><div style="flex:0 0 200px"><label>Ab Uhrzeit</label><input type="time" name="selfupdate_time" value="{{ su.time }}"></div></div>
+<div class="hint">Läuft gerade eine Aufgabe, wartet das Update, bis sie fertig ist. Zeitzone des Containers.</div>
+<p><button class="btn pri">Speichern</button></p></form>{% endif %}</div>{% endif %}
 <form method="post"><div class="card"><h2>Logs aufbewahren</h2>
 <p class="mut" style="margin-top:-4px">Jeder Lauf bekommt ein eigenes Log. Ältere Läufe werden nach jedem Lauf automatisch gelöscht.</p>
 <div class="row"><div><label>Läufe pro Aufgabe behalten</label><input type="text" inputmode="numeric" name="log_keep_runs" value="{{ s.log_keep_runs }}"><div class="hint">0 bis 1000, 0 = unbegrenzt</div></div>

@@ -8,7 +8,7 @@
 
 services:
   mirrorsync:
-    image: ghcr.io/dermilderjoghurt/mirrorsync:latest   # or a fixed version, e.g. :1.41.0
+    image: ghcr.io/dermilderjoghurt/mirrorsync:latest   # or a fixed version, e.g. :1.42.0
     # Build it yourself instead of pulling (Dockerfile and app/ in the same folder):
     # build: .
     container_name: mirrorsync
@@ -28,6 +28,8 @@ services:
     volumes:
       - ./config:/config        # jobs, storage locations, notifications, SSH keys
       - ./logs:/logs
+      # Optional: self-update from the web GUI (see README). Gives MirrorSync full control over Docker on this host!
+      # - /var/run/docker.sock:/var/run/docker.sock
       # Only needed if folders of THIS Docker host should be mirrored too:
       # - /srv/data:/data/data:ro
     ports:

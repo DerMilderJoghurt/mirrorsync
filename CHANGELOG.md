@@ -3,6 +3,18 @@
 Version numbers follow [SemVer](https://semver.org/): MAJOR.MINOR.PATCH
 (MAJOR = incompatible change, MINOR = new feature, PATCH = bug fix).
 
+## 1.42.0 – 2026-11-23
+- **Self-update via the Docker socket (optional).** If `/var/run/docker.sock` is mounted, there is an **"Update now"**
+  button at the bottom left next to the update notice and under Settings → General → Self-update, optionally also
+  **automatically once a day** from a set time. A short-lived helper container swaps the container for a new one
+  with **identical settings** (name, ports, volumes, environment variables, networks with fixed IP/MAC, restart
+  policy, labels incl. Docker Compose, so Compose, Dockhand and Portainer still recognise it). If the new version
+  does not start, the old one runs again automatically (rollback). Without the socket everything is off. New
+  permission `system.update`, audit entries "Update started / completed / failed", API/MCP `get_self_update`,
+  `self_update`, `selfupdate_auto`/`selfupdate_time` in `update_update_settings`, all 5 languages. Security note in
+  the README and compose file.
+- `docker stop` now ends MirrorSync cleanly right away instead of killing it after 10 seconds.
+
 ## 1.41.0 – 2026-11-23
 - **Require 2FA**, globally and per user. Under Settings → General → Sign-in and security: *Off (per user only)*,
   *For new users* or *For all users*. Under Users → Edit the “Require 2FA” checkbox. Affected users land on

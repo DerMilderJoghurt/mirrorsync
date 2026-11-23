@@ -4,7 +4,7 @@
 
 # MirrorSync – 1:1 mirroring with a web GUI and schedules
 
-Version **1.41.0** · Changes: [CHANGELOG.md](CHANGELOG.md) · [Deutsche Version](README.de.md)
+Version **1.42.0** · Changes: [CHANGELOG.md](CHANGELOG.md) · [Deutsche Version](README.de.md)
 
 A Docker container that **mirrors folders one-way, 1:1** (like FreeFileSync "Mirror"):
 the destination becomes an exact copy of the source, including deletions. The sync engine is
@@ -67,7 +67,7 @@ Changed files are transferred completely (no delta transfer like rsync).
 
 ## Installation
 The ready-made image is in the GitHub Container Registry: `ghcr.io/dermilderjoghurt/mirrorsync`
-(for amd64 and arm64, e.g. Raspberry Pi). Tags: `latest` (newest version), `1.41.0` (fixed version),
+(for amd64 and arm64, e.g. Raspberry Pi). Tags: `latest` (newest version), `1.42.0` (fixed version),
 `1.40` (newest patch of this version). The image is only published when the version number changes, so
 update checkers such as Dockhand or Watchtower only report an update when there really is a new version.
 
@@ -720,11 +720,45 @@ release with all changes. Only the installed version number is sent.
 
 - Turn it on or off under **Settings → General → Updates**, which also has "Save and check now" and shows when the
   last check happened. You also set the **interval** there: enter a number and pick minutes or hours (5 minutes to
-  720 hours, default 1 hour). Nothing is updated automatically, that stays up to you (see below).
+  720 hours, default 1 hour). Nothing is updated automatically unless you use the self-update (see below).
 - API/MCP: `GET /api/v1/update` (`get_update`), `POST /api/v1/update/check` (`check_update`),
   `PATCH /api/v1/settings/update` with `{"update_check": false}` and/or `{"update_interval": 120}` (minutes)
   (`update_update_settings`); `/status` contains `update` with `interval_minutes`.
 - Another repository (e.g. your own fork) can be set with `UPDATE_REPO=owner/repo`.
+
+## Self-update via the Docker socket (since 1.42.0, optional)
+MirrorSync can update itself if you mount the Docker socket into the container:
+
+```yaml
+    volumes:
+      - ./config:/config
+      - ./logs:/logs
+      - /var/run/docker.sock:/var/run/docker.sock   # optional: self-update
+```
+
+> **Security:** whoever has the Docker socket has full control over all containers on the host (effectively root).
+> Only mount it if you want that, and give the permission "Update MirrorSync" to admins only. Without the socket
+> the feature is off and you update as before (Dockhand, Portainer, `docker compose pull && docker compose up -d`).
+
+- **Update now:** at the bottom left next to "⬆ vX.Y.Z available" and under **Settings → General → Self-update**.
+  Optionally **automatically once a day** from a set time. If a job is running, the update waits until it has
+  finished.
+- **How it works:** MirrorSync pulls the image again (same name and tag as the running container, e.g. `:latest`).
+  If it is newer, a short-lived helper container from the new image stops the old container, creates a new one with
+  **exactly the same settings** (name, ports, volumes, environment variables, networks with fixed IP and MAC address,
+  restart policy, labels) and starts it. Docker Compose labels are kept and updated, so `docker compose`, Dockhand
+  and Portainer still recognise the container as theirs and do not recreate it again. Environment variables that
+  come from the image (e.g. the Python version) come from the new image, everything from your compose file stays.
+- **Rollback:** if the new version does not answer `/health` within 2 minutes or exits, it is removed and the
+  previous one runs again. Result and steps are shown in the GUI, in the audit log ("Update started / completed /
+  failed") and in `config/selfupdate.json`.
+- **Requirements:** the image has to come from a registry (`image: ghcr.io/dermilderjoghurt/mirrorsync:latest`).
+  MirrorSync cannot pull images built with `build: .`. With a fixed version tag (`:1.42.0`) only that tag is pulled
+  again. `/config` has to be a volume or bind mount (it is in the example compose file).
+- **Permission:** `system.update` ("Update MirrorSync", admins have it automatically). Changing the automatic
+  update and its time needs `system.settings`.
+- **API/MCP:** `GET /api/v1/update/self` (`get_self_update`), `POST /api/v1/update/apply` (`self_update`),
+  `PATCH /api/v1/settings/update` with `selfupdate_auto` and `selfupdate_time` (`update_update_settings`).
 
 ## Android app (since 1.40.0)
 The folder `android/` contains a small Android app (Android 7 or newer): the MirrorSync web interface without

@@ -522,19 +522,53 @@ def a_check_update(a):
     return core.update_status()
 
 
+@action("get_self_update", "GET", "/update/self", "system.update", "System",
+        "Selbst-Update über den Docker-Socket: available (Socket eingebunden und Docker erreichbar), container, image, "
+        "compose_project, pinned (fester Versions-Tag), local_only (lokal gebautes Image, kein Update möglich), auto, time, "
+        "jobs_running und state (letzter Stand: pulling, running, ok, failed, error, current mit log).", ro=True)
+def a_get_self_update(a):
+    need("system.update")
+    return core.selfupdate_status()
+
+
+@action("self_update", "POST", "/update/apply", "system.update", "System",
+        "MirrorSync jetzt selbst aktualisieren: Image neu holen und, wenn es neuer ist, den Container mit identischen "
+        "Einstellungen neu anlegen (Rollback, wenn die neue Version nicht startet). Braucht den eingebundenen Docker-Socket. "
+        "Nicht möglich, solange Aufgaben laufen. Läuft im Hintergrund; den Stand liefert get_self_update. "
+        "Die Verbindung zu MirrorSync bricht während des Neustarts etwa eine Minute ab.")
+def a_self_update(a):
+    need("system.update")
+    st, text = core.run_selfupdate(g.user)
+    if st != "started":
+        raise ApiError(409 if st == "busy" else 400, _t(text))
+    return {"ok": True, "status": st, "message": _t(text)}
+
+
 @action("update_update_settings", "PATCH", "/settings/update", "system.settings", "Einstellungen",
         "Automatische Prüfung auf neue Versionen ein- oder ausschalten (update_check) und den Abstand in Minuten "
-        "festlegen (update_interval, 5–43200, Standard 60). Nicht angegebene Felder bleiben unverändert.",
-        {"update_check": S(BOOL), "update_interval": S(INT)})
+        "festlegen (update_interval, 5–43200, Standard 60). Selbst-Update: selfupdate_auto (einmal am Tag automatisch "
+        "aktualisieren, braucht den Docker-Socket) ab selfupdate_time (HH:MM). Nicht angegebene Felder bleiben unverändert.",
+        {"update_check": S(BOOL), "update_interval": S(INT), "selfupdate_auto": S(BOOL), "selfupdate_time": S(STR, "HH:MM")})
 def a_update_update_settings(a):
-    _check_keys(a, ("update_check", "update_interval"))
+    _check_keys(a, ("update_check", "update_interval", "selfupdate_auto", "selfupdate_time"))
+    if "selfupdate_auto" in a or "selfupdate_time" in a:
+        s = core.load_settings()
+        form = {"section": "selfupdate", "selfupdate_time": str(a.get("selfupdate_time", s.get("selfupdate_time") or "04:00"))}
+        if _bool(a["selfupdate_auto"]) if "selfupdate_auto" in a else s.get("selfupdate_auto"):
+            form["selfupdate_auto"] = "on"
+        done(gui("POST", "/settings/general", form=form))
+        if not ({"update_check", "update_interval"} & set(a)):
+            return {"ok": True, "message": _t("Gespeichert."), "update": core.update_status(),
+                    "selfupdate": {k: core.selfupdate_status()[k] for k in ("auto", "time")}}
     cur = core.update_status()
     form = {"section": "update", "update_interval_unit": "min",
             "update_interval_value": str(a.get("update_interval", cur["interval_minutes"]))}
     if _bool(a["update_check"]) if "update_check" in a else cur["enabled"]:
         form["update_check"] = "on"
     msg = done(gui("POST", "/settings/general", form=form))
-    return {"ok": True, "message": msg, "update": core.update_status()}
+    s = core.load_settings()
+    return {"ok": True, "message": msg, "update": core.update_status(),
+            "selfupdate": {"auto": bool(s.get("selfupdate_auto")), "time": s.get("selfupdate_time") or "04:00"}}
 
 
 @action("purge_logs", "POST", "/logs/purge", "system.settings", "Einstellungen",
