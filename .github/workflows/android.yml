@@ -37,8 +37,13 @@ jobs:
           KS: ${{ secrets.ANDROID_KEYSTORE_B64 }}
         run: |
           if [ -n "$KS" ]; then
-            echo "$KS" | base64 -d > "$RUNNER_TEMP/release.jks"
-            echo "path=$RUNNER_TEMP/release.jks" >> "$GITHUB_OUTPUT"
+            # tolerate line breaks/spaces from copy and paste
+            if printf '%s' "$KS" | tr -d ' \r\n\t' | base64 -d > "$RUNNER_TEMP/release.jks" 2>/dev/null \
+               && [ -s "$RUNNER_TEMP/release.jks" ]; then
+              echo "path=$RUNNER_TEMP/release.jks" >> "$GITHUB_OUTPUT"
+            else
+              echo "::warning::ANDROID_KEYSTORE_B64 is not valid base64 (paste the whole content of keystore-base64.txt). Building an unsigned APK."
+            fi
           fi
 
       - name: Build APK
