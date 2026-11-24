@@ -3,6 +3,15 @@
 Version numbers follow [SemVer](https://semver.org/): MAJOR.MINOR.PATCH
 (MAJOR = incompatible change, MINOR = new feature, PATCH = bug fix).
 
+## 1.52.0 – 2026-11-24
+- **Time window per job:** start, end (also past midnight) and weekdays. Automatic starts (schedule, chain, full live
+  sync) outside the window are postponed and start as soon as the window opens; live rounds outside are skipped. At
+  the end of the window you can choose: let it run, stop and continue in the next window, or stop until the next
+  regular start. The overview shows the window and "waiting for time window", the history "time window ended". Runs
+  started by hand outside the window run to the end.
+- API/MCP: field `window` (`start`, `end`, `days`, `mode`) and `window_wait`. Permissions: like the other job
+  settings (`jobs.edit`). The audit log records changes. All 5 languages.
+
 ## 1.51.0 – 2026-11-24
 - **Duplicate jobs** ("⧉" in the overview and in the job). The copy is switched off, history and two-way state are
   not carried over.

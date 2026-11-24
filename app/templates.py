@@ -267,7 +267,7 @@ r.dataset.theme=dark?'light':'dark';try{localStorage.setItem('ms-theme',r.datase
 <div class="path">{% if j.direction == "bisync" %}<span title="Zwei-Wege-Sync">{{ j.source }} ⇄ {{ j.eff_dest }}</span>{% else %}{{ j.source }} → {{ j.eff_dest }}{% endif %}</div>
 {% if j.direction == "bisync" and j.bisync_need_resync %}<small class="fehler">Zwei-Wege-Sync abgebrochen, bitte neu zusammenführen.</small>
 {% if can("jobs.run") and not j.running %}<form class="inline" method="post" action="/job/{{ j.id }}/resync" onsubmit="return confirm('Beide Seiten neu zusammenführen? Was nur auf einer Seite liegt, wird auf die andere kopiert. Gelöscht wird nichts.')"><button class="btn sm">Neu zusammenführen</button></form>{% endif %}<br>{% endif %}
-<small>{% if j.direction == "bisync" %}⇄ Zwei-Wege · {% endif %}{% if j.n_select %}☑ nur {{ j.n_select }} {{ "Eintrag" if j.n_select == 1 else "Einträge" }} · {% endif %}{% if j.n_excludes %}{{ j.n_excludes }} Ausschlüsse · {% endif %}{% if j.no_delete and j.direction != "bisync" %}ohne Löschen · {% endif %}{% if j.versioning %}Versionierung · {% endif %}{% if j.notify_summary %}🔔 {{ j.notify_summary }}{% endif %}{% if j.dry_run %} · nur Testlauf{% endif %}</small></td>
+<small>{% if j.direction == "bisync" %}⇄ Zwei-Wege · {% endif %}{% if j.n_select %}☑ nur {{ j.n_select }} {{ "Eintrag" if j.n_select == 1 else "Einträge" }} · {% endif %}{% if j.n_excludes %}{{ j.n_excludes }} Ausschlüsse · {% endif %}{% if j.no_delete and j.direction != "bisync" %}ohne Löschen · {% endif %}{% if j.versioning %}Versionierung · {% endif %}{% if j.window_text %}🕘 {{ j.window_text }} · {% endif %}{% if j.notify_summary %}🔔 {{ j.notify_summary }}{% endif %}{% if j.dry_run %} · nur Testlauf{% endif %}</small></td>
 <td class="hide-sm">{% if j.trig == "after" %}{% if j.parent_name %}<span title="startet nach einer anderen Aufgabe">⛓ nach „{{ j.parent_name }}“</span><br><small>{{ "immer" if j.after_when == "always" else "nur bei Erfolg" }}{% if not j.enabled %} · <span class="fehler">aus</span>{% endif %}</small>{% else %}<span class="fehler">Vorgänger fehlt</span>{% endif %}
 {% elif j.trig == "time" and j.enabled and j.next_run %}{% if j.schedule_text %}{{ j.schedule_text }}{% else %}<code>{{ j.schedule }}</code>{% endif %}
 {% elif j.trig == "live" and j.enabled %}<span title="gleicht laufend Quelle und Ziel ab">⚡ {{ j.live_text }}</span><br><small>{{ j.live_full_text }}{% if j.next_run %}, nächster {{ j.next_run }}{% endif %}</small>{% if j.live_fail_count %}<br><small class="fehler">{{ j.live_fail_count }} Live-Läufe in Folge fehlgeschlagen</small>{% elif j.live_checked %}<br><small class="mut">zuletzt geprüft {{ j.live_checked[11:16] }}</small>{% endif %}
@@ -281,7 +281,7 @@ r.dataset.theme=dark?'light':'dark';try{localStorage.setItem('ms-theme',r.datase
 {% elif j.next_kind == "parent_running" %}<small>{{ _("wenn „{0}“ fertig ist", j.parent_name) }}</small>
 {% elif j.next_kind == "manual" %}<small class="mut">{{ _("nur manuell") }}</small>
 {% elif j.next_kind == "paused" %}<small class="mut">{{ _("pausiert") }}</small>
-{% else %}<small class="mut">{{ _("keiner geplant") }}</small>{% endif %}</div></td>
+{% else %}<small class="mut">{{ _("keiner geplant") }}</small>{% endif %}{% if j.window_open and not j.running %}<br><span class="tag" title="Startet automatisch, sobald das Zeitfenster aufgeht">🕘 <span>wartet auf Zeitfenster</span> ({{ j.window_open }})</span>{% endif %}</div></td>
 <td style="text-align:right;white-space:nowrap">
 {% if j.running %}{% if can("jobs.run") %}<form class="inline" method="post" action="/job/{{ j.id }}/stop"><button class="btn sm del">Stopp</button></form>{% endif %}
 {% else %}{% if can("jobs.run") %}<form class="inline" method="post" action="/job/{{ j.id }}/run"><button class="btn sm pri" title="Jetzt spiegeln">{{ ICON.play }} Start</button></form>{% endif %}
@@ -646,6 +646,21 @@ const TZN='{{ tz }}';
 
 {% with vis=job.get("visible_to"), vis_what="job" %}{% include "vis_picker.html" %}{% endwith %}
 
+{% set W = job.window or {} %}<div class="card"><h2>Zeitfenster</h2>
+<label class="check"><input type="checkbox" name="window_on" id="win_on" {{ "checked" if job.window }} onchange="winShow()"> Nur in einem Zeitfenster laufen lassen</label>
+<div id="winbox" style="{{ '' if job.window else 'display:none' }}">
+<div class="row" style="margin-top:6px">
+<div style="flex:0 0 150px"><label for="window_start">Von</label><input type="time" name="window_start" id="window_start" value="{{ W.start or '22:00' }}"></div>
+<div style="flex:0 0 150px"><label for="window_end">Bis</label><input type="time" name="window_end" id="window_end" value="{{ W.end or '06:00' }}"></div>
+<div style="flex:1 1 280px"><label>An diesen Tagen (Beginn des Fensters)</label><div class="chips" style="margin:4px 0 0">{% for d in range(7) %}<label class="check" style="margin:0 10px 0 0"><input type="checkbox" name="window_day_{{ d }}" {{ "checked" if (not W.days) or d in W.days }}> {{ ["Mo","Di","Mi","Do","Fr","Sa","So"][d] }}</label>{% endfor %}</div></div></div>
+<div style="margin-top:10px"><label for="window_mode">Wenn das Fenster endet und die Aufgabe noch läuft</label><select name="window_mode" id="window_mode" style="max-width:520px">
+<option value="finish" {{ "selected" if W.mode == "finish" or not W.mode }}>Bis zum Ende durchlaufen lassen</option>
+<option value="resume" {{ "selected" if W.mode == "resume" }}>Anhalten und im nächsten Fenster weitermachen</option>
+<option value="stop" {{ "selected" if W.mode == "stop" }}>Anhalten, erst der nächste reguläre Start läuft wieder</option></select></div>
+<div class="hint">Zeitplan, Live und Ketten starten nur innerhalb des Fensters. Fällt ein Start in die Zeit außerhalb, startet die Aufgabe, sobald das Fenster aufgeht (Live-Runden entfallen einfach). Geht das Ende über Mitternacht (z. B. 22:00 bis 06:00), zählt der Wochentag des Beginns. Beim Weitermachen wird schon Kopiertes übersprungen. Von Hand gestartete Läufe außerhalb des Fensters laufen immer durch.</div>
+</div></div>
+<script>function winShow(){document.getElementById('winbox').style.display=document.getElementById('win_on').checked?'':'none'}</script>
+
 <div class="card"><h2>Optionen</h2>
 <label class="check"><input type="checkbox" name="versioning" id="vers" {{ "checked" if job.versioning }} onchange="document.getElementById('versbox').style.display=this.checked?'':'none'"> Versionierung: gelöschte und überschriebene Dateien nach <code>&lt;ziel&gt;.versions/&lt;datum&gt;</code> verschieben statt löschen</label>
 <div id="versbox" class="row" style="margin:0 0 8px 26px;{{ '' if job.versioning else 'display:none' }}">
@@ -842,7 +857,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 {% if running and current %}<tr class="click" onclick="location='/job/{{ job_id }}/run/{{ current }}'"><td>jetzt</td><td class="hide-sm">–</td><td><span class="tag laeuft">läuft</span></td><td>–</td><td>–</td><td>–</td><td class="hide-sm">–</td><td><a class="btn sm" href="/job/{{ job_id }}/run/{{ current }}">Log</a></td></tr>{% endif %}
 {% for h in job.history %}{% set ok = has_file.get(h.run) %}<tr {% if ok %}class="click" onclick="location='/job/{{ job_id }}/run/{{ h.run }}'"{% endif %}>
 <td>{{ h.start }}</td><td class="hide-sm">{{ h.duration }} s</td>
-<td><span class="tag {{ h.status }}">{{ STATUS.get(h.status, h.status) }}</span>{% if h.dry_run %} <small>Testlauf</small>{% endif %}</td>
+<td><span class="tag {{ h.status }}">{{ STATUS.get(h.status, h.status) }}</span>{% if h.dry_run %} <small>Testlauf</small>{% endif %}{% if h.window %}<br><small class="mut" title="{{ 'Geht im nächsten Zeitfenster weiter' if h.window == 'resume' else 'Am Ende des Zeitfensters angehalten' }}">🕘 Zeitfenster zu Ende</small>{% endif %}</td>
 <td class="num" data-l="Kopiert">{{ h.copied if h.copied is defined else "–" }}</td><td class="num" data-l="Gelöscht">{{ h.deleted if h.deleted is defined else "–" }}</td>
 <td class="num {{ 'err' if h.errors }}" data-l="Fehler">{{ h.errors if h.errors is defined else "–" }}</td>
 <td class="hide-sm"><small>{{ h.by or "–" }}</small></td>

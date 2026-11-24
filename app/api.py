@@ -309,7 +309,7 @@ def _fields(base, data):
         # Benachrichtigung wird geaendert: fehlende Felder aus der Aufgabe uebernehmen (Haekchen wie im Formular)
         src.update(base.get("_notify") or {})
     for k, v in data.items():
-        if k in BOOL_FIELDS or k in TEXT_FIELDS or k == "bw":
+        if k in BOOL_FIELDS or k in TEXT_FIELDS or k in ("bw", "window"):
             src[k] = v
         elif k == "msg_tpl_on":
             src[k] = v
@@ -345,6 +345,16 @@ def _fields(base, data):
         f[k] = str(v)
     if src.get("bw") is not None:
         f["bw_json"] = json.dumps(src["bw"])
+    w = src.get("window")
+    if w:
+        if not isinstance(w, dict):
+            raise ApiError(400, core.i18n.t("window muss ein Objekt {start, end, days, mode} oder null sein."))
+        f.update(window_on="on", window_start=str(w.get("start") or ""), window_end=str(w.get("end") or ""),
+                 window_mode=str(w.get("mode") or "finish"))
+        days = w.get("days")
+        days = core.timewin.ALL_DAYS if days in (None, "", "all") else days
+        for d in (days if isinstance(days, list) else str(days).split(",")):
+            f[f"window_day_{str(d).strip()}"] = "on"
     if "_vis" in src:
         f["vis_mode"] = "all" if src["_vis"] == "all" else "some"
         if src["_vis"] != "all":
@@ -366,6 +376,7 @@ def _base_fields(j):
     b = {k: j.get(k) for k in BOOL_FIELDS + TEXT_FIELDS if k not in ("notify_telegram_token", "notify_apprise_urls")}
     b["trigger"] = core.trigger_of(j)
     b["bw"] = j.get("bw")
+    b["window"] = j.get("window")
     b["_notify"] = {k: b.pop(k) for k in [k for k in b if k.startswith("notify_")]}   # nur bei Bedarf (siehe _fields)
     b["_notify"].update(msg_tpl_on=bool(j.get("msg_tpl_on")), msg_tpl=j.get("msg_tpl") or {})
     return b
@@ -588,7 +599,8 @@ def _schema(props=None, required=None):
 JOB_ID = {"job_id": {"type": "string", "description": "ID der Aufgabe (siehe list_jobs)"}}
 JOB_FIELDS = {"type": "object", "description": "Felder der Aufgabe, z. B. name, source, dest, trigger (time|after|live|manual), "
               "schedule (Cron), selection, excludes, enabled, dry_run, versioning, max_delete, compare (standard|size|checksum|tolerant: "
-              "woran eine Änderung erkannt wird), compare_window (Sekunden bei tolerant), speed (gentle|normal|fast|max)", "additionalProperties": True}
+              "woran eine Änderung erkannt wird), compare_window (Sekunden bei tolerant), speed (gentle|normal|fast|max), no_delete "
+              "(im Ziel nichts löschen), window ({start, end, days, mode} Zeitfenster oder null)", "additionalProperties": True}
 TOOLS = [
     ("status", "Überblick: Version, laufende, fehlgeschlagene und pausierte Aufgaben, Rechte des Keys.", None,
      _schema(), lambda a: op_status(), True),
@@ -768,6 +780,7 @@ def openapi():
                 "msg_tpl": {"type": "object", "description": "{run_ok|run_fail: {title, body}}"},
                 "bw_mode": {"type": "string", "enum": ["global", "custom", "off"]},
                 "bw": {"type": "object", "description": "wie /settings/bandwidth"},
+                "window": {"type": "object", "nullable": True, "description": "Zeitfenster: {start: \"22:00\", end: \"06:00\", days: [0..6] (0 = Montag, Standard alle), mode: finish (durchlaufen lassen) | resume (am Ende anhalten, im nächsten Fenster weitermachen) | stop (am Ende anhalten)}; null = immer. Automatische Starts außerhalb warten auf das Fenster. Im Ergebnis zeigt window_wait, ob die Aufgabe gerade wartet (deferred oder resume)"},
                 "pause_chain": {"type": "string", "enum": ["skip", "stop"]},
                 "versions_keep": {"type": "string", "description": "bei versioning: so viele Stände behalten (leer = alle)"},
                 "versions_days": {"type": "string", "description": "bei versioning: Stände älter als so viele Tage entfernen (leer = unbegrenzt)"},

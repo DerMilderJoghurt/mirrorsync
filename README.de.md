@@ -4,7 +4,7 @@
 
 # MirrorSync – 1:1-Spiegelung mit Web-GUI und Zeitplänen
 
-Version **1.51.0** · Änderungen siehe [CHANGELOG.md](CHANGELOG.md) (englisch) · [English version](README.md)
+Version **1.52.0** · Änderungen siehe [CHANGELOG.md](CHANGELOG.md) (englisch) · [English version](README.md)
 
 Ein Docker-Container, der Ordner **einweg 1:1 spiegelt** (wie FreeFileSync „Spiegeln"):
 Das Ziel wird exakt wie die Quelle, inklusive Löschungen. Als Sync-Motor dient
@@ -68,7 +68,7 @@ Geänderte Dateien werden komplett neu übertragen (kein Delta wie bei rsync).
 
 ## Installation
 Das fertige Image liegt in der GitHub Container Registry: `ghcr.io/dermilderjoghurt/mirrorsync`
-(für amd64 und arm64, z. B. Raspberry Pi). Tags: `latest` (neueste Version), `1.51.0` (feste Version),
+(für amd64 und arm64, z. B. Raspberry Pi). Tags: `latest` (neueste Version), `1.52.0` (feste Version),
 `1.40` (neuester Patch dieser Version). Das Image wird nur veröffentlicht, wenn sich die Versionsnummer ändert.
 Update-Prüfer wie Dockhand oder Watchtower melden deshalb nur dann ein Update, wenn es wirklich eine neue Version gibt.
 
@@ -277,6 +277,25 @@ bleibt sie Basisordner, sonst wird der gemeinsame Elternordner zur Quelle.
   Auswahl aus** (seit 1.27.0): Die gewählten Ordner und Dateien landen direkt im Ziel, z. B. Quelle
   `NAS:share` mit Auswahl `10-Temp/` und Ziel `Familie-NAS:share` ergibt `Familie-NAS:share/10-Temp`.
 - Leeres Feld = der ganze Quellordner wie bisher.
+
+## Zeitfenster (seit 1.52.0)
+In jeder Aufgabe unter **Zeitfenster**: „Nur in einem Zeitfenster laufen lassen“, Beginn, Ende und Wochentage, z. B.
+Mo–Fr 22:00 bis 06:00.
+
+- Starts per Zeitplan, Live und Kette passieren nur im Fenster. Fällt ein Start in die Zeit außerhalb, merkt sich
+  MirrorSync das und startet die Aufgabe, sobald das Fenster aufgeht („wartet auf Zeitfenster“ in der Übersicht).
+  Live-Runden außerhalb entfallen einfach.
+- Geht das Fenster über Mitternacht, zählt der Wochentag des Beginns. Gleicher Beginn und gleiches Ende = 24 Stunden.
+- **Am Fensterende**, wenn die Aufgabe noch läuft, wählbar:
+  - *Bis zum Ende durchlaufen lassen*
+  - *Anhalten und im nächsten Fenster weitermachen:* rclone wird sauber beendet, im nächsten Fenster startet die
+    Aufgabe von selbst wieder, schon Kopiertes wird übersprungen.
+  - *Anhalten, erst der nächste reguläre Start läuft wieder*
+  Im Verlauf steht dann „🕘 Zeitfenster zu Ende“. Dafür gibt es keine Benachrichtigung und keine Folgeaufgaben.
+- Von Hand gestartete Läufe außerhalb des Fensters laufen immer durch.
+- API/MCP: Feld `window` bei `create_job`/`update_job`: `{"start": "22:00", "end": "06:00", "days": [0,1,2,3,4],
+  "mode": "resume"}` (0 = Montag, `mode`: `finish`, `resume`, `stop`), `null` schaltet es ab. `window_wait` zeigt, ob
+  die Aufgabe gerade auf das Fenster wartet.
 
 ## Duplizieren, Protokoll wechseln, Spiegeln ohne Löschen (seit 1.51.0)
 - **Aufgabe duplizieren:** „⧉“ in der Übersicht oder „⧉ Duplizieren“ in der Aufgabe. Die Kopie heißt „Name (Kopie)“,
@@ -868,7 +887,7 @@ MirrorSync kann sich selbst aktualisieren, wenn du den Docker-Socket in den Cont
   sie entfernt und die bisherige läuft wieder. Ergebnis und Ablauf stehen in der GUI, im Audit-Log
   („Update gestartet / abgeschlossen / fehlgeschlagen“) und in `config/selfupdate.json`.
 - **Voraussetzungen:** Das Image muss aus einem Registry kommen (`image: ghcr.io/dermilderjoghurt/mirrorsync:latest`).
-  Mit `build: .` gebaute Images kann MirrorSync nicht neu holen. Mit festem Versions-Tag (`:1.51.0`) wird nur dieser
+  Mit `build: .` gebaute Images kann MirrorSync nicht neu holen. Mit festem Versions-Tag (`:1.52.0`) wird nur dieser
   Tag neu geholt. `/config` muss als Volume oder Ordner eingebunden sein (ist es in der Beispiel-Compose).
 - **Recht:** `system.update` („MirrorSync aktualisieren“, Admins haben es automatisch). Automatik und Uhrzeit
   ändern braucht `system.settings`.

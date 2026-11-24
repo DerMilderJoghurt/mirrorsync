@@ -38,6 +38,7 @@ import i18n
 import update
 import selfupdate
 import preview
+import window as timewin
 import ipguard
 import msgtpl
 import notify
@@ -133,6 +134,8 @@ app.jinja_env.globals["STATUS"] = {"ok": "OK", "fehler": "Fehler", "laeuft": "l�
 _lock = threading.RLock()
 _running = {}  # job_id -> subprocess.Popen
 _current_run = {}  # job_id -> run_id des laufenden Laufs
+_win_started = {}  # job_id -> True, wenn der laufende Lauf innerhalb seines Zeitfensters gestartet wurde
+_win_stop = {}     # job_id -> "resume"/"stop": am Fensterende angehalten
 scheduler = BackgroundScheduler(timezone=TZ)
 
 
@@ -783,6 +786,14 @@ def _watch(job_id, job, proc, logf, started, dry, by, run_id, log_path, mode="fu
             logf.write("\n=== Eine Seite fehlt oder ist leer, z. B. weil ein Laufwerk nicht eingehängt ist. Zum Schutz wurde "
                        "abgebrochen, angelegt oder gelöscht wurde nichts. Prüfe beide Seiten und klicke dann auf "
                        "„Neu zusammenführen“. ===\n")
+    win_stop = _win_stop.pop(job_id, None) if rc in (-15, 143) else None
+    _win_stop.pop(job_id, None)
+    _win_started.pop(job_id, None)
+    if win_stop == "resume":
+        logf.write("\n=== Zeitfenster zu Ende: angehalten. Im nächsten Zeitfenster geht es weiter, schon Kopiertes wird "
+                   "dabei übersprungen. ===\n")
+    elif win_stop:
+        logf.write("\n=== Zeitfenster zu Ende: angehalten. Der nächste reguläre Start läuft wieder. ===\n")
     duration = int(time.time() - started)
     logf.write(f"\n=== Ende: {datetime.datetime.now():%Y-%m-%d %H:%M:%S}, Code {rc}, Dauer {duration}s ===\n")
     logf.close()
@@ -831,6 +842,10 @@ def _watch(job_id, job, proc, logf, started, dry, by, run_id, log_path, mode="fu
                 }
                 if delta:
                     entry["mode"] = "live"
+                if win_stop:
+                    entry["window"] = win_stop
+                    if win_stop == "resume":
+                        j["window_wait"] = "resume"
                 j.update(last_status=status, last_run=entry["start"], history=[entry] + j.get("history", []))
             elif j.get("last_status") == "laeuft":
                 j["last_status"] = "fehler" if repeat else (j.get("history") or [{}])[0].get("status", "ok")
@@ -841,6 +856,9 @@ def _watch(job_id, job, proc, logf, started, dry, by, run_id, log_path, mode="fu
         except OSError:
             pass
         return
+    if win_stop:
+        cleanup_logs(job_id)
+        return   # planmaessig am Fensterende angehalten: keine Benachrichtigung, keine Folgeaufgaben
     if not delta or notify_now and status == "fehler":
         send_notifications(job_id, job, status, duration, dry, log_path, by, mode)
     if not delta or mode == "livesync":    # Live wie Spiegeln: Folgeaufgaben nach jeder Runde mit Aenderungen
@@ -859,6 +877,15 @@ def start_job(job_id, dry_run=False, by="Zeitplan", mode="full", manual=False, r
             return False
         if is_paused(job) and not manual:
             return False   # pausiert: kein Start per Zeitplan, Live oder Kette
+        wcfg = job.get("window")
+        if wcfg and not manual and not timewin.inside(wcfg):
+            # ausserhalb des Zeitfensters: Live-Runden entfallen, alles andere startet, sobald das Fenster aufgeht
+            if mode != "delta" and not dry_run and not job.get("window_wait"):
+                jobs_w = load_jobs()
+                if job_id in jobs_w:
+                    jobs_w[job_id]["window_wait"] = "deferred"
+                    save_jobs(jobs_w)
+            return False
         max_age = None
         if mode == "delta" and job.get("dry_run"):
             return False   # "nur Testlauf": Live-Runden auslassen, nur der volle Abgleich laeuft als Test
@@ -925,10 +952,29 @@ def start_job(job_id, dry_run=False, by="Zeitplan", mode="full", manual=False, r
         proc = subprocess.Popen(cmd, stdout=logf, stderr=subprocess.STDOUT)
         _running[job_id] = proc
         _current_run[job_id] = run_id
-        update_job(job_id, last_status="laeuft")
+        _win_started[job_id] = bool(wcfg) and timewin.inside(wcfg) and not dry
+        update_job(job_id, last_status="laeuft", window_wait="")
     threading.Thread(target=_watch, args=(job_id, job, proc, logf, time.time(), dry, by, run_id, log_path, mode),
                      daemon=True).start()
     return True
+
+
+def window_tick(now=None):
+    """Jede Minute: wartende Aufgaben im Zeitfenster starten, laufende am Fensterende anhalten."""
+    now = now or datetime.datetime.now()
+    for jid, j in load_jobs().items():
+        cfg = j.get("window")
+        if not cfg:
+            continue
+        ins = timewin.inside(cfg, now)
+        if ins and j.get("window_wait") and jid not in _running:
+            if j.get("enabled") and not is_paused(j):
+                start_job(jid, by="Zeitfenster (fortgesetzt)" if j["window_wait"] == "resume" else "Zeitfenster (verschoben)")
+            else:
+                update_job(jid, window_wait="")
+        elif not ins and jid in _running and cfg.get("mode") in ("resume", "stop") and _win_started.get(jid):
+            _win_stop[jid] = cfg["mode"]
+            stop_job(jid)
 
 
 def stop_job(job_id):
@@ -1034,6 +1080,7 @@ def schedule_all():
     for j in scheduler.get_jobs():
         j.remove()
     scheduler.add_job(resume_expired, IntervalTrigger(minutes=1, timezone=TZ), id="_resume", coalesce=True, max_instances=1)
+    scheduler.add_job(window_tick, CronTrigger(second=5, timezone=TZ), id="_window", coalesce=True, max_instances=1)
     st = load_settings()
     if geoip_scheduled(st):
         h, m = (st.get("geoip_time") or "03:00").split(":")
@@ -2123,7 +2170,8 @@ def index():
                          followers=[visible[c]["name"] for c in sorted(children.get(job_id, []), key=by_name)],
                          schedule_text=cron_text(job.get("schedule", "")),
                          live_text=live_text(job) if trig == "live" else "", is_paused=is_paused(job),
-                         pause_text=pause_text(job),
+                         pause_text=pause_text(job), window_text=timewin.describe(job.get("window"), i18n.translate),
+                         window_open=(lambda t: t.strftime("%d.%m. %H:%M") if t else "")(timewin.next_open(job.get("window"))) if job.get("window_wait") and job.get("window") else "",
                          live_full_text=live_full_text(job) if trig == "live" else "",
                          direction="bisync" if is_bisync(job) else "mirror", **next_start_view(jobs, job_id)))
     return render_template("index.html", jobs=rows, auto_refresh=bool(_running))
@@ -2367,6 +2415,14 @@ def apply_job_form(f, job, old, job_id, jobs, api=False):
         cw_err = i18n.t("Toleranz: bitte 1 bis {0} Sekunden angeben.", COMPARE_WINDOW_MAX)
     job["compare_window"] = cw if cw.isdigit() else "2"
     job["speed"] = f.get("speed") if f.get("speed") in SPEEDS else "normal"
+    win_err = None
+    if "window_on" in f:
+        job["window"], win_err = timewin.clean({
+            "start": f.get("window_start"), "end": f.get("window_end"), "mode": f.get("window_mode"),
+            "days": [d for d in timewin.ALL_DAYS if f"window_day_{d}" in f]})
+    else:
+        job.pop("window", None)
+        job["window_wait"] = ""
     if job["trigger"] != "time":
         job["schedule"] = old.get("schedule", "") if job_id else ""
     if job["trigger"] != "after":
@@ -2439,6 +2495,8 @@ def apply_job_form(f, job, old, job_id, jobs, api=False):
         error = twoway_err
     elif cw_err:
         error = cw_err
+    elif win_err:
+        error = win_err
     elif not g.access.path_ok(job["source"]) or not g.access.path_ok(job["dest"]):
         error = "Deine Rolle darf diesen Speicherort bzw. lokale Ordner nicht verwenden."
     elif any(".." in x.strip().split("/") for x in f.get("selection", "").splitlines()):
@@ -2687,7 +2745,7 @@ def delete_job(job_id):
 
 # Beim Duplizieren nicht mitkopiert: Verlauf, Laufzustand, Zwei-Wege-Status und Live-Zustand
 DUP_SKIP = ("history", "last_status", "last_run", "bisync_ready", "bisync_need_resync", "live_state", "live_last",
-            "paused_by", "owner")
+            "live_checked", "live_failing", "live_fail_count", "window_wait", "paused_by", "owner")
 
 
 def duplicate_job_data(job_id, name=None, user=None):

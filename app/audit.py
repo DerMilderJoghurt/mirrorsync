@@ -18,7 +18,7 @@ CATEGORIES = {
 SECRET_RE = re.compile(r"(pass|secret|token|apprise_urls|hash|backup_codes|private|key$|key_|_key|bearer|cookie|session)", re.I)
 # Felder, die sich im Betrieb von selbst aendern und keine Benutzeraktion sind
 NOISE = {
-    "job": {"history", "last_status", "last_run", "live_last", "live_checked", "live_failing", "live_fail_count", "bisync_ready", "bisync_need_resync"},
+    "job": {"history", "last_status", "last_run", "live_last", "live_checked", "live_failing", "live_fail_count", "bisync_ready", "bisync_need_resync", "window_wait"},
     "user": {"last_login", "last_ip", "last_country", "last_flag", "fail_count", "auto_lock_until", "sv", "created", "totp_last", "passkeys", "webauthn_id"},
     "remote": set(), "role": set(), "group": set(), "apikey": set(), "settings": {"selfupdate_last_auto", "update_notified"}, "access": set(),
 }
@@ -30,7 +30,7 @@ LABELS = {
     "autobackup_logs": "Logs mitsichern", "autobackup_password": "Sicherungs-Passwort", "autobackup_notify": "Sicherung melden",
     "autobackup_notify_skip": "auch ohne Änderung melden", "autobackup_channels": "Sicherung: Kanäle", "language": "Sprache", "lang": "Sprache",
     "name": "Name", "source": "Quelle", "dest": "Ziel", "schedule": "Zeitplan", "enabled": "aktiv", "dry_run": "nur Testlauf",
-    "versioning": "Versionierung", "checksum": "Prüfsumme", "no_delete": "Im Ziel nichts löschen", "compare": "Änderung erkennen an", "compare_window": "Toleranz (Sekunden)", "speed": "Tempo", "max_delete": "max. Löschungen", "extra_flags": "zusätzliche Optionen",
+    "versioning": "Versionierung", "checksum": "Prüfsumme", "no_delete": "Im Ziel nichts löschen", "window": "Zeitfenster", "compare": "Änderung erkennen an", "compare_window": "Toleranz (Sekunden)", "speed": "Tempo", "max_delete": "max. Löschungen", "extra_flags": "zusätzliche Optionen",
     "excludes": "Ausschlüsse", "selection": "Auswahl", "delete_excluded": "Ausgeschlossenes löschen", "include_source_dir": "Quellordner mitkopieren",
     "trigger": "Startart", "after_job": "nach Aufgabe", "after_when": "Bedingung", "live_interval": "Live-Intervall (Min.)",
     "live_full": "voller Abgleich", "live_mode": "Live-Modus", "direction": "Art", "bisync_conflict": "Konfliktregel", "bisync_max_delete": "Löschschutz (%)", "bw_mode": "Bandbreite", "bw": "eigene Bandbreite", "notify_mode": "Benachrichtigung",
