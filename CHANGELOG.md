@@ -3,6 +3,13 @@
 Version numbers follow [SemVer](https://semver.org/): MAJOR.MINOR.PATCH
 (MAJOR = incompatible change, MINOR = new feature, PATCH = bug fix).
 
+## 1.55.0 – 2026-11-24
+- **Arrange the dashboard freely:** drag the bottom right corner of any tile to change its width (1–12 columns) and
+  height (1–24 rows). Smaller tiles move into free gaps automatically, e.g. two half-height tiles stacked next to a big
+  one. Content that does not fit scrolls inside the tile. Layouts from 1.54.0 are taken over.
+- API/MCP: `update_dashboard` takes `w` and `h` per tile (instead of `size`), `get_dashboard` returns them. All 5
+  languages.
+
 ## 1.54.0 – 2026-11-24
 - **Dashboard** (new, at the top of the sidebar) with tiles: running jobs, overview, jobs with errors, last 10 runs,
   next 10 starts, last 10 logins, last 10 changes (audit log), system. Refreshes every 5 seconds. With "Customize" you

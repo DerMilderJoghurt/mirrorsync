@@ -2432,8 +2432,8 @@ if(E)dropZone($('manual-drop'),el=>{const id=el.dataset.id;api('/schedules/job/'
 render();
 </script>
 {% endblock %}""",
-"dashboard_tiles.html": r"""{% for t in layout %}{% set x = d.get(t.id) %}<section class="dtile {{ 'wide' if t.size == 'w' }}" data-id="{{ t.id }}" data-size="{{ t.size }}">
-<div class="dhead"><span class="dgrip" title="Ziehen zum Verschieben">⠿</span><h3>{{ _(titles[t.id][0]) }}</h3><span style="flex:1"></span><span class="dedit"><button type="button" class="btn sm" onclick="dMove(this,-1)" title="Nach vorne">↑</button><button type="button" class="btn sm" onclick="dMove(this,1)" title="Nach hinten">↓</button><button type="button" class="btn sm" onclick="dSize(this)" title="Schmal oder breit">⇔</button><button type="button" class="btn sm del" onclick="dHide(this)" title="Ausblenden">✕</button></span></div>
+"dashboard_tiles.html": r"""{% for t in layout %}{% set x = d.get(t.id) %}<section class="dtile" data-id="{{ t.id }}" data-w="{{ t.w }}" data-h="{{ t.h }}" style="grid-column:span {{ t.w }};grid-row:span {{ t.h }}">
+<div class="dhead"><span class="dgrip" title="Ziehen zum Verschieben">⠿</span><h3>{{ _(titles[t.id][0]) }}</h3><span style="flex:1"></span><span class="dedit"><button type="button" class="btn sm" onclick="dMove(this,-1)" title="Nach vorne">↑</button><button type="button" class="btn sm" onclick="dMove(this,1)" title="Nach hinten">↓</button><small class="dsz mut"></small><button type="button" class="btn sm del" onclick="dHide(this)" title="Ausblenden">✕</button></span></div><span class="dres" title="Ziehen, um Breite und Höhe zu ändern"></span>
 <div class="dbody">
 {% if t.id == "running" %}{% if x %}{% for r in x %}<div class="drun"><div class="dline"><a href="/job/{{ r.id }}/run/{{ r.run }}"><b>{{ r.name }}</b></a><span class="mut"><span>seit</span> {{ r.started }}</span><span style="flex:1"></span><b>{{ r.progress }} %</b></div><div class="fmpbar" style="flex:none;width:100%"><i style="width:{{ r.progress }}%"></i></div>{% if r.stats %}<small class="mut">{{ r.stats }}</small>{% endif %}</div>{% endfor %}{% else %}<p class="mut">Gerade läuft nichts.</p>{% endif %}
 {% elif t.id == "stats" %}<div class="dstats"><a href="/"><b>{{ x.jobs }}</b><span>Aufgaben</span></a><a href="/"><b>{{ x.enabled }}</b><span>eingeschaltet</span></a><a href="/"><b class="laeuft">{{ x.running }}</b><span>laufen</span></a><a href="/"><b>{{ x.paused }}</b><span>pausiert</span></a><a href="/"><b class="{{ 'fehler' if x.failed }}">{{ x.failed }}</b><span>mit Fehler</span></a><a href="/remotes"><b>{{ x.remotes }}</b><span>Speicherorte</span></a></div>
@@ -2447,11 +2447,13 @@ render();
 "dashboard.html": r"""{% extends "base.html" %}{% block title %}Dashboard{% endblock %}
 {% block actions %}<button type="button" class="btn" id="dEditBtn" onclick="dEdit(true)">Anpassen</button>{% endblock %}
 {% block body %}<style>
-.dgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:14px;align-items:start}
-.dtile{background:var(--card);border:1px solid var(--bd);border-radius:12px;box-shadow:var(--shadow);min-width:0}
-.dtile.wide{grid-column:span 2}@media(max-width:820px){.dtile.wide{grid-column:auto}}
-.dhead{display:flex;align-items:center;gap:8px;padding:12px 16px 4px}.dhead h3{margin:0;font-size:15px}
-.dbody{padding:4px 16px 14px;overflow-x:auto}.dbody table{width:100%}.dbody td,.dbody th{padding:5px 6px}
+.dgrid{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));grid-auto-rows:40px;grid-auto-flow:row dense;gap:14px}
+.dtile{background:var(--card);border:1px solid var(--bd);border-radius:12px;box-shadow:var(--shadow);min-width:0;min-height:0;display:flex;flex-direction:column;position:relative;overflow:hidden}
+.dhead{display:flex;align-items:center;gap:8px;padding:12px 16px 4px;flex:none}.dhead h3{margin:0;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dbody{padding:4px 16px 14px;overflow:auto;flex:1;min-height:0}
+.dres{display:none;position:absolute;right:0;bottom:0;width:22px;height:22px;cursor:nwse-resize;touch-action:none;background:linear-gradient(135deg,transparent 50%,var(--acc) 50%);border-bottom-right-radius:12px}
+.dgrid.editing .dres{display:block}.dgrid.editing .dtile.rs{outline-color:var(--acc)}.dsz{min-width:44px;text-align:right}
+@media(max-width:820px){.dgrid{grid-template-columns:1fr;grid-auto-rows:auto}.dtile{grid-column:1/-1!important;grid-row:auto!important}.dtile .dbody{max-height:420px}.dres,.dsz{display:none!important}}.dbody table{width:100%}.dbody td,.dbody th{padding:5px 6px}
 .dgrip,.dedit{display:none}.dgrid.editing .dgrip{display:inline;cursor:grab;color:var(--mut)}.dgrid.editing .dedit{display:inline-flex;gap:4px}
 .dgrid.editing .dtile{outline:2px dashed var(--bd2);outline-offset:-2px}.dgrid.editing .dtile.drag{opacity:.4}
 .drun{padding:6px 0;border-bottom:1px solid var(--bd)}.drun:last-child{border-bottom:0}.dline{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;margin-bottom:4px}
@@ -2459,26 +2461,31 @@ render();
 .dstats a:hover{background:var(--acc-soft)}.dstats b{font-size:22px}.dstats span{color:var(--mut);font-size:12px}
 #dbar{display:none;margin-bottom:14px}#dbar.on{display:block}.dadd{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
 </style>
-<div class="card" id="dbar"><b>Dashboard anpassen</b> <span class="mut">Kacheln ziehen oder mit ↑ ↓ verschieben, mit ⇔ schmal oder breit stellen, mit ✕ ausblenden.</span>
+<div class="card" id="dbar"><b>Dashboard anpassen</b> <span class="mut">Kacheln ziehen oder mit ↑ ↓ verschieben, an der Ecke unten rechts größer oder kleiner ziehen, mit ✕ ausblenden. Kleine Kacheln rücken automatisch in freie Lücken, z. B. zwei halb so hohe untereinander neben eine große.</span>
 <div class="dadd" id="dadd"></div>
 <p style="margin:12px 0 0"><button type="button" class="btn pri" onclick="dSave()">Speichern</button> <button type="button" class="btn" onclick="location.reload()">Abbrechen</button> <button type="button" class="btn" onclick="dReset()">Standard wiederherstellen</button></p></div>
 <div class="dgrid" id="dgrid">{% include "dashboard_tiles.html" %}</div>
 {% if not layout %}<div class="card empty" id="dempty"><p>Keine Kacheln ausgewählt. Mit „Anpassen“ Kacheln hinzufügen.</p></div>{% endif %}
 <script>
 const CAT={{ catalog|tojson }};let editing=false,dragEl=null;const G=document.getElementById('dgrid');
-function dTiles(){return [...G.querySelectorAll('.dtile')].map(t=>({id:t.dataset.id,size:t.dataset.size}))}
+function dTiles(){return [...G.querySelectorAll('.dtile')].map(t=>({id:t.dataset.id,w:+t.dataset.w,h:+t.dataset.h}))}
+function dSet(t,w,h){t.dataset.w=w;t.dataset.h=h;t.style.gridColumn='span '+w;t.style.gridRow='span '+h;const z=t.querySelector('.dsz');if(z)z.textContent=w+' × '+h}
+function dRes(t){const hd=t.querySelector('.dres');if(!hd||hd.dataset.on)return;hd.dataset.on=1;
+ hd.onpointerdown=e=>{if(!editing)return;e.preventDefault();e.stopPropagation();hd.setPointerCapture(e.pointerId);t.draggable=false;t.classList.add('rs');
+  const gs=getComputedStyle(G),gap=parseFloat(gs.columnGap)||14,cw=(G.clientWidth-11*gap)/12+gap,rh=40+(parseFloat(gs.rowGap)||14),x0=e.clientX,y0=e.clientY,w0=+t.dataset.w,h0=+t.dataset.h;
+  hd.onpointermove=m=>dSet(t,Math.max(1,Math.min(12,Math.round(w0+(m.clientX-x0)/cw))),Math.max(1,Math.min(24,Math.round(h0+(m.clientY-y0)/rh))));
+  hd.onpointerup=()=>{hd.onpointermove=null;hd.onpointerup=null;t.classList.remove('rs');t.draggable=editing}}}
 function dAddList(){const have=new Set(dTiles().map(t=>t.id)),box=document.getElementById('dadd');box.innerHTML='';
  CAT.filter(c=>!have.has(c.id)).forEach(c=>{const b=document.createElement('button');b.type='button';b.className='btn sm';b.textContent='+ '+c.title;b.title=c.description;b.onclick=()=>dAdd(c);box.appendChild(b)});
  if(!box.children.length){box.innerHTML='<span class="mut">'+"Alle Kacheln sind schon zu sehen."+'</span>'}}
-function dAdd(c){const s=document.createElement('section');s.className='dtile'+(c.size=='w'?' wide':'');s.dataset.id=c.id;s.dataset.size=c.size;
- s.innerHTML='<div class="dhead"><span class="dgrip">⠿</span><h3></h3><span style="flex:1"></span><span class="dedit"><button type="button" class="btn sm" onclick="dMove(this,-1)">↑</button><button type="button" class="btn sm" onclick="dMove(this,1)">↓</button><button type="button" class="btn sm" onclick="dSize(this)">⇔</button><button type="button" class="btn sm del" onclick="dHide(this)">✕</button></span></div><div class="dbody"><p class="mut">'+"Wird nach dem Speichern angezeigt."+'</p></div>';
- s.querySelector('h3').textContent=c.title;G.appendChild(s);dDrag(s);dAddList();const e=document.getElementById('dempty');if(e)e.remove()}
+function dAdd(c){const s=document.createElement('section');s.className='dtile';s.dataset.id=c.id;
+ s.innerHTML='<div class="dhead"><span class="dgrip">⠿</span><h3></h3><span style="flex:1"></span><span class="dedit"><button type="button" class="btn sm" onclick="dMove(this,-1)">↑</button><button type="button" class="btn sm" onclick="dMove(this,1)">↓</button><small class="dsz mut"></small><button type="button" class="btn sm del" onclick="dHide(this)">✕</button></span></div><div class="dbody"><p class="mut">'+"Wird nach dem Speichern angezeigt."+'</p></div><span class="dres"></span>';
+ s.querySelector('h3').textContent=c.title;G.appendChild(s);dSet(s,c.w,c.h);dDrag(s);dRes(s);dAddList();const e=document.getElementById('dempty');if(e)e.remove()}
 function dMove(b,dir){const t=b.closest('.dtile');if(dir<0&&t.previousElementSibling)G.insertBefore(t,t.previousElementSibling);else if(dir>0&&t.nextElementSibling)G.insertBefore(t.nextElementSibling,t)}
-function dSize(b){const t=b.closest('.dtile');t.dataset.size=t.dataset.size=='w'?'s':'w';t.classList.toggle('wide',t.dataset.size=='w')}
 function dHide(b){b.closest('.dtile').remove();dAddList()}
-function dDrag(t){t.draggable=editing;t.ondragstart=e=>{dragEl=t;t.classList.add('drag');e.dataTransfer.effectAllowed='move'};t.ondragend=()=>{t.classList.remove('drag');dragEl=null};
+function dDrag(t){t.draggable=editing;t.ondragstart=e=>{dragEl=t;t.classList.add('drag');e.dataTransfer.effectAllowed='move';try{e.dataTransfer.setData('text/plain',t.dataset.id)}catch(x){}};t.ondragend=()=>{t.classList.remove('drag');dragEl=null};
  t.ondragover=e=>{if(!dragEl||dragEl===t)return;e.preventDefault();const r=t.getBoundingClientRect(),after=(e.clientY-r.top)>r.height/2||(e.clientX-r.left)>r.width*0.66;G.insertBefore(dragEl,after?t.nextSibling:t)}}
-function dEdit(on){editing=on;G.classList.toggle('editing',on);document.getElementById('dbar').classList.toggle('on',on);document.getElementById('dEditBtn').style.display=on?'none':'';G.querySelectorAll('.dtile').forEach(dDrag);if(on)dAddList()}
+function dEdit(on){editing=on;G.classList.toggle('editing',on);document.getElementById('dbar').classList.toggle('on',on);document.getElementById('dEditBtn').style.display=on?'none':'';G.querySelectorAll('.dtile').forEach(t=>{dDrag(t);dRes(t);dSet(t,+t.dataset.w,+t.dataset.h)});if(on)dAddList()}
 async function dPost(body){const r=await fetch('/dashboard/layout',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify(body)});const j=await r.json().catch(()=>({}));if(!r.ok||!j.ok){alert(j.error||r.status);return}location.reload()}
 function dSave(){dPost({tiles:dTiles()})}
 function dReset(){dPost({reset:true})}

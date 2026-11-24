@@ -800,7 +800,8 @@ def a_update_update_settings(a):
 
 
 @action("get_dashboard", "GET", "/dashboard", None, "Dashboard",
-        "Dashboard des angemeldeten Benutzers bzw. API-Keys: tiles (Reihenfolge, size s = schmal, w = breit), data (Inhalt "
+        "Dashboard des angemeldeten Benutzers bzw. API-Keys: tiles (Reihenfolge, w = Breite 1–12 Spalten, h = Höhe 1–24 "
+        "Zeilen zu 40 px; kleinere Kacheln rücken in freie Lücken), data (Inhalt "
         "jeder Kachel: running, stats, failed, last_runs, next_runs, logins = letzte 10 Anmeldungen, audit, system) und "
         "available (alle Kacheln, für die das Recht reicht). Kacheln ohne passendes Recht fehlen.", ro=True)
 def a_get_dashboard(a):
@@ -810,10 +811,12 @@ def a_get_dashboard(a):
 
 @action("update_dashboard", "PUT", "/dashboard", None, "Dashboard",
         "Kacheln des Dashboards festlegen (wie „Anpassen“ in der GUI): tiles = Liste in der gewünschten Reihenfolge, je "
-        "{id, size} (size s oder w) oder nur die id. Nicht genannte Kacheln werden ausgeblendet. reset=true stellt den "
+        "{id, w, h} (w = Breite 1–12 Spalten, h = Höhe 1–24 Zeilen, fehlt eins, gilt der Standard der Kachel) oder nur die id. "
+        "Kleinere Kacheln rücken automatisch in freie Lücken. Nicht genannte Kacheln werden ausgeblendet. reset=true stellt den "
         "Standard wieder her. Gilt für den angemeldeten Benutzer bzw. API-Key.",
         {"tiles": dict(type="array", items={"type": "object", "properties": {"id": {"type": "string"},
-                                                                              "size": {"type": "string", "enum": ["s", "w"]}}}),
+                                                                              "w": {"type": "integer", "minimum": 1, "maximum": 12},
+                                                                              "h": {"type": "integer", "minimum": 1, "maximum": 24}}}),
          "reset": S(BOOL)})
 def a_update_dashboard(a):
     _check_keys(a, ("tiles", "reset"))
