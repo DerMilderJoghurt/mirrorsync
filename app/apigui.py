@@ -835,9 +835,9 @@ _TAB = {"type": "object", "properties": {"id": {"type": "string"}, "name": {"typ
         "Tab), name, tiles}; nicht genannte Tabs werden gelöscht. Oder tab (ID) + tiles = nur die Kacheln dieses Tabs; tiles "
         "ohne tab = erster Tab. Jede Kachel ist eine Vorlage (nur die id, z. B. \"running\") oder aus Bausteinen gebaut: "
         "{title, source, view, filters, w, h}. source: overview, running, jobs, runs, next_runs, logins, audit, storage, "
-        "system. view: number, list, bar, ampel (welche passen, steht in get_dashboard unter catalog). filters je nach Quelle: "
+        "system. view: number, spark, list, bar, stacked, pie, gauge, line, heatmap, timeline, ampel (welche passen, steht in get_dashboard unter catalog). filters je nach Quelle: "
         "jobs (Liste von Aufgaben-IDs), job_status, run_status, run_kind (real, dry), login_result (ok, fail), audit_cat, "
-        "period (1d, 7d, 30d), limit (1–50). Kleinere Kacheln rücken automatisch in freie Lücken. reset=true stellt den "
+        "period (1d, 7d, 30d, 90d, 365d), metric (count, bytes, duration, copied, deleted, errors; für line und spark), limit (1–50). Kleinere Kacheln rücken automatisch in freie Lücken. reset=true stellt den "
         "Standard wieder her (ein Tab). Gilt für den angemeldeten Benutzer bzw. API-Key.",
         {"tabs": dict(type="array", items=_TAB), "tab": S(STR), "tiles": dict(type="array", items=_TILE), "reset": S(BOOL)})
 def a_update_dashboard(a):

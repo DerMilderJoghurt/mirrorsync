@@ -3,6 +3,16 @@
 Version numbers follow [SemVer](https://semver.org/): MAJOR.MINOR.PATCH
 (MAJOR = incompatible change, MINOR = new feature, PATCH = bug fix).
 
+## 1.57.0 – 2026-11-24
+- **New charts in the dashboard building blocks:** pie chart, line chart over time, stacked bars per day, gauge,
+  calendar heatmap, number with trend (sparkline) and a run timeline that shows overlaps. Only views that fit the data
+  source are offered.
+- New **metric** filter for runs (count, data transferred, run duration, files copied/deleted, errors) and new periods
+  of 90 and 365 days. The editor hides filters that don't fit the selected view.
+- The transferred data is stored per run (new "Transferred" column); older runs are read from the log.
+- New templates (e.g. "Runs today", "Success rate", "Run duration per day", "Runs in the calendar", "Timeline").
+- Sizes are now also shown in GB/TB. API/MCP (`update_dashboard`, `get_dashboard`) and all 5 languages updated.
+
 ## 1.56.0 – 2026-11-24
 - **Dashboard building blocks:** build tiles from a data source (overview, running jobs, jobs, runs, next starts,
   logins, audit log, disk space, system), a view (number, list, bars, status light) and filters (jobs, status, test

@@ -4,7 +4,7 @@
 
 # MirrorSync – 1:1-Spiegelung mit Web-GUI und Zeitplänen
 
-Version **1.56.0** · Änderungen siehe [CHANGELOG.md](CHANGELOG.md) (englisch) · [English version](README.md)
+Version **1.57.0** · Änderungen siehe [CHANGELOG.md](CHANGELOG.md) (englisch) · [English version](README.md)
 
 Ein Docker-Container, der Ordner **einweg 1:1 spiegelt** (wie FreeFileSync „Spiegeln"):
 Das Ziel wird exakt wie die Quelle, inklusive Löschungen. Als Sync-Motor dient
@@ -68,7 +68,7 @@ Geänderte Dateien werden komplett neu übertragen (kein Delta wie bei rsync).
 
 ## Installation
 Das fertige Image liegt in der GitHub Container Registry: `ghcr.io/dermilderjoghurt/mirrorsync`
-(für amd64 und arm64, z. B. Raspberry Pi). Tags: `latest` (neueste Version), `1.56.0` (feste Version),
+(für amd64 und arm64, z. B. Raspberry Pi). Tags: `latest` (neueste Version), `1.57.0` (feste Version),
 `1.40` (neuester Patch dieser Version). Das Image wird nur veröffentlicht, wenn sich die Versionsnummer ändert.
 Update-Prüfer wie Dockhand oder Watchtower melden deshalb nur dann ein Update, wenn es wirklich eine neue Version gibt.
 
@@ -277,6 +277,28 @@ bleibt sie Basisordner, sonst wird der gemeinsame Elternordner zur Quelle.
   Auswahl aus** (seit 1.27.0): Die gewählten Ordner und Dateien landen direkt im Ziel, z. B. Quelle
   `NAS:share` mit Auswahl `10-Temp/` und Ziel `Familie-NAS:share` ergibt `Familie-NAS:share/10-Temp`.
 - Leeres Feld = der ganze Quellordner wie bisher.
+
+## Diagramme im Dashboard (seit 1.57.0)
+Zusätzlich zu Zahl, Liste, Balken und Statusampel gibt es diese Darstellungen. Im Editor sind nur die wählbar, die zur
+Datenquelle passen:
+
+| Darstellung | Datenquellen | Zeigt |
+|---|---|---|
+| Tortendiagramm | Aufgaben, Läufe, Anmeldungen, Audit-Log, Speicherplatz | Anteile nach Status (bzw. Bereich), beim Speicherplatz belegt/frei je Laufwerk |
+| Liniendiagramm | Läufe, Anmeldungen, Audit-Log | Verlauf pro Tag (bei 24 Stunden pro Stunde). Bei Läufen wählbarer **Messwert**: Anzahl, übertragene Datenmenge, Laufdauer (Durchschnitt), kopierte/gelöschte Dateien, Fehler. Sind 2–8 Aufgaben gewählt, je Aufgabe eine Linie. |
+| Gestapelte Balken pro Tag | Läufe, Anmeldungen, Audit-Log | je Tag ein Balken, aufgeteilt nach OK, gestoppt, Fehler (bzw. Bereich) |
+| Tacho | Läufe, Anmeldungen, Aufgaben, Speicherplatz | Erfolgsquote, Anteil Aufgaben ohne Fehler, belegter Platz in Prozent (grün/gelb/rot) |
+| Kalender-Heatmap | Läufe, Anmeldungen, Audit-Log | ein Feld pro Tag wie bei GitHub: grün = alles OK, gelb = gestoppt, rot = Fehler, kräftiger = mehr Läufe |
+| Zahl mit Verlauf | Läufe, Anmeldungen, Audit-Log | Zahl mit kleiner Verlaufslinie dahinter, z. B. „Läufe heute: 12“ |
+| Zeitleiste | Läufe | je Aufgabe eine Zeile mit allen Läufen und ihrer Dauer; Läufe, die sich mit anderen Aufgaben überschneiden, sind rot umrandet und werden gezählt |
+
+Neue Zeiträume: 90 und 365 Tage. Ohne Zeitraum zeigen die Diagramme die letzten 30 Tage (Heatmap 90 Tage, Zeitleiste
+24 Stunden). Fertige Vorlagen: „Läufe heute“, „Erfolgsquote (30 Tage)“, „Übertragene Datenmenge pro Tag“,
+„Laufdauer pro Tag“, „Läufe pro Tag“, „Läufe nach Status“, „Läufe im Kalender“, „Zeitleiste der Läufe“ und ein Tacho
+für den Speicherplatz.
+
+Die übertragene Datenmenge wird ab 1.57.0 bei jedem Lauf gespeichert (Spalte „Übertragen“ in der Liste der Läufe). Für
+ältere Läufe liest MirrorSync sie aus dem vorhandenen Log.
 
 ## Dashboard-Baukasten und Tabs (seit 1.56.0)
 Jede Kachel besteht aus drei Bausteinen, ähnlich wie die selbst zusammengestellten Benachrichtigungen:
@@ -957,7 +979,7 @@ MirrorSync kann sich selbst aktualisieren, wenn du den Docker-Socket in den Cont
   sie entfernt und die bisherige läuft wieder. Ergebnis und Ablauf stehen in der GUI, im Audit-Log
   („Update gestartet / abgeschlossen / fehlgeschlagen“) und in `config/selfupdate.json`.
 - **Voraussetzungen:** Das Image muss aus einem Registry kommen (`image: ghcr.io/dermilderjoghurt/mirrorsync:latest`).
-  Mit `build: .` gebaute Images kann MirrorSync nicht neu holen. Mit festem Versions-Tag (`:1.56.0`) wird nur dieser
+  Mit `build: .` gebaute Images kann MirrorSync nicht neu holen. Mit festem Versions-Tag (`:1.57.0`) wird nur dieser
   Tag neu geholt. `/config` muss als Volume oder Ordner eingebunden sein (ist es in der Beispiel-Compose).
 - **Recht:** `system.update` („MirrorSync aktualisieren“, Admins haben es automatisch). Automatik und Uhrzeit
   ändern braucht `system.settings`.

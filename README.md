@@ -4,7 +4,7 @@
 
 # MirrorSync – 1:1 mirroring with a web GUI and schedules
 
-Version **1.56.0** · Changes: [CHANGELOG.md](CHANGELOG.md) · [Deutsche Version](README.de.md)
+Version **1.57.0** · Changes: [CHANGELOG.md](CHANGELOG.md) · [Deutsche Version](README.de.md)
 
 A Docker container that **mirrors folders one-way, 1:1** (like FreeFileSync "Mirror"):
 the destination becomes an exact copy of the source, including deletions. The sync engine is
@@ -67,7 +67,7 @@ Changed files are transferred completely (no delta transfer like rsync).
 
 ## Installation
 The ready-made image is in the GitHub Container Registry: `ghcr.io/dermilderjoghurt/mirrorsync`
-(for amd64 and arm64, e.g. Raspberry Pi). Tags: `latest` (newest version), `1.56.0` (fixed version),
+(for amd64 and arm64, e.g. Raspberry Pi). Tags: `latest` (newest version), `1.57.0` (fixed version),
 `1.40` (newest patch of this version). The image is only published when the version number changes, so
 update checkers such as Dockhand or Watchtower only report an update when there really is a new version.
 
@@ -271,6 +271,29 @@ the base folder, otherwise the common parent folder becomes the source.
   (since 1.27.0): the selected folders and files go directly into the destination, e.g. source `NAS:share`
   with selection `10-Temp/` and destination `Family-NAS:share` gives `Family-NAS:share/10-Temp`.
 - Empty field = the whole source folder.
+
+## Dashboard charts (since 1.57.0)
+In addition to number, list, bars and status light there are these views. The editor only offers the ones that fit the
+data source:
+
+| View | Data sources | Shows |
+|---|---|---|
+| Pie chart | jobs, runs, logins, audit log, disk space | shares by status (or area), for disk space used/free per drive |
+| Line chart | runs, logins, audit log | values per day (per hour for 24 hours). For runs a selectable **metric**: count, data transferred, run duration (average), files copied/deleted, errors. With 2–8 jobs selected, one line per job. |
+| Stacked bars per day | runs, logins, audit log | one bar per day, split into OK, stopped, error (or area) |
+| Gauge | runs, logins, jobs, disk space | success rate, share of jobs without errors, used space in percent (green/yellow/red) |
+| Calendar heatmap | runs, logins, audit log | one square per day like on GitHub: green = all OK, yellow = stopped, red = error, stronger = more runs |
+| Number with trend | runs, logins, audit log | a number with a small sparkline, e.g. "Runs today: 12" |
+| Timeline | runs | one row per job with all runs and their duration; runs that overlap with other jobs get a red outline and are counted |
+
+New periods: 90 and 365 days. Without a period the charts show the last 30 days (heatmap 90 days, timeline 24 hours).
+Ready-made templates: "Runs today", "Success rate (30 days)", "Data transferred per day", "Run duration per day",
+"Runs per day", "Runs by status", "Runs in the calendar", "Run timeline" and a gauge for disk space.
+
+From 1.57.0 the transferred data is stored with every run ("Transferred" column in the list of runs). For older runs
+MirrorSync reads it from the existing log.
+
+![Dashboard charts](docs/screenshots/dashboard-charts.png)
 
 ## Dashboard building blocks and tabs (since 1.56.0)
 Every tile is made of three building blocks, similar to the self-assembled notifications:
@@ -933,7 +956,7 @@ MirrorSync can update itself if you mount the Docker socket into the container:
   previous one runs again. Result and steps are shown in the GUI, in the audit log ("Update started / completed /
   failed") and in `config/selfupdate.json`.
 - **Requirements:** the image has to come from a registry (`image: ghcr.io/dermilderjoghurt/mirrorsync:latest`).
-  MirrorSync cannot pull images built with `build: .`. With a fixed version tag (`:1.56.0`) only that tag is pulled
+  MirrorSync cannot pull images built with `build: .`. With a fixed version tag (`:1.57.0`) only that tag is pulled
   again. `/config` has to be a volume or bind mount (it is in the example compose file).
 - **Permission:** `system.update` ("Update MirrorSync", admins have it automatically). Changing the automatic
   update and its time needs `system.settings`.

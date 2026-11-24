@@ -917,6 +917,7 @@ def _watch(job_id, job, proc, logf, started, dry, by, run_id, log_path, mode="fu
                     "start": datetime.datetime.fromtimestamp(started).strftime("%Y-%m-%d %H:%M:%S"),
                     "duration": duration, "status": status, "code": rc, "dry_run": dry, "by": by,
                     "run": run_id, "copied": copied, "deleted": deleted, "errors": len(errors),
+                    "bytes": transferred_bytes(log_path),
                 }
                 if delta:
                     entry["mode"] = "live"
@@ -2295,7 +2296,7 @@ def _dstatus(k):
 
 
 def _dcut(filters):
-    days = {"1d": 1, "7d": 7, "30d": 30}.get(filters.get("period"))
+    days = dash.PERIOD_DAYS.get(filters.get("period"))
     return (datetime.datetime.now() - datetime.timedelta(days=days)).strftime("%Y-%m-%d %H:%M:%S") if days else ""
 
 
@@ -2376,10 +2377,12 @@ def _src_runs(c, f):
                 continue
             if f.get("run_kind") == "real" and h.get("dry_run") or f.get("run_kind") == "dry" and not h.get("dry_run"):
                 continue
+            b = _run_bytes(jid, h)
             rows.append({"id": jid, "name": j["name"], "run": h.get("run"), "start": h.get("start", ""), "status": h.get("status"),
                          "status_text": _dstatus(h.get("status")) + (" · " + i18n.translate("Testlauf") if h.get("dry_run") else ""),
                          "duration": h.get("duration"), "duration_text": f"{h.get('duration', 0)} s", "copied": h.get("copied"),
                          "deleted": h.get("deleted"), "errors": h.get("errors"), "dry_run": bool(h.get("dry_run")),
+                         "bytes": b, "bytes_text": "" if b is None else _size(b),
                          "link": f"/job/{jid}/run/{h.get('run')}"})
     return sorted(rows, key=lambda r: r["start"], reverse=True)
 
@@ -2435,7 +2438,7 @@ def _src_storage(c, f):
         rows.append({"label": i18n.t("Laufwerk {0}", label) + (" " + i18n.t("(dasselbe wie oben)") if key in seen else ""),
                      "pct": pct, "value": pct, "value_text": f"{pct} %", "used_text": _size(du.total - du.free),
                      "free_text": _size(du.free), "status": "fehler" if pct >= 95 else "warn" if pct >= 85 else "ok",
-                     "status_text": f"{pct} %", "cls": "fehler" if pct >= 95 else ""})
+                     "status_text": f"{pct} %", "cls": "fehler" if pct >= 95 else "", "same": key in seen})
         seen.add(key)
     usage = 0
     for root, _, files in os.walk(LOG_DIR):
@@ -3148,6 +3151,34 @@ def run_job(job_id):
 
 
 _PCT_RE = re.compile(r"(\d{1,3})%")
+_BYTES_RE = re.compile(r"([\d.]+)\s*([KMGTPE]?)i?B(?:ytes)?\s*/\s*[\d.]+\s*[KMGTPE]?i?B(?:ytes)?,\s*(?:-|\d{1,3}%)")
+_BYTES_CACHE = {}
+
+
+def transferred_bytes(log_path):
+    """Uebertragene Datenmenge eines Laufs aus der letzten rclone-Statuszeile (Bytes, None = unbekannt)."""
+    try:
+        with open(log_path, "rb") as f:
+            f.seek(0, 2)
+            f.seek(max(0, f.tell() - 16384))
+            tail = f.read().decode("utf-8", "replace").splitlines()
+    except OSError:
+        return None
+    for line in reversed(tail):
+        m = _BYTES_RE.search(line)
+        if m:
+            return int(float(m.group(1)) * 1024 ** " KMGTPE".index(m.group(2) or " "))
+    return 0 if tail else None
+
+
+def _run_bytes(jid, h):
+    """Datenmenge eines Laufs aus dem Verlauf; aeltere Laeufe ohne Wert einmal aus dem Log lesen (nur im Speicher)."""
+    if "bytes" in h:
+        return h["bytes"]
+    key = (jid, h.get("run"))
+    if key not in _BYTES_CACHE and h.get("run"):
+        _BYTES_CACHE[key] = transferred_bytes(run_log_path(jid, h["run"]))
+    return _BYTES_CACHE.get(key)
 
 
 def run_progress(log_path):
@@ -4039,7 +4070,7 @@ _ab_lock = threading.Lock()
 
 def _size(n):
     n = int(n or 0)
-    return f"{n} B" if n < 1024 else f"{n / 1024:.0f} KB" if n < 1024 * 1024 else f"{n / 1024 / 1024:.1f} MB"
+    return dash.human_size(n)
 
 
 def _autobackup_view():

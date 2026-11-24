@@ -6,14 +6,24 @@ Layout je Benutzer (auch API-Keys) in der Datenbank, Bereich "dashboard":
 - Jede Datenquelle braucht ein Recht; Kacheln ohne Recht werden weder angezeigt noch geliefert.
 - Raster: 12 Spalten, Zeilen zu je 40 px, dicht gepackt (kleinere Kacheln ruecken in freie Luecken).
 """
+import datetime
+import math
 import secrets
 
 COLS, MAX_H, MAX_TILES = 12, 24, 40
 
-VIEWS = {"number": "Zahl", "list": "Liste", "bar": "Balken", "ampel": "Statusampel"}
+VIEWS = {"number": "Zahl", "spark": "Zahl mit Verlauf", "list": "Liste", "bar": "Balken", "stacked": "Gestapelte Balken pro Tag",
+         "pie": "Tortendiagramm", "gauge": "Tacho", "line": "Liniendiagramm", "heatmap": "Kalender-Heatmap", "timeline": "Zeitleiste",
+         "ampel": "Statusampel"}
+# Darstellungen ueber die Zeit: Standard-Zeitraum in Tagen, wenn im Filter keiner gewaehlt ist
+TIME_VIEWS = {"spark": 30, "stacked": 30, "line": 30, "heatmap": 90, "timeline": 1}
 
 # Filter-Bausteine: type jobs (Mehrfachauswahl), select (options) oder int
-PERIODS = [("", "gesamter Zeitraum"), ("1d", "letzte 24 Stunden"), ("7d", "letzte 7 Tage"), ("30d", "letzte 30 Tage")]
+PERIODS = [("", "gesamter Zeitraum"), ("1d", "letzte 24 Stunden"), ("7d", "letzte 7 Tage"), ("30d", "letzte 30 Tage"),
+           ("90d", "letzte 90 Tage"), ("365d", "letzte 365 Tage")]
+PERIOD_DAYS = {"1d": 1, "7d": 7, "30d": 30, "90d": 90, "365d": 365}
+METRICS = [("count", "Anzahl Läufe"), ("bytes", "übertragene Datenmenge"), ("duration", "Laufdauer (Durchschnitt)"),
+           ("copied", "kopierte Dateien"), ("deleted", "gelöschte Dateien"), ("errors", "Fehler")]
 FILTERS = {
     "jobs": {"type": "jobs", "label": "Aufgaben", "hint": "keine Auswahl = alle Aufgaben"},
     "job_status": {"type": "select", "label": "Status", "options": [
@@ -25,7 +35,9 @@ FILTERS = {
     "login_result": {"type": "select", "label": "Ergebnis", "options": [("", "alle"), ("ok", "erfolgreich"), ("fail", "fehlgeschlagen")]},
     "audit_cat": {"type": "select", "label": "Bereich", "options": [("", "alle")]},   # wird aus audit.CATEGORIES gefuellt
     "period": {"type": "select", "label": "Zeitraum", "options": PERIODS},
-    "limit": {"type": "int", "label": "Höchstens so viele Einträge", "min": 1, "max": 50, "default": 10},
+    "limit": {"type": "int", "label": "Höchstens so viele Einträge", "min": 1, "max": 50, "default": 10,
+              "views": ["list", "bar", "ampel"]},
+    "metric": {"type": "select", "label": "Messwert", "options": METRICS, "views": ["line", "spark"]},
 }
 
 # Datenquellen. cols: Spalten fuer die Liste; status: Feld fuer Ampel und Balken (gezaehlt je Status);
@@ -37,25 +49,28 @@ SOURCES = {
     "running": {"title": "Laufende Aufträge", "perm": "jobs.view", "views": ["list", "bar", "number", "ampel"], "filters": ["jobs"],
                 "cols": [("name", "Aufgabe"), ("started", "seit"), ("progress_text", "Fortschritt")], "status": "status",
                 "value": "progress", "max": 100, "noun": "laufen gerade", "desc": "Aufgaben, die gerade laufen, mit Fortschritt"},
-    "jobs": {"title": "Aufgaben", "perm": "jobs.view", "views": ["ampel", "list", "number", "bar"], "filters": ["jobs", "job_status", "limit"],
+    "jobs": {"title": "Aufgaben", "perm": "jobs.view", "views": ["ampel", "list", "number", "bar", "pie", "gauge"], "filters": ["jobs", "job_status", "limit"],
              "cols": [("name", "Aufgabe"), ("status_text", "Status"), ("last_run", "Letzter Lauf")], "status": "status",
              "noun": "Aufgaben", "desc": "Aufgaben mit dem Status ihres letzten Laufs"},
-    "runs": {"title": "Läufe", "perm": "jobs.view", "views": ["list", "number", "bar", "ampel"],
-             "filters": ["jobs", "run_status", "run_kind", "period", "limit"],
+    "runs": {"title": "Läufe", "perm": "jobs.view", "views": ["list", "number", "spark", "bar", "stacked", "pie", "gauge", "line",
+                                                           "heatmap", "timeline", "ampel"],
+             "filters": ["jobs", "run_status", "run_kind", "period", "metric", "limit"], "time": "start",
              "cols": [("name", "Aufgabe"), ("start", "Start"), ("status_text", "Status"), ("duration_text", "Dauer"),
-                      ("copied", "Kopiert"), ("deleted", "Gelöscht"), ("errors", "Fehler")], "status": "status",
+                      ("bytes_text", "Übertragen"), ("copied", "Kopiert"), ("deleted", "Gelöscht"), ("errors", "Fehler")], "status": "status",
              "noun": "Läufe", "desc": "Läufe aus dem Verlauf aller oder ausgewählter Aufgaben"},
     "next_runs": {"title": "Nächste Starts", "perm": "jobs.view", "views": ["list", "number"], "filters": ["jobs", "limit"],
                   "cols": [("name", "Aufgabe"), ("at", "Start"), ("kind_text", "Art")], "noun": "geplante Starts",
                   "desc": "Die nächsten geplanten Starts"},
-    "logins": {"title": "Anmeldungen", "perm": "users.view", "views": ["list", "number", "bar", "ampel"],
-               "filters": ["login_result", "period", "limit"],
+    "logins": {"title": "Anmeldungen", "perm": "users.view", "views": ["list", "number", "spark", "bar", "stacked", "pie", "gauge",
+                                                                  "line", "heatmap", "ampel"],
+               "filters": ["login_result", "period", "limit"], "time": "time",
                "cols": [("time", "Zeit"), ("user", "Benutzer"), ("status_text", "Ergebnis"), ("where", "IP-Adresse")], "status": "status",
                "noun": "Anmeldungen", "desc": "Anmeldungen und Fehlversuche"},
-    "audit": {"title": "Änderungen (Audit-Log)", "perm": "system.audit", "views": ["list", "number", "bar"], "filters": ["audit_cat", "period", "limit"],
+    "audit": {"title": "Änderungen (Audit-Log)", "perm": "system.audit", "views": ["list", "number", "spark", "bar", "stacked", "pie",
+                                                                                "line", "heatmap"], "filters": ["audit_cat", "period", "limit"], "time": "ts",
               "cols": [("ts", "Zeit"), ("user", "Benutzer"), ("action", "Aktion"), ("target", "Objekt")], "status": "cat_text",
               "noun": "Einträge", "desc": "Einträge im Audit-Log"},
-    "storage": {"title": "Speicherplatz", "perm": "system.settings", "views": ["bar", "list", "number", "ampel"], "filters": [], "kind": "metrics",
+    "storage": {"title": "Speicherplatz", "perm": "system.settings", "views": ["bar", "pie", "gauge", "list", "number", "ampel"], "filters": [], "kind": "metrics",
                 "value": "pct", "max": 100, "status": "status",
                 "cols": [("label", "Ort"), ("used_text", "belegt"), ("free_text", "frei"), ("value_text", "Anteil")],
                 "desc": "Belegter Platz auf den Laufwerken von /config und /logs sowie Größe der Logs"},
@@ -79,6 +94,15 @@ PRESETS = {
     "runs_bar": {"title": "Läufe der letzten 7 Tage", "source": "runs", "view": "bar", "filters": {"period": "7d"}, "w": 4, "h": 5},
     "failed_logins": {"title": "Fehlgeschlagene Anmeldungen (7 Tage)", "source": "logins", "view": "number", "filters": {"login_result": "fail", "period": "7d"}, "w": 4, "h": 3},
     "storage": {"title": "Speicherplatz", "source": "storage", "view": "bar", "filters": {}, "w": 4, "h": 5},
+    "runs_pie": {"title": "Läufe nach Status (30 Tage)", "source": "runs", "view": "pie", "filters": {"period": "30d"}, "w": 4, "h": 6},
+    "bytes_line": {"title": "Übertragene Datenmenge pro Tag", "source": "runs", "view": "line", "filters": {"period": "30d", "metric": "bytes"}, "w": 6, "h": 6},
+    "duration_line": {"title": "Laufdauer pro Tag", "source": "runs", "view": "line", "filters": {"period": "30d", "metric": "duration"}, "w": 6, "h": 6},
+    "runs_stacked": {"title": "Läufe pro Tag", "source": "runs", "view": "stacked", "filters": {"period": "30d"}, "w": 6, "h": 6},
+    "success_gauge": {"title": "Erfolgsquote (30 Tage)", "source": "runs", "view": "gauge", "filters": {"period": "30d"}, "w": 3, "h": 5},
+    "storage_gauge": {"title": "Speicherplatz", "source": "storage", "view": "gauge", "filters": {}, "w": 4, "h": 5},
+    "runs_heatmap": {"title": "Läufe im Kalender", "source": "runs", "view": "heatmap", "filters": {"period": "365d"}, "w": 12, "h": 5},
+    "runs_today": {"title": "Läufe heute", "source": "runs", "view": "spark", "filters": {"period": "1d"}, "w": 3, "h": 3},
+    "runs_timeline": {"title": "Zeitleiste der Läufe (24 Stunden)", "source": "runs", "view": "timeline", "filters": {"period": "1d"}, "w": 12, "h": 7},
 }
 DEFAULT = ["running", "stats", "failed", "last_runs", "next_runs", "logins", "audit", "system"]
 OLD_SIZE = {"s": 4, "w": 8}   # Layouts aus 1.54.0: size s/w
@@ -223,6 +247,8 @@ def catalog(has, tr=lambda x: x):
             d.update(min=f["min"], max=f["max"], default=f["default"])
         if f.get("hint"):
             d["hint"] = tr(f["hint"])
+        if f.get("views"):
+            d["views"] = f["views"]
         return d
     sources = [{"id": s, "title": tr(v["title"]), "description": tr(v["desc"]), "permission": v["perm"], "views": v["views"],
                 "filters": [fil(k) for k in v["filters"]]} for s, v in SOURCES.items() if allowed_source(s, has)]
@@ -269,6 +295,26 @@ def shape(src, view, rows, filters, tr=lambda x: x, status_text=lambda x: x):
             mx = max(list(counts.values()) + [1])
             out["bars"] = [{"label": status_text(k) if st_key == "status" else k, "value": n, "max": mx, "text": str(n), "cls": k,
                             "link": ""} for k, n in sorted(counts.items(), key=lambda x: -x[1])]
+    elif view == "pie":
+        if spec.get("value"):   # Speicherplatz: je Laufwerk belegt/frei
+            pies = []
+            for r in rows:
+                if r.get("pct") is None or r.get("same"):
+                    continue
+                pies.append(pie(r["label"], [(tr("belegt") + f" ({r.get('used_text', '')})", r["pct"], "fehler" if r["pct"] >= 95 else "used"),
+                                             (tr("frei") + f" ({r.get('free_text', '')})", 100 - r["pct"], "free")], f"{r['pct']} %"))
+            out["pies"] = pies
+        else:
+            counts = {}
+            for r in rows:
+                k = r.get(st_key) or ""
+                counts[k] = counts.get(k, 0) + 1
+            items = [(status_text(k) if st_key == "status" else k, n, k) for k, n in sorted(counts.items(), key=lambda x: -x[1])]
+            out["pies"] = [pie("", items, str(len(rows)))] if rows else []
+    elif view in TIME_VIEWS:
+        out.update(_time_view(src, view, rows, filters, tr, status_text))
+    elif view == "gauge":
+        out["gauges"] = _gauges(src, rows, tr)
     elif view == "ampel":
         lights = [{"label": r.get("label") or r.get("name") or r.get("user") or "", "state": LIGHT.get(r.get(st_key), "grey"),
                    "text": r.get("status_text") or r.get("value_text") or "", "link": r.get("link", "")} for r in rows]
@@ -326,3 +372,278 @@ def tabs_for(stored, has, tr=lambda x: x):
         if isinstance(t, dict) and t.get("id"):
             out.append({"id": t["id"], "name": t.get("name") or tr(DEFAULT_TAB), "tiles": layout_for(t.get("tiles") or [], has)})
     return out or default_tabs(has, tr)
+
+
+# Farben fuer Tortenstuecke: Status-Farben, sonst eine feste Reihe
+PIE_STATUS = {"ok": "var(--ok)", "fehler": "var(--err)", "fail": "var(--err)", "laeuft": "var(--run)", "gestoppt": "var(--warn)",
+              "paused": "var(--warn)", "off": "var(--bd2)", "never": "var(--mut)", "used": "var(--acc)", "free": "var(--bd)"}
+PIE_COLORS = ["#4f46e5", "#0ea5e9", "#16a34a", "#f59e0b", "#db2777", "#14b8a6", "#8b5cf6", "#ef4444", "#84cc16", "#64748b"]
+
+
+def pie(title, items, center=""):
+    """Tortendiagramm: items = [(label, wert, schluessel)] -> {"title", "center", "gradient" (CSS), "slices"}."""
+    total = sum(v for _, v, _ in items) or 1
+    slices, stops, pos, n = [], [], 0.0, 0
+    for label, v, key in items:
+        color = PIE_STATUS.get(key)
+        if not color:
+            color = PIE_COLORS[n % len(PIE_COLORS)]
+            n += 1
+        share = 100.0 * v / total
+        stops.append(f"{color} {pos:.2f}% {pos + share:.2f}%")
+        pos += share
+        slices.append({"label": label, "value": v, "pct": round(share), "color": color})
+    return {"title": title, "center": center, "slices": slices,
+            "gradient": "conic-gradient(" + ", ".join(stops) + ")" if stops else "var(--bd)"}
+
+
+# ----------------------------------------------------------------- Diagramme ueber die Zeit
+def human_size(n):
+    n = int(n or 0)
+    for unit in ("B", "KB", "MB", "GB", "TB"):
+        if n < 1024 or unit == "TB":
+            return f"{n} B" if unit == "B" else f"{n:.0f} {unit}" if unit == "KB" else f"{n:.1f} {unit}"
+        n /= 1024
+
+
+def human_dur(sec):
+    sec = int(round(sec or 0))
+    if sec < 60:
+        return f"{sec} s"
+    m, s = divmod(sec, 60)
+    if m < 60:
+        return f"{m} min {s} s" if s else f"{m} min"
+    h, m = divmod(m, 60)
+    return f"{h} h {m} min"
+
+
+def _ts(v):
+    try:
+        return datetime.datetime.strptime(str(v)[:19].replace("T", " "), "%Y-%m-%d %H:%M:%S")
+    except ValueError:
+        return None
+
+
+def _window(view, filters):
+    return PERIOD_DAYS.get(filters.get("period")) or TIME_VIEWS.get(view, 30)
+
+
+def _buckets(days, now):
+    """Zeitabschnitte: bei 24 Stunden je Stunde, sonst je Tag. -> (start, schritt, anzahl, beschriftungen)"""
+    if days <= 1:
+        start = now.replace(minute=0, second=0, microsecond=0) - datetime.timedelta(hours=23)
+        return start, datetime.timedelta(hours=1), 24, [(start + datetime.timedelta(hours=i)).strftime("%H:00") for i in range(24)]
+    start = (now - datetime.timedelta(days=days - 1)).replace(hour=0, minute=0, second=0, microsecond=0)
+    return start, datetime.timedelta(days=1), days, [(start + datetime.timedelta(days=i)).strftime("%d.%m.") for i in range(days)]
+
+
+def _bucketize(rows, tkey, start, step, n):
+    out = [[] for _ in range(n)]
+    for r in rows:
+        t = _ts(r.get(tkey))
+        if t and t >= start:
+            i = int((t - start) / step)
+            if 0 <= i < n:
+                out[i].append(r)
+    return out
+
+
+def _metric(rows, metric):
+    if metric == "duration":
+        vals = [r.get("duration") or 0 for r in rows]
+        return sum(vals) / len(vals) if vals else 0
+    if metric in ("bytes", "copied", "deleted", "errors"):
+        return sum(r.get(metric) or 0 for r in rows)
+    return len(rows)
+
+
+def _mtext(v, metric):
+    if metric == "bytes":
+        return human_size(v)
+    if metric == "duration":
+        return human_dur(v)
+    return str(int(round(v)))
+
+
+def _line_points(vals, mx, w=300.0, h=100.0, pad=6.0):
+    n = len(vals)
+    xs = [w * i / (n - 1) if n > 1 else w / 2 for i in range(n)]
+    return " ".join(f"{x:.1f},{h - pad - (h - 2 * pad) * (v / mx if mx else 0):.1f}" for x, v in zip(xs, vals))
+
+
+def _state_key(src, r):
+    return r.get(SOURCES[src].get("status") or "status") or ""
+
+
+def _color(key, n):
+    c = PIE_STATUS.get(key)
+    return (c, n) if c else (PIE_COLORS[n % len(PIE_COLORS)], n + 1)
+
+
+def _time_view(src, view, rows, filters, tr, status_text):
+    spec, now = SOURCES[src], datetime.datetime.now()
+    tkey = spec.get("time")
+    days = _window(view, filters)
+    metric = filters.get("metric") if src == "runs" else ""
+    metric = metric or "count"
+    mlabel = tr(dict(METRICS).get(metric)) if src == "runs" else tr(spec.get("noun", ""))
+    if view == "timeline":
+        return _timeline(rows, days, now, tr, status_text)
+    if view == "heatmap":
+        return _heatmap(src, rows, max(days, 7), now, tr, status_text)
+    start, step, n, labels = _buckets(days, now)
+    groups = _bucketize(rows, tkey, start, step, n)
+    hourly = days <= 1
+    if view == "spark":
+        inside = [r for g in groups for r in g]
+        vals = [_metric(g, metric) for g in groups]
+        return {"value": _mtext(_metric(inside, metric), metric), "label": mlabel, "points": _line_points(vals, max(vals + [0])),
+                "range": f"{labels[0]} – {labels[-1]}" if not hourly else tr("letzte 24 Stunden")}
+    if view == "line":
+        series = []
+        sel = filters.get("jobs") or []
+        if src == "runs" and 2 <= len(sel) <= 8:   # mehrere Aufgaben gewaehlt: je Aufgabe eine Linie
+            names = {}
+            for r in rows:
+                names.setdefault(r.get("id"), r.get("name", ""))
+            for i, jid in enumerate(j for j in sel if j in names):
+                series.append({"label": names[jid], "vals": [_metric([r for r in g if r.get("id") == jid], metric) for g in groups],
+                               "color": PIE_COLORS[i % len(PIE_COLORS)]})
+        if not series:
+            series = [{"label": mlabel, "vals": [_metric(g, metric) for g in groups], "color": "var(--acc)"}]
+        mx = max([v for s in series for v in s["vals"]] + [0])
+        for s in series:
+            s["points"] = _line_points(s["vals"], mx)
+            s["total"] = _mtext(_metric([r for g in groups for r in g if len(series) == 1 or r.get("name") == s["label"]], metric), metric)
+        cols = [{"label": labels[i], "text": " · ".join(f"{s['label']}: {_mtext(s['vals'][i], metric)}" for s in series)} for i in range(n)]
+        for s in series:
+            del s["vals"]
+        if len(series) == 1:
+            series[0]["area"] = "0,100 " + series[0]["points"] + " 300,100"
+        return {"series": series, "cols": cols, "max_text": _mtext(mx, metric), "metric": mlabel,
+                "first": labels[0], "mid": labels[n // 2], "last": labels[-1], "empty": not any(groups)}
+    # stacked: je Abschnitt ein Balken, aufgeteilt nach Status
+    keys, order = {}, []
+    for g in groups:
+        for r in g:
+            k = _state_key(src, r)
+            if k not in keys:
+                keys[k] = 0
+                order.append(k)
+            keys[k] += 1
+    pref = ["ok", "gestoppt", "paused", "fehler", "fail"]
+    order.sort(key=lambda k: (pref.index(k) if k in pref else 9, -keys[k]))
+    colors, ci = {}, 0
+    for k in order:
+        colors[k], ci = _color(k, ci)
+    label = (lambda k: status_text(k)) if SOURCES[src].get("status") == "status" else (lambda k: k)
+    mx = max([len(g) for g in groups] + [1])
+    bars = []
+    for i, g in enumerate(groups):
+        cnt = {}
+        for r in g:
+            k = _state_key(src, r)
+            cnt[k] = cnt.get(k, 0) + 1
+        segs = [{"color": colors[k], "pct": round(100 * cnt[k] / len(g), 2), "n": cnt[k]} for k in order if cnt.get(k)]
+        bars.append({"label": labels[i], "h": round(100 * len(g) / mx, 2), "total": len(g), "segs": segs,
+                     "title": f"{labels[i]}: " + ", ".join(f"{label(k)} {cnt[k]}" for k in order if cnt.get(k)) if g else f"{labels[i]}: 0",
+                     "tick": i == 0 or i == n - 1 or (n > 1 and i % max(1, math.ceil(n / 6)) == 0 and n - 1 - i >= math.ceil(n / 12))})
+    return {"bars": bars, "legend": [{"label": label(k), "color": colors[k], "n": keys[k]} for k in order], "max_text": str(mx),
+            "empty": not any(groups)}
+
+
+def _heatmap(src, rows, days, now, tr, status_text):
+    start, step, n, _ = _buckets(days, now)
+    groups = _bucketize(rows, SOURCES[src]["time"], start, step, n)
+    mx = max([len(g) for g in groups] + [1])
+    lead = start.weekday()   # Spalten = Wochen ab Montag
+    cells = [{"empty": True} for _ in range(lead)]
+    for i, g in enumerate(groups):
+        day = start + datetime.timedelta(days=i)
+        states = {_state_key(src, r) for r in g}
+        st = "fehler" if states & {"fehler", "fail"} else "warn" if "gestoppt" in states else ("ok" if src != "audit" else "info") if g else "none"
+        level = 0 if not g else min(4, 1 + int(3 * len(g) / mx))
+        bad = sum(1 for r in g if _state_key(src, r) in ("fehler", "fail"))
+        cells.append({"state": st, "level": level, "date": day.strftime("%d.%m.%Y"), "n": len(g), "bad": bad,
+                      "month": day.strftime("%m") if day.day <= 7 and day.weekday() == 0 else ""})
+    weeks = math.ceil(len(cells) / 7)
+    return {"cells": cells, "weeks": weeks, "noun": tr(SOURCES[src].get("noun", "")), "bad_label": tr("davon Fehler"),
+            "legend": [{"cls": "ok", "label": status_text("ok")}, {"cls": "warn", "label": status_text("gestoppt")},
+                       {"cls": "fehler", "label": status_text("fehler")}] if src != "audit" else
+                      [{"cls": "info", "label": tr("mehr Einträge = kräftigere Farbe")}],
+            "total": sum(len(g) for g in groups)}
+
+
+def _timeline(rows, days, now, tr, status_text):
+    t0 = now - datetime.timedelta(days=days)
+    span = (now - t0).total_seconds()
+    runs = []
+    for r in rows:
+        s = _ts(r.get("start"))
+        if not s:
+            continue
+        e = s + datetime.timedelta(seconds=r.get("duration") or 0)
+        if e < t0:
+            continue
+        runs.append((s, e, r))
+    lanes, order = {}, []
+    for s, e, r in sorted(runs, key=lambda x: x[0]):
+        key = r.get("id") or r.get("name")
+        if key not in lanes:
+            lanes[key] = {"name": r.get("name", ""), "link": f"/job/{r.get('id')}/log" if r.get("id") else "", "bars": []}
+            order.append(key)
+        lanes[key]["bars"].append((s, e, r))
+    overlaps, raw = 0, {k: list(lanes[k]["bars"]) for k in order}
+    for key in order:
+        out = []
+        for s, e, r in lanes[key]["bars"]:
+            ov = any(o_s < e and s < o_e for k2 in order if k2 != key for o_s, o_e, _ in raw[k2])
+            overlaps += ov
+            left = max(0.0, (s - t0).total_seconds() / span * 100)
+            width = max(0.6, min(100 - left, ((e - max(s, t0)).total_seconds()) / span * 100))
+            out.append({"left": round(left, 2), "width": round(width, 2), "status": r.get("status"), "overlap": ov,
+                        "color": PIE_STATUS.get(r.get("status"), "var(--acc)"), "link": r.get("link", ""),
+                        "title": f"{r.get('name', '')}: {s:%d.%m. %H:%M:%S} – {e:%H:%M:%S} ({human_dur(r.get('duration'))}) · {r.get('status_text', '')}"
+                                 + (" · " + tr("überschneidet sich mit einer anderen Aufgabe") if ov else "")})
+        lanes[key]["bars"] = out
+    ticks = []
+    if days <= 1:
+        first = (t0 + datetime.timedelta(hours=1)).replace(minute=0, second=0, microsecond=0)
+        for h in range(0, 24, 3):
+            t = first + datetime.timedelta(hours=h)
+            if t < now:
+                ticks.append({"left": round((t - t0).total_seconds() / span * 100, 2), "label": t.strftime("%H:%M")})
+    else:
+        stepd = max(1, math.ceil(days / 7))
+        first = (t0 + datetime.timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+        t = first
+        while t < now:
+            ticks.append({"left": round((t - t0).total_seconds() / span * 100, 2), "label": t.strftime("%d.%m.")})
+            t += datetime.timedelta(days=stepd)
+    return {"lanes": [lanes[k] for k in sorted(order, key=lambda k: lanes[k]["name"].lower())], "ticks": ticks, "overlaps": overlaps,
+            "overlap_text": tr("Überschneidungen"), "empty": not runs}
+
+
+def _gauge(title, pct, sub, good_high=True):
+    pct = max(0, min(100, int(round(pct))))
+    if good_high:
+        cls = "ok" if pct >= 95 else "warn" if pct >= 80 else "fehler"
+    else:
+        cls = "fehler" if pct >= 95 else "warn" if pct >= 85 else "ok"
+    return {"title": title, "pct": pct, "text": f"{pct} %", "sub": sub, "cls": cls}
+
+
+def _gauges(src, rows, tr):
+    if src == "storage":
+        return [_gauge(r["label"], r["pct"], f"{tr('belegt')} {r.get('used_text', '')} · {tr('frei')} {r.get('free_text', '')}", False)
+                for r in rows if r.get("pct") is not None and not r.get("same")]
+    if src == "jobs":
+        rel = [r for r in rows if r.get("status") not in ("off", "never")]
+        good = sum(1 for r in rel if r.get("status") != "fehler")
+        return [_gauge(tr("ohne Fehler"), 100 * good / len(rel), f"{good} / {len(rel)} {tr('Aufgaben')}")] if rel else []
+    if src == "logins":
+        good = sum(1 for r in rows if r.get("status") == "ok")
+        return [_gauge(tr("Erfolgsquote"), 100 * good / len(rows), f"{good} / {len(rows)} {tr('Anmeldungen')}")] if rows else []
+    done = [r for r in rows if r.get("status") in ("ok", "fehler", "gestoppt")]
+    good = sum(1 for r in done if r.get("status") == "ok")
+    return [_gauge(tr("Erfolgsquote"), 100 * good / len(done), f"{good} / {len(done)} {tr('Läufe')}")] if done else []
