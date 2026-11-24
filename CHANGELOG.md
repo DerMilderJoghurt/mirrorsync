@@ -3,6 +3,13 @@
 Version numbers follow [SemVer](https://semver.org/): MAJOR.MINOR.PATCH
 (MAJOR = incompatible change, MINOR = new feature, PATCH = bug fix).
 
+## 1.54.0 – 2026-11-24
+- **Dashboard** (new, at the top of the sidebar) with tiles: running jobs, overview, jobs with errors, last 10 runs,
+  next 10 starts, last 10 logins, last 10 changes (audit log), system. Refreshes every 5 seconds. With "Customize" you
+  show and hide tiles, move them (drag or arrows) and make them narrow or wide; saved per user.
+- Permissions: each tile needs the matching permission (`jobs.view`, `users.view`, `system.audit`). API/MCP:
+  `get_dashboard`, `update_dashboard`. Audit "dashboard customized". All 5 languages.
+
 ## 1.53.0 – 2026-11-24
 - **Restart the container:** by hand ("Restart now", optionally even while jobs run) or on a schedule (time,
   weekdays; waits for running jobs). With the Docker socket via Docker, otherwise MirrorSync exits and Docker restarts

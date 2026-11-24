@@ -39,6 +39,7 @@ import update
 import selfupdate
 import preview
 import window as timewin
+import dashboard as dash
 import ipguard
 import msgtpl
 import notify
@@ -1500,7 +1501,7 @@ ENDPOINT_PERMS = {
     "job_notify_test": "jobs.notify", "job_pause": "jobs.edit",
     "remotes": "remotes.view", "test_remote": "remotes.test", "delete_remote": "remotes.delete",
     "duplicate_job": "jobs.create", "duplicate_remote": "remotes.create",
-    "system_restart": "system.restart", "system_images": "system.update", "system_images_prune": "system.update",
+    "dashboard_page": None, "dashboard_save": None, "system_restart": "system.restart", "system_images": "system.update", "system_images_prune": "system.update",
     "auth_remote": "remotes.edit", "browse": "remotes.browse", "browse_list": "remotes.browse",
     "users_page": "users.view", "login_history": "users.view", "login_log_action": "users.manage", "user_unlock": "users.manage", "user_edit": "users.manage", "user_delete": "users.manage",
     "roles_page": "roles.manage", "role_edit": "roles.manage", "role_delete": "roles.manage",
@@ -1760,7 +1761,7 @@ AUDIT_EP = {
 # Aktionen, die ohne Datenaenderung protokolliert werden
 AUDIT_ACTIONS = {
     "run_job": ("run", "gestartet"), "resync_job": ("run", "neu zusammengeführt (Zwei-Wege)"), "stop": ("run", "gestoppt"), "test_remote": ("remote", "Verbindung getestet"),
-    "user_unlock": ("user", "entsperrt"), "login_log_action": ("login", "Anmeldeverlauf bearbeitet"),
+    "user_unlock": ("user", "entsperrt"), "dashboard_save": ("user", "Dashboard angepasst"), "login_log_action": ("login", "Anmeldeverlauf bearbeitet"),
 }
 SECTION_NAMES = {"settings_page": "Benachrichtigungen", "general_settings": "Allgemein"}
 
@@ -2253,6 +2254,106 @@ def index():
                          live_full_text=live_full_text(job) if trig == "live" else "",
                          direction="bisync" if is_bisync(job) else "mirror", **next_start_view(jobs, job_id)))
     return render_template("index.html", jobs=rows, auto_refresh=bool(_running))
+
+
+# ---------------------------------------------------------------- Dashboard
+_BOOT = time.time()
+
+
+def _dash_key():
+    return (g.get("user") or "").strip() or "?"
+
+
+def dashboard_layout():
+    return dash.layout_for(DB.get("dashboard", _dash_key()), g.access.has)
+
+
+def _uptime_text(sec):
+    d, rest = divmod(int(sec), 86400)
+    h, rest = divmod(rest, 3600)
+    m = rest // 60
+    return (i18n.t("{0} Tg. {1} Std.", d, h) if d else i18n.t("{0} Std. {1} Min.", h, m) if h else i18n.t("{0} Min.", m))
+
+
+def dashboard_data(layout=None):
+    """Inhalte der Kacheln (nur die im Layout und mit Recht)."""
+    layout = dashboard_layout() if layout is None else layout
+    ids = {t["id"] for t in layout}
+    out = {}
+    jobs = load_jobs() if ids & {"stats", "failed", "last_runs", "next_runs"} else {}
+    visible = {jid: j for jid, j in jobs.items() if g.access.job_ok(jid, j)}
+    if "running" in ids:
+        out["running"] = running_jobs_data()
+    if "stats" in ids:
+        try:
+            text = open(RCLONE_CONF, encoding="utf-8").read()
+            n_rem = len([n for n in re.findall(r"(?m)^\[(.+?)\]", text) if g.access.remote_ok(n)])
+        except OSError:
+            n_rem = 0
+        out["stats"] = {"jobs": len(visible), "enabled": sum(1 for j in visible.values() if j.get("enabled")),
+                        "running": sum(1 for jid in visible if jid in _running),
+                        "paused": sum(1 for j in visible.values() if is_paused(j)),
+                        "failed": sum(1 for j in visible.values() if j.get("last_status") == "fehler"),
+                        "remotes": n_rem}
+    if "failed" in ids:
+        out["failed"] = sorted(({"id": jid, "name": j["name"], "last_run": j.get("last_run", ""),
+                                 "errors": ((j.get("history") or [{}])[0]).get("errors", 0)}
+                                for jid, j in visible.items() if j.get("last_status") == "fehler"),
+                               key=lambda x: x["last_run"], reverse=True)
+    if "last_runs" in ids:
+        runs = [dict(h, id=jid, name=j["name"]) for jid, j in visible.items() for h in (j.get("history") or [])[:10]]
+        out["last_runs"] = [{k: r.get(k) for k in ("id", "name", "run", "start", "duration", "status", "dry_run", "copied",
+                                                  "deleted", "errors", "by")}
+                            for r in sorted(runs, key=lambda r: r.get("start", ""), reverse=True)[:10]]
+    if "next_runs" in ids:
+        nxt = []
+        for jid, j in visible.items():
+            t, kind = next_start(jobs, jid)
+            if t:
+                nxt.append({"id": jid, "name": j["name"], "at": t.strftime("%Y-%m-%d %H:%M"), "kind": kind})
+        out["next_runs"] = sorted(nxt, key=lambda x: x["at"])[:10]
+    if "logins" in ids:
+        out["logins"] = [{k: e.get(k, "") for k in ("time", "user", "ok", "reason", "ip", "flag", "country")}
+                         for e in login_log.load()[:10]]
+    if "audit" in ids:
+        out["audit"] = [{k: e.get(k, "") for k in ("ts", "user", "cat", "action", "target", "detail")}
+                        for e in audit_log.all()[:10]]
+    if "system" in ids:
+        upd = update_status()
+        last = load_settings().get("restart_last") or {}
+        out["system"] = {"version": VERSION, "latest": upd.get("latest") or "", "update_available": bool(upd.get("update_available")),
+                         "url": upd.get("url") or "", "started": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(_BOOT)),
+                         "uptime": _uptime_text(time.time() - _BOOT), "uptime_seconds": int(time.time() - _BOOT),
+                         "last_restart": last.get("done", ""), "timezone": TZ}
+    return out
+
+
+@app.get("/dashboard")
+def dashboard_page():
+    layout = dashboard_layout()
+    if request.args.get("partial"):
+        return render_template("dashboard_tiles.html", layout=layout, d=dashboard_data(layout), titles=dash.TILES)
+    return render_template("dashboard.html", layout=layout, d=dashboard_data(layout), titles=dash.TILES,
+                           catalog=dash.catalog(g.access.has), tz=TZ)
+
+
+@app.post("/dashboard/layout")
+def dashboard_save():
+    data = request.get_json(silent=True)
+    if data is None and request.form.get("layout"):
+        try:
+            data = json.loads(request.form["layout"])
+        except ValueError:
+            data = None
+    if isinstance(data, dict) and data.get("reset"):
+        DB.put("dashboard", _dash_key(), None)
+        return {"ok": True, "message": i18n.t("Standard wiederhergestellt."), "tiles": dash.default_layout(g.access.has)}
+    tiles = data.get("tiles") if isinstance(data, dict) else data
+    layout, err = dash.clean(tiles, g.access.has)
+    if err:
+        return {"ok": False, "error": i18n.t(*err)}, 400
+    DB.put("dashboard", _dash_key(), layout)
+    return {"ok": True, "message": i18n.t("Gespeichert."), "tiles": layout}
 
 
 # ---------------------------------------------------------------- Zeitplaene (Uebersicht aller Ausloeser)

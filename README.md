@@ -4,7 +4,7 @@
 
 # MirrorSync – 1:1 mirroring with a web GUI and schedules
 
-Version **1.53.0** · Changes: [CHANGELOG.md](CHANGELOG.md) · [Deutsche Version](README.de.md)
+Version **1.54.0** · Changes: [CHANGELOG.md](CHANGELOG.md) · [Deutsche Version](README.de.md)
 
 A Docker container that **mirrors folders one-way, 1:1** (like FreeFileSync "Mirror"):
 the destination becomes an exact copy of the source, including deletions. The sync engine is
@@ -67,7 +67,7 @@ Changed files are transferred completely (no delta transfer like rsync).
 
 ## Installation
 The ready-made image is in the GitHub Container Registry: `ghcr.io/dermilderjoghurt/mirrorsync`
-(for amd64 and arm64, e.g. Raspberry Pi). Tags: `latest` (newest version), `1.53.0` (fixed version),
+(for amd64 and arm64, e.g. Raspberry Pi). Tags: `latest` (newest version), `1.54.0` (fixed version),
 `1.40` (newest patch of this version). The image is only published when the version number changes, so
 update checkers such as Dockhand or Watchtower only report an update when there really is a new version.
 
@@ -271,6 +271,26 @@ the base folder, otherwise the common parent folder becomes the source.
   (since 1.27.0): the selected folders and files go directly into the destination, e.g. source `NAS:share`
   with selection `10-Temp/` and destination `Family-NAS:share` gives `Family-NAS:share/10-Temp`.
 - Empty field = the whole source folder.
+
+## Dashboard (since 1.54.0)
+At the top of the sidebar: **Dashboard** with tiles that refresh themselves every 5 seconds:
+
+![Dashboard](docs/screenshots/dashboard.png)
+
+| Tile | Content | Permission |
+|---|---|---|
+| Running jobs | jobs that are running right now, with progress | `jobs.view` |
+| Overview | jobs, enabled, running, paused, with errors, storage locations | `jobs.view` |
+| Jobs with errors | jobs whose last run failed | `jobs.view` |
+| Latest runs | the last 10 runs of all jobs | `jobs.view` |
+| Next starts | the next 10 scheduled starts | `jobs.view` |
+| Latest logins | the last 10 logins and failed attempts | `users.view` |
+| Latest changes | the last 10 audit log entries | `system.audit` |
+| System | version, available update, running since, last restart | – |
+
+With **Customize** every user picks which tiles to see, in which order (drag or ↑ ↓) and whether narrow or wide (⇔).
+"Restore default" resets everything. Tiles without the needed permission are not shown. The layout is per user (and
+per API key). API/MCP: `get_dashboard`, `update_dashboard` (`tiles`, `reset`).
 
 ## Restart and old images (since 1.53.0)
 Under **Settings → General → Restart** you can restart the MirrorSync container: by hand with "Restart now" or on a
@@ -888,7 +908,7 @@ MirrorSync can update itself if you mount the Docker socket into the container:
   previous one runs again. Result and steps are shown in the GUI, in the audit log ("Update started / completed /
   failed") and in `config/selfupdate.json`.
 - **Requirements:** the image has to come from a registry (`image: ghcr.io/dermilderjoghurt/mirrorsync:latest`).
-  MirrorSync cannot pull images built with `build: .`. With a fixed version tag (`:1.53.0`) only that tag is pulled
+  MirrorSync cannot pull images built with `build: .`. With a fixed version tag (`:1.54.0`) only that tag is pulled
   again. `/config` has to be a volume or bind mount (it is in the example compose file).
 - **Permission:** `system.update` ("Update MirrorSync", admins have it automatically). Changing the automatic
   update and its time needs `system.settings`.

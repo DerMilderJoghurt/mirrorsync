@@ -799,6 +799,32 @@ def a_update_update_settings(a):
                            "prune": bool(s.get("selfupdate_prune", True))}}
 
 
+@action("get_dashboard", "GET", "/dashboard", None, "Dashboard",
+        "Dashboard des angemeldeten Benutzers bzw. API-Keys: tiles (Reihenfolge, size s = schmal, w = breit), data (Inhalt "
+        "jeder Kachel: running, stats, failed, last_runs, next_runs, logins = letzte 10 Anmeldungen, audit, system) und "
+        "available (alle Kacheln, für die das Recht reicht). Kacheln ohne passendes Recht fehlen.", ro=True)
+def a_get_dashboard(a):
+    layout = core.dashboard_layout()
+    return {"tiles": layout, "data": core.dashboard_data(layout), "available": core.dash.catalog(g.access.has, _t)}
+
+
+@action("update_dashboard", "PUT", "/dashboard", None, "Dashboard",
+        "Kacheln des Dashboards festlegen (wie „Anpassen“ in der GUI): tiles = Liste in der gewünschten Reihenfolge, je "
+        "{id, size} (size s oder w) oder nur die id. Nicht genannte Kacheln werden ausgeblendet. reset=true stellt den "
+        "Standard wieder her. Gilt für den angemeldeten Benutzer bzw. API-Key.",
+        {"tiles": dict(type="array", items={"type": "object", "properties": {"id": {"type": "string"},
+                                                                              "size": {"type": "string", "enum": ["s", "w"]}}}),
+         "reset": S(BOOL)})
+def a_update_dashboard(a):
+    _check_keys(a, ("tiles", "reset"))
+    body = {"reset": True} if _bool(a.get("reset", False)) else {"tiles": a.get("tiles")}
+    r = gui("POST", "/dashboard/layout", js=body)
+    res = r["resp"].get_json(silent=True) or {}
+    if r["status"] != 200 or not res.get("ok"):
+        raise ApiError(r["status"] if r["status"] >= 400 else 400, res.get("error") or _t("Fehler"))
+    return {"ok": True, "message": res.get("message"), "tiles": res.get("tiles")}
+
+
 @action("list_old_images", "GET", "/system/images", "system.update", "System",
         "Alte MirrorSync-Images auf dem Docker-Host, die kein Container mehr verwendet (id, tags, version, size in Bytes, "
         "created) und ihre Gesamtgröße (total). Braucht den eingebundenen Docker-Socket.", ro=True)
