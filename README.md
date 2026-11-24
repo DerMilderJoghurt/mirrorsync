@@ -4,7 +4,7 @@
 
 # MirrorSync – 1:1 mirroring with a web GUI and schedules
 
-Version **1.55.0** · Changes: [CHANGELOG.md](CHANGELOG.md) · [Deutsche Version](README.de.md)
+Version **1.56.0** · Changes: [CHANGELOG.md](CHANGELOG.md) · [Deutsche Version](README.de.md)
 
 A Docker container that **mirrors folders one-way, 1:1** (like FreeFileSync "Mirror"):
 the destination becomes an exact copy of the source, including deletions. The sync engine is
@@ -67,7 +67,7 @@ Changed files are transferred completely (no delta transfer like rsync).
 
 ## Installation
 The ready-made image is in the GitHub Container Registry: `ghcr.io/dermilderjoghurt/mirrorsync`
-(for amd64 and arm64, e.g. Raspberry Pi). Tags: `latest` (newest version), `1.55.0` (fixed version),
+(for amd64 and arm64, e.g. Raspberry Pi). Tags: `latest` (newest version), `1.56.0` (fixed version),
 `1.40` (newest patch of this version). The image is only published when the version number changes, so
 update checkers such as Dockhand or Watchtower only report an update when there really is a new version.
 
@@ -271,6 +271,28 @@ the base folder, otherwise the common parent folder becomes the source.
   (since 1.27.0): the selected folders and files go directly into the destination, e.g. source `NAS:share`
   with selection `10-Temp/` and destination `Family-NAS:share` gives `Family-NAS:share/10-Temp`.
 - Empty field = the whole source folder.
+
+## Dashboard building blocks and tabs (since 1.56.0)
+Every tile is made of three building blocks, similar to the self-assembled notifications:
+
+- **Data source:** overview, running jobs, jobs, runs, next starts, logins, changes (audit log), disk space (/config,
+  /logs, size of the logs) or system.
+- **View:** number, list, bars or status light. Only views that fit the data source are offered.
+- **Filters:** depending on the source specific jobs, status, test runs yes/no, login result, audit log area, period
+  (24 hours, 7 or 30 days) and number of entries.
+
+Under **Customize**, ✎ opens the editor with a live preview, "+ Custom tile" builds a new one, "+ Add template" adds a
+ready-made one (e.g. "Errors in the last 7 days", "Job status lights", "Disk space"). The default tiles are templates
+too and can be rebuilt the same way, e.g. "Jobs with errors" as a status light.
+
+**Tabs:** Above the tiles there are tabs like in a browser, each with its own tiles. Under "Customize" rename the tab,
+move it with ← →, "+ New tab" or "Delete tab". The last opened tab is remembered.
+
+Permissions: each data source needs its permission (`jobs.view`, `users.view` for logins, `system.audit` for the audit
+log, `system.settings` for disk space). API/MCP: `get_dashboard` (tabs, tiles, content, building blocks) and
+`update_dashboard` (`tabs` or `tab` + `tiles`, `reset`).
+
+![Dashboard tabs](docs/screenshots/dashboard-tabs.png)
 
 ## Dashboard (since 1.54.0)
 At the top of the sidebar: **Dashboard** with tiles that refresh themselves every 5 seconds:
@@ -911,7 +933,7 @@ MirrorSync can update itself if you mount the Docker socket into the container:
   previous one runs again. Result and steps are shown in the GUI, in the audit log ("Update started / completed /
   failed") and in `config/selfupdate.json`.
 - **Requirements:** the image has to come from a registry (`image: ghcr.io/dermilderjoghurt/mirrorsync:latest`).
-  MirrorSync cannot pull images built with `build: .`. With a fixed version tag (`:1.55.0`) only that tag is pulled
+  MirrorSync cannot pull images built with `build: .`. With a fixed version tag (`:1.56.0`) only that tag is pulled
   again. `/config` has to be a volume or bind mount (it is in the example compose file).
 - **Permission:** `system.update` ("Update MirrorSync", admins have it automatically). Changing the automatic
   update and its time needs `system.settings`.

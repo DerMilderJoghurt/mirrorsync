@@ -3,6 +3,16 @@
 Version numbers follow [SemVer](https://semver.org/): MAJOR.MINOR.PATCH
 (MAJOR = incompatible change, MINOR = new feature, PATCH = bug fix).
 
+## 1.56.0 – 2026-11-24
+- **Dashboard building blocks:** build tiles from a data source (overview, running jobs, jobs, runs, next starts,
+  logins, audit log, disk space, system), a view (number, list, bars, status light) and filters (jobs, status, test
+  runs, period, number of entries). Editor with live preview, extra templates. The default tiles are now templates and
+  can be rebuilt the same way.
+- **Dashboard tabs** like in a browser: add, rename, move, delete; each tab has its own tiles.
+- New data source disk space (drives of /config and /logs, size of the logs; permission `system.settings`).
+- API/MCP: `get_dashboard` returns tabs, tiles, content and building blocks; `update_dashboard` takes `tabs` or `tab` +
+  `tiles`. Layouts from 1.54/1.55 become the first tab. All 5 languages.
+
 ## 1.55.0 – 2026-11-24
 - **Arrange the dashboard freely:** drag the bottom right corner of any tile to change its width (1–12 columns) and
   height (1–24 rows). Smaller tiles move into free gaps automatically, e.g. two half-height tiles stacked next to a big

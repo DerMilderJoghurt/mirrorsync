@@ -4,7 +4,7 @@
 
 # MirrorSync – 1:1-Spiegelung mit Web-GUI und Zeitplänen
 
-Version **1.55.0** · Änderungen siehe [CHANGELOG.md](CHANGELOG.md) (englisch) · [English version](README.md)
+Version **1.56.0** · Änderungen siehe [CHANGELOG.md](CHANGELOG.md) (englisch) · [English version](README.md)
 
 Ein Docker-Container, der Ordner **einweg 1:1 spiegelt** (wie FreeFileSync „Spiegeln"):
 Das Ziel wird exakt wie die Quelle, inklusive Löschungen. Als Sync-Motor dient
@@ -68,7 +68,7 @@ Geänderte Dateien werden komplett neu übertragen (kein Delta wie bei rsync).
 
 ## Installation
 Das fertige Image liegt in der GitHub Container Registry: `ghcr.io/dermilderjoghurt/mirrorsync`
-(für amd64 und arm64, z. B. Raspberry Pi). Tags: `latest` (neueste Version), `1.55.0` (feste Version),
+(für amd64 und arm64, z. B. Raspberry Pi). Tags: `latest` (neueste Version), `1.56.0` (feste Version),
 `1.40` (neuester Patch dieser Version). Das Image wird nur veröffentlicht, wenn sich die Versionsnummer ändert.
 Update-Prüfer wie Dockhand oder Watchtower melden deshalb nur dann ein Update, wenn es wirklich eine neue Version gibt.
 
@@ -277,6 +277,26 @@ bleibt sie Basisordner, sonst wird der gemeinsame Elternordner zur Quelle.
   Auswahl aus** (seit 1.27.0): Die gewählten Ordner und Dateien landen direkt im Ziel, z. B. Quelle
   `NAS:share` mit Auswahl `10-Temp/` und Ziel `Familie-NAS:share` ergibt `Familie-NAS:share/10-Temp`.
 - Leeres Feld = der ganze Quellordner wie bisher.
+
+## Dashboard-Baukasten und Tabs (seit 1.56.0)
+Jede Kachel besteht aus drei Bausteinen, ähnlich wie die selbst zusammengestellten Benachrichtigungen:
+
+- **Datenquelle:** Überblick, laufende Aufträge, Aufgaben, Läufe, nächste Starts, Anmeldungen, Änderungen
+  (Audit-Log), Speicherplatz (/config, /logs, Größe der Logs) oder System.
+- **Darstellung:** Zahl, Liste, Balken oder Statusampel. Angeboten wird nur, was zur Datenquelle passt.
+- **Filter:** je nach Quelle bestimmte Aufgaben, Status, Testläufe ja/nein, Ergebnis der Anmeldung, Bereich im
+  Audit-Log, Zeitraum (24 Stunden, 7 oder 30 Tage) und Anzahl der Einträge.
+
+Unter **Anpassen** öffnet ✎ den Editor mit Live-Vorschau, „+ Eigene Kachel“ baut eine neue, „+ Vorlage hinzufügen“
+nimmt eine fertige (z. B. „Fehler der letzten 7 Tage“, „Statusampel der Aufgaben“, „Speicherplatz“). Auch die
+Standardkacheln sind nur Vorlagen und lassen sich so umbauen, z. B. „Aufgaben mit Fehler“ als Statusampel.
+
+**Tabs:** Über den Kacheln stehen Tabs wie im Browser, jeder mit eigenen Kacheln. Unter „Anpassen“ den Tab umbenennen,
+mit ← → verschieben, „+ Neuer Tab“ oder „Tab löschen“. Der zuletzt geöffnete Tab wird gemerkt.
+
+Rechte: jede Datenquelle braucht ihr Recht (`jobs.view`, `users.view` für Anmeldungen, `system.audit` für das
+Audit-Log, `system.settings` für Speicherplatz). API/MCP: `get_dashboard` (Tabs, Kacheln, Inhalte, Bausteine) und
+`update_dashboard` (`tabs` oder `tab` + `tiles`, `reset`).
 
 ## Dashboard (seit 1.54.0)
 Ganz oben in der Seitenleiste: **Dashboard** mit Kacheln, die sich alle 5 Sekunden selbst aktualisieren:
@@ -937,7 +957,7 @@ MirrorSync kann sich selbst aktualisieren, wenn du den Docker-Socket in den Cont
   sie entfernt und die bisherige läuft wieder. Ergebnis und Ablauf stehen in der GUI, im Audit-Log
   („Update gestartet / abgeschlossen / fehlgeschlagen“) und in `config/selfupdate.json`.
 - **Voraussetzungen:** Das Image muss aus einem Registry kommen (`image: ghcr.io/dermilderjoghurt/mirrorsync:latest`).
-  Mit `build: .` gebaute Images kann MirrorSync nicht neu holen. Mit festem Versions-Tag (`:1.55.0`) wird nur dieser
+  Mit `build: .` gebaute Images kann MirrorSync nicht neu holen. Mit festem Versions-Tag (`:1.56.0`) wird nur dieser
   Tag neu geholt. `/config` muss als Volume oder Ordner eingebunden sein (ist es in der Beispiel-Compose).
 - **Recht:** `system.update` („MirrorSync aktualisieren“, Admins haben es automatisch). Automatik und Uhrzeit
   ändern braucht `system.settings`.

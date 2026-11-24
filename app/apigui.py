@@ -14,6 +14,7 @@ from flask import Response, g, has_request_context, jsonify, request
 from werkzeug.datastructures import MultiDict
 
 import api
+import dashboard as _dash
 from api import ApiError, _schema, need
 
 core = None
@@ -800,32 +801,58 @@ def a_update_update_settings(a):
 
 
 @action("get_dashboard", "GET", "/dashboard", None, "Dashboard",
-        "Dashboard des angemeldeten Benutzers bzw. API-Keys: tiles (Reihenfolge, w = Breite 1–12 Spalten, h = Höhe 1–24 "
-        "Zeilen zu 40 px; kleinere Kacheln rücken in freie Lücken), data (Inhalt "
-        "jeder Kachel: running, stats, failed, last_runs, next_runs, logins = letzte 10 Anmeldungen, audit, system) und "
-        "available (alle Kacheln, für die das Recht reicht). Kacheln ohne passendes Recht fehlen.", ro=True)
+        "Dashboard des angemeldeten Benutzers bzw. API-Keys. tabs: Tabs in Reihenfolge, je {id, name, tiles}. Jede Kachel "
+        "{id, title, source, view, filters, w, h} (w = Breite 1–12 Spalten, h = Höhe 1–24 Zeilen zu 40 px). data: Inhalt der "
+        "Kacheln nach Tab-ID und Kachel-ID in der gewählten Darstellung (number: numbers, list: cols und rows, bar: bars, "
+        "ampel: overall, counts und lights); tab = nur diesen Tab berechnen. catalog: Bausteine (Datenquellen mit erlaubten "
+        "Darstellungen und Filtern, Darstellungen, Vorlagen). Datenquellen ohne passendes Recht fehlen.",
+        {"tab": S(STR, "ID eines Tabs; leer = alle Tabs")}, ro=True)
 def a_get_dashboard(a):
-    layout = core.dashboard_layout()
-    return {"tiles": layout, "data": core.dashboard_data(layout), "available": core.dash.catalog(g.access.has, _t)}
+    tabs = core.dashboard_tabs()
+    want = a.get("tab") or ""
+    if want and want not in [t["id"] for t in tabs]:
+        raise ApiError(404, _t("Unbekannter Tab: {0}").replace("{0}", want))
+    out_tabs, data = [], {}
+    for t in tabs:
+        titles = core._dash_titles(t["tiles"])
+        out_tabs.append(dict(t, tiles=[dict(x, display_title=titles[x["id"]]) for x in t["tiles"]]))
+        if not want or want == t["id"]:
+            data[t["id"]] = core.dashboard_data(t["tiles"])
+    return {"tabs": out_tabs, "data": data, "catalog": core.dash.catalog(g.access.has, _t)}
+
+
+_TILE = {"type": "object", "properties": {
+    "id": {"type": "string", "description": "Vorlage (z. B. running, stats, failed, last_runs) oder eigene ID; leer = neue Kachel"},
+    "title": {"type": "string"}, "source": {"type": "string", "enum": sorted(_dash.SOURCES)},
+    "view": {"type": "string", "enum": sorted(_dash.VIEWS)}, "filters": {"type": "object"},
+    "w": {"type": "integer", "minimum": 1, "maximum": 12}, "h": {"type": "integer", "minimum": 1, "maximum": 24}}}
+_TAB = {"type": "object", "properties": {"id": {"type": "string"}, "name": {"type": "string"},
+                                         "tiles": {"type": "array", "items": _TILE}}}
 
 
 @action("update_dashboard", "PUT", "/dashboard", None, "Dashboard",
-        "Kacheln des Dashboards festlegen (wie „Anpassen“ in der GUI): tiles = Liste in der gewünschten Reihenfolge, je "
-        "{id, w, h} (w = Breite 1–12 Spalten, h = Höhe 1–24 Zeilen, fehlt eins, gilt der Standard der Kachel) oder nur die id. "
-        "Kleinere Kacheln rücken automatisch in freie Lücken. Nicht genannte Kacheln werden ausgeblendet. reset=true stellt den "
-        "Standard wieder her. Gilt für den angemeldeten Benutzer bzw. API-Key.",
-        {"tiles": dict(type="array", items={"type": "object", "properties": {"id": {"type": "string"},
-                                                                              "w": {"type": "integer", "minimum": 1, "maximum": 12},
-                                                                              "h": {"type": "integer", "minimum": 1, "maximum": 24}}}),
-         "reset": S(BOOL)})
+        "Dashboard festlegen (wie „Anpassen“ in der GUI). Entweder tabs = alle Tabs in Reihenfolge, je {id (leer = neuer "
+        "Tab), name, tiles}; nicht genannte Tabs werden gelöscht. Oder tab (ID) + tiles = nur die Kacheln dieses Tabs; tiles "
+        "ohne tab = erster Tab. Jede Kachel ist eine Vorlage (nur die id, z. B. \"running\") oder aus Bausteinen gebaut: "
+        "{title, source, view, filters, w, h}. source: overview, running, jobs, runs, next_runs, logins, audit, storage, "
+        "system. view: number, list, bar, ampel (welche passen, steht in get_dashboard unter catalog). filters je nach Quelle: "
+        "jobs (Liste von Aufgaben-IDs), job_status, run_status, run_kind (real, dry), login_result (ok, fail), audit_cat, "
+        "period (1d, 7d, 30d), limit (1–50). Kleinere Kacheln rücken automatisch in freie Lücken. reset=true stellt den "
+        "Standard wieder her (ein Tab). Gilt für den angemeldeten Benutzer bzw. API-Key.",
+        {"tabs": dict(type="array", items=_TAB), "tab": S(STR), "tiles": dict(type="array", items=_TILE), "reset": S(BOOL)})
 def a_update_dashboard(a):
-    _check_keys(a, ("tiles", "reset"))
-    body = {"reset": True} if _bool(a.get("reset", False)) else {"tiles": a.get("tiles")}
+    _check_keys(a, ("tabs", "tab", "tiles", "reset"))
+    if _bool(a.get("reset", False)):
+        body = {"reset": True}
+    elif "tabs" in a:
+        body = {"tabs": a["tabs"]}
+    else:
+        body = {"tab": a.get("tab") or "", "tiles": a.get("tiles")}
     r = gui("POST", "/dashboard/layout", js=body)
     res = r["resp"].get_json(silent=True) or {}
     if r["status"] != 200 or not res.get("ok"):
         raise ApiError(r["status"] if r["status"] >= 400 else 400, res.get("error") or _t("Fehler"))
-    return {"ok": True, "message": res.get("message"), "tiles": res.get("tiles")}
+    return {"ok": True, "message": res.get("message"), "tabs": res.get("tabs")}
 
 
 @action("list_old_images", "GET", "/system/images", "system.update", "System",

@@ -1434,6 +1434,7 @@ def drop_principal(pid):
         DB.put_map("remote_meta", meta)
 login_log = users.LoginLog(DB)
 audit_log = audit.AuditLog(DB)
+dash.set_audit_categories(audit.CATEGORIES)
 geoip.init(CONFIG_DIR)
 guard = ipguard.Guard(DB)
 IPGUARD_OFF = os.environ.get("IPGUARD", "").lower() in ("0", "off", "false", "nein")
@@ -2264,8 +2265,18 @@ def _dash_key():
     return (g.get("user") or "").strip() or "?"
 
 
-def dashboard_layout():
-    return dash.layout_for(DB.get("dashboard", _dash_key()), g.access.has)
+def dashboard_tabs():
+    return dash.tabs_for(DB.get("dashboard", _dash_key()), g.access.has, i18n.translate)
+
+
+def dashboard_tab(tab_id=None):
+    """(tabs, aktueller Tab). Unbekannte ID = erster Tab."""
+    tabs = dashboard_tabs()
+    return tabs, next((t for t in tabs if t["id"] == tab_id), tabs[0])
+
+
+def dashboard_layout(tab_id=None):
+    return dashboard_tab(tab_id)[1]["tiles"]
 
 
 def _uptime_text(sec):
@@ -2275,85 +2286,258 @@ def _uptime_text(sec):
     return (i18n.t("{0} Tg. {1} Std.", d, h) if d else i18n.t("{0} Std. {1} Min.", h, m) if h else i18n.t("{0} Min.", m))
 
 
-def dashboard_data(layout=None):
-    """Inhalte der Kacheln (nur die im Layout und mit Recht)."""
-    layout = dashboard_layout() if layout is None else layout
-    ids = {t["id"] for t in layout}
-    out = {}
-    jobs = load_jobs() if ids & {"stats", "failed", "last_runs", "next_runs"} else {}
-    visible = {jid: j for jid, j in jobs.items() if g.access.job_ok(jid, j)}
-    if "running" in ids:
-        out["running"] = running_jobs_data()
-    if "stats" in ids:
+_DSTATUS = {"ok": "OK", "fehler": "Fehler", "laeuft": "läuft", "gestoppt": "gestoppt", "paused": "pausiert",
+            "off": "ausgeschaltet", "never": "noch nie gelaufen", "fail": "fehlgeschlagen", "warn": "Hinweis", "info": "OK"}
+
+
+def _dstatus(k):
+    return i18n.translate(_DSTATUS.get(k, k or "–"))
+
+
+def _dcut(filters):
+    days = {"1d": 1, "7d": 7, "30d": 30}.get(filters.get("period"))
+    return (datetime.datetime.now() - datetime.timedelta(days=days)).strftime("%Y-%m-%d %H:%M:%S") if days else ""
+
+
+class _DashCtx:
+    """Daten, die mehrere Kacheln brauchen, nur einmal pro Anfrage laden."""
+    def __init__(self):
+        self._jobs = None
+
+    @property
+    def jobs(self):
+        if self._jobs is None:
+            all_jobs = load_jobs()
+            self.all_jobs = all_jobs
+            self._jobs = {jid: j for jid, j in all_jobs.items() if g.access.job_ok(jid, j)}
+        return self._jobs
+
+    def pick(self, filters):
+        sel = filters.get("jobs")
+        return {jid: j for jid, j in self.jobs.items() if not sel or jid in sel}
+
+
+def _job_state(jid, j):
+    if jid in _running:
+        return "laeuft"
+    if j.get("last_status") == "fehler":
+        return "fehler"
+    if is_paused(j):
+        return "paused"
+    if j.get("last_status") in ("ok", "gestoppt"):
+        return j["last_status"]
+    if not j.get("enabled") and trigger_of(j) != "manual":
+        return "off"
+    return "never" if not j.get("history") else (j.get("last_status") or "ok")
+
+
+def _src_overview(c, f):
+    jobs = c.jobs
+    try:
+        text = open(RCLONE_CONF, encoding="utf-8").read()
+        n_rem = len([n for n in re.findall(r"(?m)^\[(.+?)\]", text) if g.access.remote_ok(n)])
+    except OSError:
+        n_rem = 0
+    n_fail = sum(1 for j in jobs.values() if j.get("last_status") == "fehler")
+    t = i18n.translate
+    return [{"label": t("Aufgaben"), "value": len(jobs), "link": "/"},
+            {"label": t("eingeschaltet"), "value": sum(1 for j in jobs.values() if j.get("enabled")), "link": "/"},
+            {"label": t("laufen"), "value": sum(1 for jid in jobs if jid in _running), "cls": "laeuft", "link": "/"},
+            {"label": t("pausiert"), "value": sum(1 for j in jobs.values() if is_paused(j)), "link": "/"},
+            {"label": t("mit Fehler"), "value": n_fail, "cls": "fehler" if n_fail else "", "link": "/"},
+            {"label": t("Speicherorte"), "value": n_rem, "link": "/remotes"}]
+
+
+def _src_running(c, f):
+    sel = f.get("jobs")
+    return [dict(r, status="laeuft", progress_text=f"{r['progress']} %", link=f"/job/{r['id']}/run/{r['run']}")
+            for r in running_jobs_data() if not sel or r["id"] in sel]
+
+
+def _src_jobs(c, f):
+    rows = []
+    for jid, j in c.pick(f).items():
+        st = _job_state(jid, j)
+        if f.get("job_status") and st != f["job_status"]:
+            continue
+        rows.append({"id": jid, "name": j["name"], "status": st, "status_text": _dstatus(st), "last_run": j.get("last_run", ""),
+                     "link": f"/job/{jid}/log"})
+    order = {"fehler": 0, "laeuft": 1, "gestoppt": 2, "paused": 3, "ok": 4, "never": 5, "off": 6}
+    return sorted(rows, key=lambda r: (order.get(r["status"], 9), r["name"].lower()))
+
+
+def _src_runs(c, f):
+    cut, rows = _dcut(f), []
+    for jid, j in c.pick(f).items():
+        for h in j.get("history") or []:
+            if cut and h.get("start", "") < cut:
+                break   # Verlauf ist neueste zuerst
+            if f.get("run_status") and h.get("status") != f["run_status"]:
+                continue
+            if f.get("run_kind") == "real" and h.get("dry_run") or f.get("run_kind") == "dry" and not h.get("dry_run"):
+                continue
+            rows.append({"id": jid, "name": j["name"], "run": h.get("run"), "start": h.get("start", ""), "status": h.get("status"),
+                         "status_text": _dstatus(h.get("status")) + (" · " + i18n.translate("Testlauf") if h.get("dry_run") else ""),
+                         "duration": h.get("duration"), "duration_text": f"{h.get('duration', 0)} s", "copied": h.get("copied"),
+                         "deleted": h.get("deleted"), "errors": h.get("errors"), "dry_run": bool(h.get("dry_run")),
+                         "link": f"/job/{jid}/run/{h.get('run')}"})
+    return sorted(rows, key=lambda r: r["start"], reverse=True)
+
+
+def _src_next_runs(c, f):
+    rows = []
+    kinds = {"time": "Zeitplan", "live": "Live", "after": "nach Vorgänger (geschätzt)"}
+    for jid, j in c.pick(f).items():
+        t, kind = next_start(c.all_jobs, jid)
+        if t:
+            rows.append({"id": jid, "name": j["name"], "at": t.strftime("%Y-%m-%d %H:%M"), "kind": kind,
+                         "kind_text": i18n.translate(kinds.get(kind, kind)), "link": f"/job/{jid}"})
+    return sorted(rows, key=lambda r: r["at"])
+
+
+def _src_logins(c, f):
+    cut, rows = _dcut(f), []
+    for e in login_log.load():
+        if cut and e.get("time", "") < cut:
+            break
+        if f.get("login_result") == "ok" and not e.get("ok") or f.get("login_result") == "fail" and e.get("ok"):
+            continue
+        st = "ok" if e.get("ok") else "fail"
+        rows.append({"time": e.get("time", ""), "user": e.get("user") or "?", "status": st,
+                     "status_text": i18n.translate("angemeldet" if e.get("ok") else "fehlgeschlagen"),
+                     "reason": e.get("reason", ""), "ip": e.get("ip", ""), "where": f"{e.get('flag', '')} {e.get('ip', '')}".strip(),
+                     "label": e.get("user") or "?", "link": "/users/log"})
+    return rows
+
+
+def _src_audit(c, f):
+    cut, rows = _dcut(f), []
+    for e in audit_log.all():
+        if cut and e.get("ts", "") < cut:
+            break
+        if f.get("audit_cat") and e.get("cat") != f["audit_cat"]:
+            continue
+        rows.append({"ts": e.get("ts", ""), "user": e.get("user", ""), "cat": e.get("cat", ""),
+                     "cat_text": i18n.translate(audit.CATEGORIES.get(e.get("cat"), e.get("cat", ""))),
+                     "action": i18n.translate(e.get("action", "")), "target": e.get("target", ""), "link": "/audit"})
+    return rows
+
+
+def _src_storage(c, f):
+    rows, seen = [], set()
+    for label, path in (("/config", CONFIG_DIR), ("/logs", LOG_DIR)):
         try:
-            text = open(RCLONE_CONF, encoding="utf-8").read()
-            n_rem = len([n for n in re.findall(r"(?m)^\[(.+?)\]", text) if g.access.remote_ok(n)])
+            du = shutil.disk_usage(path)
         except OSError:
-            n_rem = 0
-        out["stats"] = {"jobs": len(visible), "enabled": sum(1 for j in visible.values() if j.get("enabled")),
-                        "running": sum(1 for jid in visible if jid in _running),
-                        "paused": sum(1 for j in visible.values() if is_paused(j)),
-                        "failed": sum(1 for j in visible.values() if j.get("last_status") == "fehler"),
-                        "remotes": n_rem}
-    if "failed" in ids:
-        out["failed"] = sorted(({"id": jid, "name": j["name"], "last_run": j.get("last_run", ""),
-                                 "errors": ((j.get("history") or [{}])[0]).get("errors", 0)}
-                                for jid, j in visible.items() if j.get("last_status") == "fehler"),
-                               key=lambda x: x["last_run"], reverse=True)
-    if "last_runs" in ids:
-        runs = [dict(h, id=jid, name=j["name"]) for jid, j in visible.items() for h in (j.get("history") or [])[:10]]
-        out["last_runs"] = [{k: r.get(k) for k in ("id", "name", "run", "start", "duration", "status", "dry_run", "copied",
-                                                  "deleted", "errors", "by")}
-                            for r in sorted(runs, key=lambda r: r.get("start", ""), reverse=True)[:10]]
-    if "next_runs" in ids:
-        nxt = []
-        for jid, j in visible.items():
-            t, kind = next_start(jobs, jid)
-            if t:
-                nxt.append({"id": jid, "name": j["name"], "at": t.strftime("%Y-%m-%d %H:%M"), "kind": kind})
-        out["next_runs"] = sorted(nxt, key=lambda x: x["at"])[:10]
-    if "logins" in ids:
-        out["logins"] = [{k: e.get(k, "") for k in ("time", "user", "ok", "reason", "ip", "flag", "country")}
-                         for e in login_log.load()[:10]]
-    if "audit" in ids:
-        out["audit"] = [{k: e.get(k, "") for k in ("ts", "user", "cat", "action", "target", "detail")}
-                        for e in audit_log.all()[:10]]
-    if "system" in ids:
-        upd = update_status()
-        last = load_settings().get("restart_last") or {}
-        out["system"] = {"version": VERSION, "latest": upd.get("latest") or "", "update_available": bool(upd.get("update_available")),
-                         "url": upd.get("url") or "", "started": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(_BOOT)),
-                         "uptime": _uptime_text(time.time() - _BOOT), "uptime_seconds": int(time.time() - _BOOT),
-                         "last_restart": last.get("done", ""), "timezone": TZ}
-    return out
+            continue
+        key = (du.total, du.free)
+        pct = round(100 * (du.total - du.free) / du.total) if du.total else 0
+        rows.append({"label": i18n.t("Laufwerk {0}", label) + (" " + i18n.t("(dasselbe wie oben)") if key in seen else ""),
+                     "pct": pct, "value": pct, "value_text": f"{pct} %", "used_text": _size(du.total - du.free),
+                     "free_text": _size(du.free), "status": "fehler" if pct >= 95 else "warn" if pct >= 85 else "ok",
+                     "status_text": f"{pct} %", "cls": "fehler" if pct >= 95 else ""})
+        seen.add(key)
+    usage = 0
+    for root, _, files in os.walk(LOG_DIR):
+        for fn in files:
+            try:
+                usage += os.path.getsize(os.path.join(root, fn))
+            except OSError:
+                pass
+    rows.append({"label": i18n.translate("Logs von MirrorSync"), "pct": None, "value": round(usage / 1048576), "value_text": _size(usage),
+                 "used_text": _size(usage), "free_text": "", "status": "info", "status_text": _size(usage), "link": "/settings/general"})
+    return rows
+
+
+def _src_system(c, f):
+    upd = update_status()
+    last = load_settings().get("restart_last") or {}
+    t = i18n.translate
+    rows = [{"label": t("Version"), "value": f"v{VERSION}", "status": "warn" if upd.get("update_available") else "ok",
+             "status_text": (t("Neue Version verfügbar") + f": v{upd.get('latest')}") if upd.get("update_available") else t("aktuell"),
+             "link": upd.get("url") or ""},
+            {"label": t("Läuft seit"), "value": f"{time.strftime('%Y-%m-%d %H:%M', time.localtime(_BOOT))} ({_uptime_text(time.time() - _BOOT)})",
+             "status": "ok", "status_text": _uptime_text(time.time() - _BOOT)}]
+    if last.get("done"):
+        rows.append({"label": t("Letzter Neustart"), "value": last["done"], "status": "ok", "status_text": last["done"]})
+    rows.append({"label": t("Zeitzone"), "value": TZ, "status": "ok", "status_text": TZ})
+    return rows
+
+
+_DSOURCES = {"overview": _src_overview, "running": _src_running, "jobs": _src_jobs, "runs": _src_runs, "next_runs": _src_next_runs,
+             "logins": _src_logins, "audit": _src_audit, "storage": _src_storage, "system": _src_system}
+
+
+def dashboard_tile_data(tile, ctx=None):
+    ctx = ctx or _DashCtx()
+    try:
+        rows = _DSOURCES[tile["source"]](ctx, tile["filters"])
+    except Exception as e:  # noqa: BLE001 - eine kaputte Kachel soll das Dashboard nicht umwerfen
+        return {"view": tile["view"], "error": str(e)}
+    return dash.shape(tile["source"], tile["view"], rows, tile["filters"], i18n.translate, _dstatus)
+
+
+def dashboard_data(layout=None):
+    """Inhalte der Kacheln (nur die im Layout und mit Recht), nach Kachel-ID."""
+    layout = dashboard_layout() if layout is None else layout
+    ctx = _DashCtx()
+    return {t["id"]: dashboard_tile_data(t, ctx) for t in layout}
+
+
+def _dash_titles(layout):
+    return {t["id"]: dash.tile_title(t, i18n.translate) for t in layout}
+
+
+def _dash_jobs():
+    return sorted(({"id": jid, "name": j["name"]} for jid, j in load_jobs().items() if g.access.job_ok(jid, j)),
+                  key=lambda x: x["name"].lower())
 
 
 @app.get("/dashboard")
 def dashboard_page():
-    layout = dashboard_layout()
+    tabs, tab = dashboard_tab(request.args.get("tab"))
+    layout = tab["tiles"]
     if request.args.get("partial"):
-        return render_template("dashboard_tiles.html", layout=layout, d=dashboard_data(layout), titles=dash.TILES)
-    return render_template("dashboard.html", layout=layout, d=dashboard_data(layout), titles=dash.TILES,
-                           catalog=dash.catalog(g.access.has), tz=TZ)
+        return render_template("dashboard_tiles.html", layout=layout, d=dashboard_data(layout), titles=_dash_titles(layout))
+    if request.args.get("preview"):   # Vorschau einer Kachel im Editor
+        try:
+            raw = json.loads(request.args["preview"])
+        except ValueError:
+            raw = None
+        t, err = dash.clean_tile(raw, g.access.has)
+        if err:
+            return f'<p class="fehler">{Markup.escape(i18n.t(*err))}</p>', 400
+        return render_template("dashboard_tiles.html", layout=[t], d={t["id"]: dashboard_tile_data(t)}, titles=_dash_titles([t]))
+    return render_template("dashboard.html", layout=layout, d=dashboard_data(layout), titles=_dash_titles(layout),
+                           tabs=tabs, tab=tab, catalog=dash.catalog(g.access.has, i18n.translate), djobs=_dash_jobs(), tz=TZ)
 
 
 @app.post("/dashboard/layout")
 def dashboard_save():
+    """Speichern: {"tabs": [...]} alle Tabs, {"tab": id, "tiles": [...]} nur die Kacheln eines Tabs,
+    {"tiles": [...]} die Kacheln des ersten Tabs, {"reset": true} Standard."""
     data = request.get_json(silent=True)
-    if data is None and request.form.get("layout"):
-        try:
-            data = json.loads(request.form["layout"])
-        except ValueError:
-            data = None
-    if isinstance(data, dict) and data.get("reset"):
+    if not isinstance(data, (dict, list)):
+        return {"ok": False, "error": i18n.t("Ungültige Daten.")}, 400
+    if isinstance(data, list):
+        data = {"tiles": data}
+    if data.get("reset"):
         DB.put("dashboard", _dash_key(), None)
-        return {"ok": True, "message": i18n.t("Standard wiederhergestellt."), "tiles": dash.default_layout(g.access.has)}
-    tiles = data.get("tiles") if isinstance(data, dict) else data
-    layout, err = dash.clean(tiles, g.access.has)
+        return {"ok": True, "message": i18n.t("Standard wiederhergestellt."), "tabs": dash.default_tabs(g.access.has, i18n.translate)}
+    if "tabs" in data:
+        tabs, err = dash.clean_tabs(data["tabs"], g.access.has)
+    else:
+        tabs = dashboard_tabs()
+        tab = next((t for t in tabs if t["id"] == data.get("tab")), None) if data.get("tab") else tabs[0]
+        if tab is None:
+            return {"ok": False, "error": i18n.t("Unbekannter Tab: {0}", str(data.get("tab")))}, 404
+        tiles, err = dash.clean(data.get("tiles"), g.access.has)
+        if not err:
+            tab["tiles"] = tiles
     if err:
         return {"ok": False, "error": i18n.t(*err)}, 400
-    DB.put("dashboard", _dash_key(), layout)
-    return {"ok": True, "message": i18n.t("Gespeichert."), "tiles": layout}
+    DB.put("dashboard", _dash_key(), {"tabs": tabs})
+    return {"ok": True, "message": i18n.t("Gespeichert."), "tabs": tabs}
 
 
 # ---------------------------------------------------------------- Zeitplaene (Uebersicht aller Ausloeser)

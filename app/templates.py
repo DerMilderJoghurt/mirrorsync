@@ -2432,65 +2432,121 @@ if(E)dropZone($('manual-drop'),el=>{const id=el.dataset.id;api('/schedules/job/'
 render();
 </script>
 {% endblock %}""",
-"dashboard_tiles.html": r"""{% for t in layout %}{% set x = d.get(t.id) %}<section class="dtile" data-id="{{ t.id }}" data-w="{{ t.w }}" data-h="{{ t.h }}" style="grid-column:span {{ t.w }};grid-row:span {{ t.h }}">
-<div class="dhead"><span class="dgrip" title="Ziehen zum Verschieben">⠿</span><h3>{{ _(titles[t.id][0]) }}</h3><span style="flex:1"></span><span class="dedit"><button type="button" class="btn sm" onclick="dMove(this,-1)" title="Nach vorne">↑</button><button type="button" class="btn sm" onclick="dMove(this,1)" title="Nach hinten">↓</button><small class="dsz mut"></small><button type="button" class="btn sm del" onclick="dHide(this)" title="Ausblenden">✕</button></span></div><span class="dres" title="Ziehen, um Breite und Höhe zu ändern"></span>
+"dashboard_tiles.html": r"""{% for t in layout %}{% set x = d.get(t.id) or {} %}<section class="dtile" data-id="{{ t.id }}" data-w="{{ t.w }}" data-h="{{ t.h }}" data-cfg="{{ t|tojson|forceescape }}" style="grid-column:span {{ t.w }};grid-row:span {{ t.h }}">
+<div class="dhead"><span class="dgrip" title="Ziehen zum Verschieben">⠿</span><h3>{{ titles.get(t.id, '') }}</h3><span style="flex:1"></span><span class="dedit"><button type="button" class="btn sm" onclick="dOpen(this)" title="Bausteine bearbeiten">✎</button><button type="button" class="btn sm" onclick="dMove(this,-1)" title="Nach vorne">↑</button><button type="button" class="btn sm" onclick="dMove(this,1)" title="Nach hinten">↓</button><small class="dsz mut"></small><button type="button" class="btn sm del" onclick="dHide(this)" title="Ausblenden">✕</button></span></div>
 <div class="dbody">
-{% if t.id == "running" %}{% if x %}{% for r in x %}<div class="drun"><div class="dline"><a href="/job/{{ r.id }}/run/{{ r.run }}"><b>{{ r.name }}</b></a><span class="mut"><span>seit</span> {{ r.started }}</span><span style="flex:1"></span><b>{{ r.progress }} %</b></div><div class="fmpbar" style="flex:none;width:100%"><i style="width:{{ r.progress }}%"></i></div>{% if r.stats %}<small class="mut">{{ r.stats }}</small>{% endif %}</div>{% endfor %}{% else %}<p class="mut">Gerade läuft nichts.</p>{% endif %}
-{% elif t.id == "stats" %}<div class="dstats"><a href="/"><b>{{ x.jobs }}</b><span>Aufgaben</span></a><a href="/"><b>{{ x.enabled }}</b><span>eingeschaltet</span></a><a href="/"><b class="laeuft">{{ x.running }}</b><span>laufen</span></a><a href="/"><b>{{ x.paused }}</b><span>pausiert</span></a><a href="/"><b class="{{ 'fehler' if x.failed }}">{{ x.failed }}</b><span>mit Fehler</span></a><a href="/remotes"><b>{{ x.remotes }}</b><span>Speicherorte</span></a></div>
-{% elif t.id == "failed" %}{% if x %}<table>{% for r in x %}<tr class="click" onclick="location='/job/{{ r.id }}/log'"><td><b>{{ r.name }}</b></td><td class="mut">{{ r.last_run }}</td><td class="num fehler">{{ r.errors or "" }}</td></tr>{% endfor %}</table>{% else %}<p class="ok">✓ <span>Alle letzten Läufe waren erfolgreich.</span></p>{% endif %}
-{% elif t.id == "last_runs" %}{% if x %}<table><tr><th>Aufgabe</th><th>Start</th><th>Status</th><th class="hide-sm">Dauer</th><th class="num">Kopiert</th><th class="num hide-sm">Gelöscht</th></tr>{% for r in x %}<tr class="click" onclick="location='/job/{{ r.id }}/run/{{ r.run }}'"><td>{{ r.name }}</td><td class="mut">{{ r.start }}</td><td><span class="tag {{ r.status }}">{{ STATUS.get(r.status, r.status) }}</span>{% if r.dry_run %} <small>Testlauf</small>{% endif %}</td><td class="hide-sm">{{ r.duration }} s</td><td class="num">{{ r.copied if r.copied is not none else "–" }}</td><td class="num hide-sm">{{ r.deleted if r.deleted is not none else "–" }}</td></tr>{% endfor %}</table>{% else %}<p class="mut">Noch keine Läufe.</p>{% endif %}
-{% elif t.id == "next_runs" %}{% if x %}<table>{% for r in x %}<tr class="click" onclick="location='/job/{{ r.id }}'"><td>{{ r.name }}</td><td class="mut" style="white-space:nowrap">{{ r.at }}</td><td>{% if r.kind == "live" %}<span class="tag">Live</span>{% elif r.kind == "after" %}<span class="tag" title="geschätzt über die vorherige Aufgabe">⛓</span>{% endif %}</td></tr>{% endfor %}</table>{% else %}<p class="mut">Keine geplanten Starts.</p>{% endif %}
-{% elif t.id == "logins" %}{% if x %}<table>{% for e in x %}<tr><td style="white-space:nowrap">{{ e.time }}</td><td><b>{{ e.user or "?" }}</b></td><td>{% if e.ok %}<span class="tag ok">angemeldet</span>{% else %}<span class="tag fehler" title="{{ e.reason }}">fehlgeschlagen</span>{% endif %}</td><td class="hide-sm mut">{{ e.flag }} {{ e.ip }}</td></tr>{% endfor %}</table><p style="margin:8px 0 0"><a href="/users/log">Ganzer Anmeldeverlauf</a></p>{% else %}<p class="mut">Noch keine Anmeldungen.</p>{% endif %}
-{% elif t.id == "audit" %}{% if x %}<table>{% for e in x %}<tr><td style="white-space:nowrap" class="mut">{{ e.ts }}</td><td>{{ e.user }}</td><td>{{ _(e.action) }} <small class="mut">{{ e.target }}</small></td></tr>{% endfor %}</table><p style="margin:8px 0 0"><a href="/audit">Ganzes Audit-Log</a></p>{% else %}<p class="mut">Noch keine Einträge.</p>{% endif %}
-{% elif t.id == "system" %}<table><tr><td class="mut">Version</td><td><b>v{{ x.version }}</b>{% if x.update_available %} <a class="tag ok" href="{{ x.url }}" target="_blank" rel="noopener">⬆ v{{ x.latest }}</a>{% endif %}</td></tr><tr><td class="mut">Läuft seit</td><td>{{ x.started }} <small class="mut">({{ x.uptime }})</small></td></tr>{% if x.last_restart %}<tr><td class="mut">Letzter Neustart</td><td>{{ x.last_restart }}</td></tr>{% endif %}<tr><td class="mut">Zeitzone</td><td>{{ x.timezone }}</td></tr></table>
-{% endif %}</div></section>{% endfor %}""",
+{% if x.error %}<p class="fehler"><span>Fehler in dieser Kachel:</span> {{ x.error }}</p>
+{% elif x.view == "number" %}<div class="dnums">{% for n in x.numbers %}<a {% if n.link %}href="{{ n.link }}"{% endif %}><b class="{{ n.cls }}">{{ n.value }}</b><span>{{ n.label }}</span></a>{% endfor %}</div>
+{% elif x.view == "list" %}{% if x.rows %}<table>{% if x.cols|selectattr('label')|list %}<tr>{% for c in x.cols %}<th class="{{ 'num' if c.key in ('copied','deleted','errors') }}">{{ c.label }}</th>{% endfor %}</tr>{% endif %}
+{% for r in x.rows %}<tr {% if r.link %}class="click" onclick="location='{{ r.link }}'"{% endif %}>{% for c in x.cols %}{% set v = r.get(c.key) %}<td class="{{ 'num' if c.key in ('copied','deleted','errors') }}{{ ' mut' if c.key in ('started','start','last_run','at','time','ts') }}">{% if c.key == "status_text" %}<span class="tag {{ r.status }}">{{ v }}</span>{% elif c.key in ("name", "label") %}<b>{{ v }}</b>{% else %}{{ "–" if v is none or v == "" else v }}{% endif %}</td>{% endfor %}</tr>{% endfor %}</table>{% if x.total > x.rows|length %}<p class="mut" style="margin:6px 0 0"><small><span>weitere Einträge:</span> {{ x.total - x.rows|length }}</small></p>{% endif %}
+{% else %}<p class="mut">Keine Einträge.</p>{% endif %}
+{% elif x.view == "bar" %}{% if x.bars %}{% for b in x.bars %}<div class="dbarrow"><span class="dbl">{% if b.link %}<a href="{{ b.link }}">{{ b.label }}</a>{% else %}{{ b.label }}{% endif %}</span><span class="dbt"><i class="{{ b.cls }}" style="width:{{ [100, (100 * b.value / (b.max or 1))|round|int]|min }}%"></i></span><span class="dbv">{{ b.text }}</span></div>{% endfor %}
+{% else %}<p class="mut">Keine Einträge.</p>{% endif %}
+{% elif x.view == "ampel" %}<div class="damp"><span class="dot big {{ x.overall }}"></span><span>{% for k, n in x.counts.items() %}<span class="dot {{ k }}"></span> {{ n }} &nbsp;{% endfor %}{% if not x.counts %}<span class="mut">Keine Einträge.</span>{% endif %}</span></div>
+{% for l in x.lights %}<div class="dlight">{% if l.link %}<a href="{{ l.link }}">{% endif %}<span class="dot {{ l.state }}"></span> <b>{{ l.label }}</b>{% if l.link %}</a>{% endif %} <small class="mut">{{ l.text }}</small></div>{% endfor %}
+{% endif %}</div><span class="dres" title="Ziehen, um Breite und Höhe zu ändern"></span></section>{% endfor %}""",
 "dashboard.html": r"""{% extends "base.html" %}{% block title %}Dashboard{% endblock %}
 {% block actions %}<button type="button" class="btn" id="dEditBtn" onclick="dEdit(true)">Anpassen</button>{% endblock %}
 {% block body %}<style>
 .dgrid{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));grid-auto-rows:40px;grid-auto-flow:row dense;gap:14px}
 .dtile{background:var(--card);border:1px solid var(--bd);border-radius:12px;box-shadow:var(--shadow);min-width:0;min-height:0;display:flex;flex-direction:column;position:relative;overflow:hidden}
 .dhead{display:flex;align-items:center;gap:8px;padding:12px 16px 4px;flex:none}.dhead h3{margin:0;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.dbody{padding:4px 16px 14px;overflow:auto;flex:1;min-height:0}
+.dbody{padding:4px 16px 14px;overflow:auto;flex:1;min-height:0}.dbody table{width:100%}.dbody td,.dbody th{padding:5px 6px}
+.dgrip,.dedit{display:none}.dgrid.editing .dgrip{display:inline;cursor:grab;color:var(--mut)}.dgrid.editing .dedit{display:inline-flex;gap:4px;align-items:center}
+.dgrid.editing .dtile{outline:2px dashed var(--bd2);outline-offset:-2px}.dgrid.editing .dtile.drag{opacity:.4}
 .dres{display:none;position:absolute;right:0;bottom:0;width:22px;height:22px;cursor:nwse-resize;touch-action:none;background:linear-gradient(135deg,transparent 50%,var(--acc) 50%);border-bottom-right-radius:12px}
 .dgrid.editing .dres{display:block}.dgrid.editing .dtile.rs{outline-color:var(--acc)}.dsz{min-width:44px;text-align:right}
-@media(max-width:820px){.dgrid{grid-template-columns:1fr;grid-auto-rows:auto}.dtile{grid-column:1/-1!important;grid-row:auto!important}.dtile .dbody{max-height:420px}.dres,.dsz{display:none!important}}.dbody table{width:100%}.dbody td,.dbody th{padding:5px 6px}
-.dgrip,.dedit{display:none}.dgrid.editing .dgrip{display:inline;cursor:grab;color:var(--mut)}.dgrid.editing .dedit{display:inline-flex;gap:4px}
-.dgrid.editing .dtile{outline:2px dashed var(--bd2);outline-offset:-2px}.dgrid.editing .dtile.drag{opacity:.4}
-.drun{padding:6px 0;border-bottom:1px solid var(--bd)}.drun:last-child{border-bottom:0}.dline{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;margin-bottom:4px}
-.dstats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.dstats a{display:flex;flex-direction:column;padding:8px 10px;border:1px solid var(--bd);border-radius:10px;color:inherit;text-decoration:none}
-.dstats a:hover{background:var(--acc-soft)}.dstats b{font-size:22px}.dstats span{color:var(--mut);font-size:12px}
-#dbar{display:none;margin-bottom:14px}#dbar.on{display:block}.dadd{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.dnums{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px}.dnums a{display:flex;flex-direction:column;padding:8px 10px;border:1px solid var(--bd);border-radius:10px;color:inherit;text-decoration:none}
+.dnums a[href]:hover{background:var(--acc-soft)}.dnums b{font-size:24px;line-height:1.2}.dnums span{color:var(--mut);font-size:12px}
+.dbarrow{display:grid;grid-template-columns:minmax(80px,38%) 1fr auto;gap:10px;align-items:center;padding:4px 0}.dbl{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dbt{height:10px;background:var(--bd);border-radius:5px;overflow:hidden}.dbt i{display:block;height:100%;background:var(--acc)}.dbt i.ok{background:var(--ok)}.dbt i.fehler,.dbt i.fail{background:var(--err)}.dbt i.gestoppt,.dbt i.paused{background:var(--warn)}.dbt i.laeuft{background:var(--run)}
+.dbv{white-space:nowrap;font-variant-numeric:tabular-nums}
+.dot{display:inline-block;width:11px;height:11px;border-radius:50%;background:var(--bd2);vertical-align:middle}.dot.big{width:34px;height:34px}
+.dot.green{background:var(--ok)}.dot.red{background:var(--err)}.dot.yellow{background:var(--warn)}.dot.blue{background:var(--run)}.dot.grey{background:var(--bd2)}
+.damp{display:flex;gap:14px;align-items:center;margin:2px 0 8px}.dlight{padding:3px 0}.dlight a{color:inherit;text-decoration:none}
+@media(max-width:820px){.dgrid{grid-template-columns:1fr;grid-auto-rows:auto}.dtile{grid-column:1/-1!important;grid-row:auto!important}.dtile .dbody{max-height:420px}.dres,.dsz{display:none!important}}
+#dbar{display:none;margin-bottom:14px}#dbar.on{display:block}
+.dtabs{display:flex;gap:4px;flex-wrap:wrap;border-bottom:1px solid var(--bd);margin:0 0 14px;align-items:flex-end}.dtabs a{padding:8px 14px;border:1px solid transparent;border-bottom:0;border-radius:10px 10px 0 0;color:var(--mut);text-decoration:none;margin-bottom:-1px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dtabs a:hover{color:var(--fg);background:var(--card2)}.dtabs a.on{background:var(--card);border-color:var(--bd);color:var(--fg);font-weight:600}
+.dtabtools{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:10px;padding-top:10px;border-top:1px solid var(--bd)}.dtabtools input{width:220px}.dadd{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center}
+#dlg{width:min(860px,96vw);border:1px solid var(--bd);border-radius:12px;background:var(--card);color:var(--fg);padding:20px 22px}#dlg .dfl{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px 16px}
+#dlg .dviews{display:flex;gap:6px;flex-wrap:wrap}#dlg .dviews label{display:inline-flex;gap:6px;align-items:center;border:1px solid var(--bd2);border-radius:8px;padding:5px 10px;margin:0;cursor:pointer}
+#dlg .dviews label.dis{opacity:.4;cursor:not-allowed}#dlg .djobs{max-height:150px;overflow:auto;border:1px solid var(--bd);border-radius:8px;padding:6px 8px}
+#dprev{margin-top:12px;display:grid;grid-template-columns:1fr;grid-auto-rows:auto}#dprev .dtile{min-height:120px;max-height:360px}#dprev .dres,#dprev .dedit,#dprev .dgrip{display:none!important}
 </style>
-<div class="card" id="dbar"><b>Dashboard anpassen</b> <span class="mut">Kacheln ziehen oder mit ↑ ↓ verschieben, an der Ecke unten rechts größer oder kleiner ziehen, mit ✕ ausblenden. Kleine Kacheln rücken automatisch in freie Lücken, z. B. zwei halb so hohe untereinander neben eine große.</span>
-<div class="dadd" id="dadd"></div>
+<div class="card" id="dbar"><b>Dashboard anpassen</b> <span class="mut">Kacheln ziehen oder mit ↑ ↓ verschieben, an der Ecke unten rechts größer oder kleiner ziehen, mit ✎ die Bausteine ändern, mit ✕ ausblenden. Kleine Kacheln rücken automatisch in freie Lücken.</span>
+<div class="dtabtools"><b>Tab</b><input type="text" id="tabName" maxlength="40" value="{{ tab.name }}" aria-label="Name des Tabs"><button type="button" class="btn sm" onclick="tabMove(-1)" title="Tab nach links">←</button><button type="button" class="btn sm" onclick="tabMove(1)" title="Tab nach rechts">→</button><button type="button" class="btn sm" onclick="tabNew()">+ Neuer Tab</button>{% if tabs|length > 1 %}<button type="button" class="btn sm del" onclick="tabDel()">Tab löschen</button>{% endif %}<small class="mut">Name und Reihenfolge werden mit „Speichern“ übernommen.</small></div>
+<div class="dadd"><button type="button" class="btn sm pri" onclick="dOpen(null)">+ Eigene Kachel</button><select id="dpre" style="width:auto"><option value="">+ Vorlage hinzufügen …</option></select></div>
 <p style="margin:12px 0 0"><button type="button" class="btn pri" onclick="dSave()">Speichern</button> <button type="button" class="btn" onclick="location.reload()">Abbrechen</button> <button type="button" class="btn" onclick="dReset()">Standard wiederherstellen</button></p></div>
+<div class="dtabs" id="dtabs" role="tablist">{% for t in tabs %}<a href="/dashboard?tab={{ t.id }}" data-id="{{ t.id }}" class="{{ 'on' if t.id == tab.id }}" onclick="try{localStorage.setItem('ms-dtab',this.dataset.id)}catch(e){}">{{ t.name }}</a>{% endfor %}</div>
 <div class="dgrid" id="dgrid">{% include "dashboard_tiles.html" %}</div>
 {% if not layout %}<div class="card empty" id="dempty"><p>Keine Kacheln ausgewählt. Mit „Anpassen“ Kacheln hinzufügen.</p></div>{% endif %}
+<dialog id="dlg"><h2 style="margin-top:0" id="dlgTitle">Kachel bearbeiten</h2>
+<div class="dfl"><div><label>Titel</label><input type="text" id="fTitle" maxlength="80" placeholder="Name der Datenquelle"></div>
+<div><label>Datenquelle</label><select id="fSrc"></select><div class="hint" id="fSrcHint"></div></div></div>
+<label style="margin-top:10px">Darstellung</label><div class="dviews" id="fViews"></div>
+<div class="dfl" id="fFil" style="margin-top:10px"></div>
+<div class="dfl" style="margin-top:10px"><div><label>Breite (1–12 Spalten)</label><input type="number" id="fW" min="1" max="12"></div><div><label>Höhe (1–24 Zeilen)</label><input type="number" id="fH" min="1" max="24"></div></div>
+<label style="margin-top:12px">Vorschau</label><div id="dprev"></div>
+<p style="margin:14px 0 0"><button type="button" class="btn pri" onclick="dApply()">Übernehmen</button> <button type="button" class="btn" onclick="document.getElementById('dlg').close()">Abbrechen</button></p></dialog>
 <script>
-const CAT={{ catalog|tojson }};let editing=false,dragEl=null;const G=document.getElementById('dgrid');
-function dTiles(){return [...G.querySelectorAll('.dtile')].map(t=>({id:t.dataset.id,w:+t.dataset.w,h:+t.dataset.h}))}
+const CAT={{ catalog|tojson }},JOBS={{ djobs|tojson }},TABS={{ tabs|tojson }},CUR={{ tab.id|tojson }};let editing=false,dragEl=null,cur=null;const G=document.getElementById('dgrid');
+(()=>{try{const q=new URLSearchParams(location.search);if(!q.get('tab')){const t=localStorage.getItem('ms-dtab');if(t&&t!==CUR&&TABS.some(x=>x.id===t))location.replace('/dashboard?tab='+encodeURIComponent(t))}else localStorage.setItem('ms-dtab',CUR)}catch(e){}})();
+function curIdx(){return TABS.findIndex(t=>t.id===CUR)}
+function tabBar(){const n=document.getElementById('dtabs');n.innerHTML='';TABS.forEach(t=>{const a=document.createElement('a');a.href='/dashboard?tab='+encodeURIComponent(t.id);a.textContent=t.name;if(t.id===CUR)a.className='on';n.appendChild(a)})}
+document.getElementById('tabName').addEventListener('input',e=>{TABS[curIdx()].name=e.target.value;tabBar()});
+function tabMove(d){const i=curIdx(),j=i+d;if(j<0||j>=TABS.length)return;[TABS[i],TABS[j]]=[TABS[j],TABS[i]];tabBar()}
+function tabSync(){if(curIdx()>=0)TABS[curIdx()].tiles=dTiles();TABS.forEach(t=>{t.name=(t.name||'').trim()||"Tab"})}
+async function tabPost(go){tabSync();const r=await fetch('/dashboard/layout',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify({tabs:TABS})});const j=await r.json().catch(()=>({}));
+ if(!r.ok||!j.ok){alert(j.error||r.status);return}const t=j.tabs[Math.max(0,Math.min(go,j.tabs.length-1))];try{localStorage.setItem('ms-dtab',t.id)}catch(e){}location.href='/dashboard?tab='+encodeURIComponent(t.id)}
+function tabNew(){TABS.push({id:'',name:"Neuer Tab",tiles:[]});tabPost(TABS.length-1)}
+function tabDel(){if(TABS.length<2||!confirm("Diesen Tab mit allen Kacheln löschen?"))return;const i=curIdx();TABS.splice(i,1);tabPost(Math.max(0,i-1))}
+const VNAME=Object.fromEntries(CAT.views.map(v=>[v.id,v.title])),SRC=Object.fromEntries(CAT.sources.map(s=>[s.id,s]));
+function cfgOf(t){try{return JSON.parse(t.dataset.cfg)}catch(e){return {id:t.dataset.id}}}
+function dTiles(){return [...G.querySelectorAll('.dtile')].map(t=>Object.assign(cfgOf(t),{w:+t.dataset.w,h:+t.dataset.h}))}
 function dSet(t,w,h){t.dataset.w=w;t.dataset.h=h;t.style.gridColumn='span '+w;t.style.gridRow='span '+h;const z=t.querySelector('.dsz');if(z)z.textContent=w+' × '+h}
 function dRes(t){const hd=t.querySelector('.dres');if(!hd||hd.dataset.on)return;hd.dataset.on=1;
  hd.onpointerdown=e=>{if(!editing)return;e.preventDefault();e.stopPropagation();hd.setPointerCapture(e.pointerId);t.draggable=false;t.classList.add('rs');
   const gs=getComputedStyle(G),gap=parseFloat(gs.columnGap)||14,cw=(G.clientWidth-11*gap)/12+gap,rh=40+(parseFloat(gs.rowGap)||14),x0=e.clientX,y0=e.clientY,w0=+t.dataset.w,h0=+t.dataset.h;
   hd.onpointermove=m=>dSet(t,Math.max(1,Math.min(12,Math.round(w0+(m.clientX-x0)/cw))),Math.max(1,Math.min(24,Math.round(h0+(m.clientY-y0)/rh))));
   hd.onpointerup=()=>{hd.onpointermove=null;hd.onpointerup=null;t.classList.remove('rs');t.draggable=editing}}}
-function dAddList(){const have=new Set(dTiles().map(t=>t.id)),box=document.getElementById('dadd');box.innerHTML='';
- CAT.filter(c=>!have.has(c.id)).forEach(c=>{const b=document.createElement('button');b.type='button';b.className='btn sm';b.textContent='+ '+c.title;b.title=c.description;b.onclick=()=>dAdd(c);box.appendChild(b)});
- if(!box.children.length){box.innerHTML='<span class="mut">'+"Alle Kacheln sind schon zu sehen."+'</span>'}}
-function dAdd(c){const s=document.createElement('section');s.className='dtile';s.dataset.id=c.id;
- s.innerHTML='<div class="dhead"><span class="dgrip">⠿</span><h3></h3><span style="flex:1"></span><span class="dedit"><button type="button" class="btn sm" onclick="dMove(this,-1)">↑</button><button type="button" class="btn sm" onclick="dMove(this,1)">↓</button><small class="dsz mut"></small><button type="button" class="btn sm del" onclick="dHide(this)">✕</button></span></div><div class="dbody"><p class="mut">'+"Wird nach dem Speichern angezeigt."+'</p></div><span class="dres"></span>';
- s.querySelector('h3').textContent=c.title;G.appendChild(s);dSet(s,c.w,c.h);dDrag(s);dRes(s);dAddList();const e=document.getElementById('dempty');if(e)e.remove()}
 function dMove(b,dir){const t=b.closest('.dtile');if(dir<0&&t.previousElementSibling)G.insertBefore(t,t.previousElementSibling);else if(dir>0&&t.nextElementSibling)G.insertBefore(t.nextElementSibling,t)}
-function dHide(b){b.closest('.dtile').remove();dAddList()}
+function dHide(b){b.closest('.dtile').remove()}
 function dDrag(t){t.draggable=editing;t.ondragstart=e=>{dragEl=t;t.classList.add('drag');e.dataTransfer.effectAllowed='move';try{e.dataTransfer.setData('text/plain',t.dataset.id)}catch(x){}};t.ondragend=()=>{t.classList.remove('drag');dragEl=null};
  t.ondragover=e=>{if(!dragEl||dragEl===t)return;e.preventDefault();const r=t.getBoundingClientRect(),after=(e.clientY-r.top)>r.height/2||(e.clientX-r.left)>r.width*0.66;G.insertBefore(dragEl,after?t.nextSibling:t)}}
-function dEdit(on){editing=on;G.classList.toggle('editing',on);document.getElementById('dbar').classList.toggle('on',on);document.getElementById('dEditBtn').style.display=on?'none':'';G.querySelectorAll('.dtile').forEach(t=>{dDrag(t);dRes(t);dSet(t,+t.dataset.w,+t.dataset.h)});if(on)dAddList()}
+function dPrep(t){dDrag(t);dRes(t);dSet(t,+t.dataset.w,+t.dataset.h)}
+function dEdit(on){editing=on;G.classList.toggle('editing',on);document.getElementById('dbar').classList.toggle('on',on);document.getElementById('dEditBtn').style.display=on?'none':'';G.querySelectorAll('.dtile').forEach(dPrep)}
+const pre=document.getElementById('dpre');CAT.presets.forEach((p,i)=>{const o=document.createElement('option');o.value=i;o.textContent=p.title+' ('+VNAME[p.view]+')';pre.appendChild(o)});
+pre.onchange=()=>{if(pre.value==='')return;const p=JSON.parse(JSON.stringify(CAT.presets[+pre.value]));pre.value='';if(G.querySelector('.dtile[data-id="'+p.id+'"]'))p.id='';dPut(null,p)};
+async function dRender(cfg){const r=await fetch('/dashboard?preview='+encodeURIComponent(JSON.stringify(cfg)));const tx=await r.text();if(!r.ok)return {err:tx};const b=document.createElement('div');b.innerHTML=tx;return {el:b.querySelector('.dtile')}}
+async function dPut(old,cfg){const res=await dRender(cfg);if(res.err){alert(res.err.replace(/<[^>]+>/g,''));return false}const el=res.el;if(old)old.replaceWith(el);else{G.appendChild(el);const e=document.getElementById('dempty');if(e)e.remove()}dPrep(el);return true}
+function opt(sel,v,l,on){const o=document.createElement('option');o.value=v;o.textContent=l;if(on)o.selected=true;sel.appendChild(o)}
+function dForm(cfg){const s=document.getElementById('fSrc');s.innerHTML='';CAT.sources.forEach(x=>opt(s,x.id,x.title,x.id==cfg.source));
+ const src=SRC[cfg.source]||CAT.sources[0];document.getElementById('fSrcHint').textContent=src.description;
+ const vs=document.getElementById('fViews');vs.innerHTML='';CAT.views.forEach(v=>{const ok=src.views.includes(v.id),l=document.createElement('label');if(!ok)l.className='dis';
+  l.innerHTML='<input type="radio" name="fView" value="'+v.id+'"'+(ok?'':' disabled')+(v.id==cfg.view?' checked':'')+'> ';l.appendChild(document.createTextNode(v.title));vs.appendChild(l)});
+ if(!vs.querySelector('input:checked'))vs.querySelector('input:not([disabled])').checked=true;
+ const ff=document.getElementById('fFil');ff.innerHTML='';const f=cfg.filters||{};
+ src.filters.forEach(x=>{const d=document.createElement('div');const lb=document.createElement('label');lb.textContent=x.label;d.appendChild(lb);let inp;
+  if(x.type=='select'){inp=document.createElement('select');x.options.forEach(o=>opt(inp,o.value,o.label,(f[x.key]||'')==o.value))}
+  else if(x.type=='int'){inp=document.createElement('input');inp.type='number';inp.min=x.min;inp.max=x.max;inp.value=f[x.key]||x.default}
+  else{inp=document.createElement('div');inp.className='djobs';const selj=new Set(f.jobs||[]);JOBS.forEach(j=>{const l=document.createElement('label');l.className='check';l.style.margin='0';l.innerHTML='<input type="checkbox" value="'+j.id+'"'+(selj.has(j.id)?' checked':'')+'> ';l.appendChild(document.createTextNode(j.name));inp.appendChild(l)})}
+  inp.dataset.key=x.key;inp.dataset.type=x.type;d.appendChild(inp);if(x.hint){const h=document.createElement('div');h.className='hint';h.textContent=x.hint;d.appendChild(h)}ff.appendChild(d)})}
+function dRead(){const c={id:cur.cfg.id||'',title:document.getElementById('fTitle').value.trim(),source:document.getElementById('fSrc').value,
+ view:(document.querySelector('input[name=fView]:checked')||{}).value,filters:{},w:+document.getElementById('fW').value||4,h:+document.getElementById('fH').value||5};
+ document.querySelectorAll('#fFil [data-key]').forEach(e=>{const k=e.dataset.key;if(e.dataset.type=='jobs'){const v=[...e.querySelectorAll('input:checked')].map(i=>i.value);if(v.length)c.filters[k]=v}else if(e.dataset.type=='int'){c.filters[k]=+e.value}else if(e.value)c.filters[k]=e.value});return c}
+let pvT=null;function dPrev(){clearTimeout(pvT);pvT=setTimeout(async()=>{const r=await dRender(dRead());const p=document.getElementById('dprev');p.innerHTML='';if(r.err)p.innerHTML=r.err;else{r.el.style.cssText='';p.appendChild(r.el)}},250)}
+function dOpen(b){const t=b?b.closest('.dtile'):null;const cfg=t?Object.assign(cfgOf(t),{w:+t.dataset.w,h:+t.dataset.h}):{id:'',title:'',source:'runs',view:'number',filters:{},w:4,h:4};cur={tile:t,cfg:cfg};
+ document.getElementById('dlgTitle').textContent=t?"Kachel bearbeiten":"Eigene Kachel";document.getElementById('fTitle').value=cfg.title||'';document.getElementById('fTitle').placeholder=t?t.querySelector('h3').textContent:'';
+ document.getElementById('fW').value=cfg.w;document.getElementById('fH').value=cfg.h;dForm(cfg);document.getElementById('dlg').showModal();dPrev()}
+document.getElementById('dlg').addEventListener('change',e=>{if(e.target.id=='fSrc'){const c=dRead();c.filters={};c.view='';dForm(c)}dPrev()});
+document.getElementById('dlg').addEventListener('input',e=>{if(e.target.type!='checkbox'&&e.target.type!='radio')dPrev()});
+async function dApply(){const c=dRead();if(await dPut(cur.tile,c))document.getElementById('dlg').close()}
 async function dPost(body){const r=await fetch('/dashboard/layout',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify(body)});const j=await r.json().catch(()=>({}));if(!r.ok||!j.ok){alert(j.error||r.status);return}location.reload()}
-function dSave(){dPost({tiles:dTiles()})}
+function dSave(){tabPost(curIdx())}
 function dReset(){dPost({reset:true})}
 setInterval(async()=>{if(editing||document.hidden||String(getSelection())!=='')return;const tp=document.getElementById('taskpop');if(tp&&!tp.hidden)return;
- try{const r=await fetch('/dashboard?partial=1');if(r.ok&&!editing)G.innerHTML=await r.text()}catch(e){}},5000);
+ try{const r=await fetch('/dashboard?partial=1&tab='+encodeURIComponent(CUR));if(r.ok&&!editing)G.innerHTML=await r.text()}catch(e){}},5000);
 </script>
 {% endblock %}""",
 "access.html": r"""{% extends "base.html" %}{% block title %}Einstellungen{% endblock %}{% block body %}{% include "tabs.html" %}
