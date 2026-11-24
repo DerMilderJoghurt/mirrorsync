@@ -2085,8 +2085,26 @@ scope();
 <form method="post" style="margin-top:16px"><input type="hidden" name="section" value="selfupdate">
 <label class="check"><input type="checkbox" name="selfupdate_auto" {{ "checked" if su.auto }}> Automatisch aktualisieren, einmal am Tag</label>
 <div class="row"><div style="flex:0 0 200px"><label>Ab Uhrzeit</label><input type="time" name="selfupdate_time" value="{{ su.time }}"></div></div>
-<div class="hint">Läuft gerade eine Aufgabe, wartet das Update, bis sie fertig ist. Zeitzone des Containers.</div>
-<p><button class="btn pri">Speichern</button></p></form>{% endif %}</div>{% endif %}
+<label class="check"><input type="checkbox" name="selfupdate_prune" {{ "checked" if s.selfupdate_prune is not defined or s.selfupdate_prune }}> Altes Image nach dem Update löschen</label>
+<div class="hint">Läuft gerade eine Aufgabe, wartet das Update, bis sie fertig ist. Zeitzone des Containers. Das alte Image wird nur gelöscht, wenn es kein anderer Container mehr verwendet.</div>
+<p><button class="btn pri">Speichern</button></p></form>
+{% if old_imgs is not none %}<h3 style="margin-top:18px">Alte MirrorSync-Images</h3>
+{% if old_imgs %}<table><tr><th>Version</th><th>Image-Tag</th><th>Erstellt</th><th>Größe</th></tr>{% for im in old_imgs %}<tr><td>{{ "v" ~ im.version if im.version else "–" }}</td><td><code>{{ im.tags|join(", ") or im.id[7:19] }}</code></td><td>{{ im.created }}</td><td>{{ (im.size / 1048576)|round|int }} MB</td></tr>{% endfor %}</table>
+{% if can("system.update") %}<form method="post" action="/system/images/prune" onsubmit="return confirm('Die alten MirrorSync-Images löschen? Ein Zurückspringen auf diese Versionen braucht danach wieder einen Download.')" style="margin-top:10px"><input type="hidden" name="back" value="/settings/general#selfupdate"><button class="btn del">Alte Images entfernen</button></form>{% endif %}
+{% else %}<p class="mut">Keine alten Images vorhanden.</p>{% endif %}{% endif %}{% endif %}</div>{% endif %}
+{% if restart %}{% set rs = restart %}<div class="card" id="restart"><h2>Neustart</h2>
+<p class="mut" style="margin-top:-4px">Startet den Container von MirrorSync neu, zum Beispiel wenn eine Verbindung hängt. Die Oberfläche ist danach einige Sekunden nicht erreichbar. Laufende Aufgaben werden dabei abgebrochen.</p>
+{% if rs.socket %}<p class="hint"><span>Weg:</span> <b><span>Docker-Socket</span></b> · <span>Neustart-Regel:</span> <code>{{ rs.policy or "?" }}</code></p>
+{% else %}<p class="hint">Ohne Docker-Socket beendet sich MirrorSync und Docker startet den Container über die Neustart-Regel wieder. Dafür muss in der Compose-Datei <code>restart: unless-stopped</code> (oder <code>always</code>) stehen, sonst bleibt MirrorSync aus.</p>{% endif %}
+{% if rs.socket and rs.policy in ("no", "") %}<p class="hint fehler"><span>Achtung: Die Neustart-Regel des Containers ist</span> <code>{{ rs.policy or "no" }}</code>. <span>Der Neustart klappt über den Socket trotzdem, aber nach einem Neustart des Hosts startet MirrorSync nicht von selbst.</span></p>{% endif %}
+{% if rs.last and rs.last.done %}<p><span class="tag ok">Letzter Neustart</span> <small class="mut">{{ rs.last.done }} · {{ rs.last.by }}</small></p>{% endif %}
+{% if can("system.restart") %}<form method="post" action="/system/restart" onsubmit="return confirm('MirrorSync jetzt neu starten? Die Oberfläche ist einige Sekunden nicht erreichbar.')"><input type="hidden" name="back" value="/settings/general#restart"><button class="btn pri">Jetzt neu starten</button>{% if rs.jobs_running %} <label class="check" style="display:inline-flex;margin-left:10px"><input type="checkbox" name="force" value="1"> <span>auch wenn Aufgaben laufen</span> ({{ rs.jobs_running|length }})</label>{% endif %}</form>{% endif %}
+<form method="post" style="margin-top:16px"><input type="hidden" name="section" value="restart">
+<label class="check"><input type="checkbox" name="restart_auto" {{ "checked" if rs.auto }}> Nach Zeitplan neu starten</label>
+<div class="row"><div style="flex:0 0 200px"><label>Uhrzeit</label><input type="time" name="restart_time" value="{{ rs.time }}"></div>
+<div><label>Wochentage</label><div style="display:flex;gap:10px;flex-wrap:wrap">{% for d in range(7) %}<label class="check" style="margin:0"><input type="checkbox" name="restart_day_{{ d }}" {{ "checked" if d in rs.days }}> {{ day_names[d] }}</label>{% endfor %}</div></div></div>
+<div class="hint">Läuft gerade eine Aufgabe, wartet der Neustart, bis sie fertig ist (höchstens bis Mitternacht). Zeitzone des Containers.</div>
+<p><button class="btn pri">Speichern</button></p></form></div>{% endif %}
 <form method="post"><div class="card"><h2>Logs aufbewahren</h2>
 <p class="mut" style="margin-top:-4px">Jeder Lauf bekommt ein eigenes Log. Ältere Läufe werden nach jedem Lauf automatisch gelöscht.</p>
 <div class="row"><div><label>Läufe pro Aufgabe behalten</label><input type="text" inputmode="numeric" name="log_keep_runs" value="{{ s.log_keep_runs }}"><div class="hint">0 bis 1000, 0 = unbegrenzt</div></div>

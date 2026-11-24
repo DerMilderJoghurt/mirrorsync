@@ -49,6 +49,7 @@ PERM_GROUPS = [
         ("system.audit", "Audit-Log ansehen und exportieren"),
         ("system.api", "API-Keys verwalten (nur mit Rechten, die man selbst hat)"),
         ("system.update", "MirrorSync aktualisieren (Selbst-Update über den Docker-Socket)"),
+        ("system.restart", "MirrorSync neu starten (Container)"),
     ]),
 ]
 ALL_PERMS = [p for _, perms in PERM_GROUPS for p, _ in perms]

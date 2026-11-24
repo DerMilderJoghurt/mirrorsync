@@ -20,7 +20,7 @@ SECRET_RE = re.compile(r"(pass|secret|token|apprise_urls|hash|backup_codes|priva
 NOISE = {
     "job": {"history", "last_status", "last_run", "live_last", "live_checked", "live_failing", "live_fail_count", "bisync_ready", "bisync_need_resync", "window_wait"},
     "user": {"last_login", "last_ip", "last_country", "last_flag", "fail_count", "auto_lock_until", "sv", "created", "totp_last", "passkeys", "webauthn_id"},
-    "remote": set(), "role": set(), "group": set(), "apikey": set(), "settings": {"selfupdate_last_auto", "update_notified"}, "access": set(),
+    "remote": set(), "role": set(), "group": set(), "apikey": set(), "settings": {"selfupdate_last_auto", "update_notified", "restart_last_auto", "restart_pending", "restart_last"}, "access": set(),
 }
 
 LABELS = {
@@ -35,7 +35,7 @@ LABELS = {
     "trigger": "Startart", "after_job": "nach Aufgabe", "after_when": "Bedingung", "live_interval": "Live-Intervall (Min.)",
     "live_full": "voller Abgleich", "live_mode": "Live-Modus", "direction": "Art", "bisync_conflict": "Konfliktregel", "bisync_max_delete": "Löschschutz (%)", "bw_mode": "Bandbreite", "bw": "eigene Bandbreite", "notify_mode": "Benachrichtigung",
     "notify_when": "benachrichtigen bei", "owner": "Besitzer", "role": "Rolle", "disabled": "deaktiviert",
-    "lock_from": "gesperrt ab", "lock_until": "wieder aktiv ab", "totp_enabled": "2FA", "selfupdate_auto": "Automatisch aktualisieren", "selfupdate_time": "Selbst-Update ab Uhrzeit", "webhook_enabled": "Webhook aktiv", "webhook_method": "Webhook-Methode", "smtp_enabled": "E-Mail aktiv", "smtp_port": "SMTP-Port", "smtp_security": "SMTP-Verschlüsselung", "smtp_from": "E-Mail-Absender", "telegram_enabled": "Telegram aktiv", "telegram_chat_id": "Telegram-Chat-ID", "require_2fa": "2FA erzwingen", "require_2fa_mode": "2FA erzwingen (global)", "perms": "Rechte", "jobs": "Aufgaben",
+    "lock_from": "gesperrt ab", "lock_until": "wieder aktiv ab", "totp_enabled": "2FA", "selfupdate_auto": "Automatisch aktualisieren", "selfupdate_time": "Selbst-Update ab Uhrzeit", "selfupdate_prune": "Altes Image nach Update löschen", "restart_auto": "Neustart nach Zeitplan", "restart_time": "Neustart-Uhrzeit", "restart_days": "Neustart-Wochentage", "webhook_enabled": "Webhook aktiv", "webhook_method": "Webhook-Methode", "smtp_enabled": "E-Mail aktiv", "smtp_port": "SMTP-Port", "smtp_security": "SMTP-Verschlüsselung", "smtp_from": "E-Mail-Absender", "telegram_enabled": "Telegram aktiv", "telegram_chat_id": "Telegram-Chat-ID", "require_2fa": "2FA erzwingen", "require_2fa_mode": "2FA erzwingen (global)", "perms": "Rechte", "jobs": "Aufgaben",
     "remotes": "Speicherorte", "description": "Beschreibung", "type": "Typ", "allow": "Erlaubt-Liste", "block": "Sperrliste",
     "country_mode": "Länder-Regel", "countries": "Länder", "auto_attempts": "Auto-Sperre nach Fehlversuchen",
     "auto_minutes": "Auto-Sperre Minuten", "auto_window": "Zeitfenster Fehlversuche", "auto_exempt_lan": "LAN ausnehmen",

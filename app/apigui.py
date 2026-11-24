@@ -755,29 +755,34 @@ def a_update_files_settings(a):
 @action("update_update_settings", "PATCH", "/settings/update", "system.settings", "Einstellungen",
         "Automatische Prüfung auf neue Versionen ein- oder ausschalten (update_check) und den Abstand in Minuten "
         "festlegen (update_interval, 5–43200, Standard 60). Selbst-Update: selfupdate_auto (einmal am Tag automatisch "
-        "aktualisieren, braucht den Docker-Socket) ab selfupdate_time (HH:MM). update_notify: Benachrichtigung schicken, "
+        "aktualisieren, braucht den Docker-Socket) ab selfupdate_time (HH:MM), selfupdate_prune (altes Image nach dem Update löschen, Standard an). update_notify: Benachrichtigung schicken, "
         "wenn eine neue Version verfügbar ist (je Version einmal), update_notify_channels: Kanäle (webhook, smtp, "
         "telegram, apprise; leer = alle eingeschalteten). Nicht angegebene Felder bleiben unverändert.",
         {"update_check": S(BOOL), "update_interval": S(INT), "selfupdate_auto": S(BOOL), "selfupdate_time": S(STR, "HH:MM"),
+         "selfupdate_prune": S(BOOL),
          "update_notify": S(BOOL), "update_notify_channels": dict(STRS, description="webhook, smtp, telegram, apprise")})
 def a_update_update_settings(a):
-    _check_keys(a, ("update_check", "update_interval", "selfupdate_auto", "selfupdate_time", "update_notify",
-                    "update_notify_channels"))
+    _check_keys(a, ("update_check", "update_interval", "selfupdate_auto", "selfupdate_time", "selfupdate_prune",
+                    "update_notify", "update_notify_channels"))
     chans = ([x.strip() for x in _lines(a["update_notify_channels"]).replace(",", "\n").split("\n") if x.strip()]
              if "update_notify_channels" in a else None)
     if chans is not None:
         bad = [c for c in chans if c not in core.notify.CHANNELS]
         if bad:
             raise ApiError(400, _t("Unbekannter Kanal.") + " " + ", ".join(bad))
-    if "selfupdate_auto" in a or "selfupdate_time" in a:
+    if "selfupdate_auto" in a or "selfupdate_time" in a or "selfupdate_prune" in a:
         s = core.load_settings()
         form = {"section": "selfupdate", "selfupdate_time": str(a.get("selfupdate_time", s.get("selfupdate_time") or "04:00"))}
         if _bool(a["selfupdate_auto"]) if "selfupdate_auto" in a else s.get("selfupdate_auto"):
             form["selfupdate_auto"] = "on"
+        if _bool(a["selfupdate_prune"]) if "selfupdate_prune" in a else s.get("selfupdate_prune", True):
+            form["selfupdate_prune"] = "on"
         done(gui("POST", "/settings/general", form=form))
         if not ({"update_check", "update_interval", "update_notify", "update_notify_channels"} & set(a)):
+            s = core.load_settings()
             return {"ok": True, "message": _t("Gespeichert."), "update": core.update_status(),
-                    "selfupdate": {k: core.selfupdate_status()[k] for k in ("auto", "time")}}
+                    "selfupdate": {"auto": bool(s.get("selfupdate_auto")), "time": s.get("selfupdate_time") or "04:00",
+                                   "prune": bool(s.get("selfupdate_prune", True))}}
     cur = core.update_status()
     form = {"section": "update", "update_interval_unit": "min",
             "update_interval_value": str(a.get("update_interval", cur["interval_minutes"]))}
@@ -790,7 +795,76 @@ def a_update_update_settings(a):
     msg = done(gui("POST", "/settings/general", form=form))
     s = core.load_settings()
     return {"ok": True, "message": msg, "update": core.update_status(),
-            "selfupdate": {"auto": bool(s.get("selfupdate_auto")), "time": s.get("selfupdate_time") or "04:00"}}
+            "selfupdate": {"auto": bool(s.get("selfupdate_auto")), "time": s.get("selfupdate_time") or "04:00",
+                           "prune": bool(s.get("selfupdate_prune", True))}}
+
+
+@action("list_old_images", "GET", "/system/images", "system.update", "System",
+        "Alte MirrorSync-Images auf dem Docker-Host, die kein Container mehr verwendet (id, tags, version, size in Bytes, "
+        "created) und ihre Gesamtgröße (total). Braucht den eingebundenen Docker-Socket.", ro=True)
+def a_list_old_images(a):
+    need("system.update")
+    ok, why = core.selfupdate.available()
+    if not ok:
+        raise ApiError(409, _t("Der Docker-Socket ist nicht eingebunden."))
+    imgs = core.selfupdate.old_images()
+    return {"images": imgs, "total": sum(i["size"] for i in imgs)}
+
+
+@action("prune_images", "POST", "/system/images/prune", "system.update", "System",
+        "Alle alten MirrorSync-Images löschen, die kein Container mehr verwendet (wie „Alte Images entfernen“). "
+        "Liefert removed (Versionen), failed (mit Fehler) und freed (Bytes). Braucht den eingebundenen Docker-Socket.")
+def a_prune_images(a):
+    need("system.update")
+    ok, why = core.selfupdate.available()
+    if not ok:
+        raise ApiError(409, _t("Der Docker-Socket ist nicht eingebunden."))
+    res = core.selfupdate.prune_images()
+    core.audit_add("system", "Alte Images entfernt", ", ".join(res["removed"]) or "–", user=g.user,
+                   detail=f"{round(res['freed'] / 1048576)} MB")
+    return dict(res, ok=True)
+
+
+@action("get_restart", "GET", "/system/restart", "system.restart", "System",
+        "Neustart des MirrorSync-Containers: method (docker = über den Docker-Socket, exit = Prozess beendet sich und "
+        "Docker startet ihn über restart: unless-stopped/always neu), policy (Neustart-Regel, nur mit Socket), Zeitplan "
+        "(auto, time, days 0 = Montag bis 6 = Sonntag), last (letzter Neustart) und jobs_running.", ro=True)
+def a_get_restart(a):
+    need("system.restart")
+    return core.restart_status()
+
+
+@action("restart_container", "POST", "/system/restart", "system.restart", "System",
+        "MirrorSync jetzt neu starten (Container). Laufen Aufgaben, wird abgelehnt, außer force=true (dann werden sie "
+        "abgebrochen). Die Verbindung zu MirrorSync bricht für einige Sekunden ab. Ohne Docker-Socket klappt das nur, wenn "
+        "der Container restart: unless-stopped oder always hat.", {"force": S(BOOL)})
+def a_restart_container(a):
+    need("system.restart")
+    _check_keys(a, ("force",))
+    ok, text = core.do_restart(g.user, force=_bool(a.get("force", False)))
+    if not ok:
+        raise ApiError(409, _t(text))
+    return {"ok": True, "message": _t(text)}
+
+
+@action("update_restart_settings", "PATCH", "/settings/restart", "system.settings", "Einstellungen",
+        "Neustart nach Zeitplan: restart_auto (an/aus), restart_time (HH:MM), restart_days (Liste 0 = Montag bis "
+        "6 = Sonntag). Laufen Aufgaben, wartet der Neustart, bis sie fertig sind. Nicht angegebene Felder bleiben unverändert.",
+        {"restart_auto": S(BOOL), "restart_time": S(STR, "HH:MM"), "restart_days": dict(type="array", items={"type": "integer"})})
+def a_update_restart_settings(a):
+    _check_keys(a, ("restart_auto", "restart_time", "restart_days"))
+    s = core.load_settings()
+    days = a.get("restart_days", s.get("restart_days") or [])
+    if not isinstance(days, list) or any(not isinstance(d, int) or d not in range(7) for d in days):
+        raise ApiError(400, _t("Wochentage als Zahlen 0 (Montag) bis 6 (Sonntag)."))
+    form = {"section": "restart", "restart_time": str(a.get("restart_time", s.get("restart_time") or "04:30"))}
+    if _bool(a["restart_auto"]) if "restart_auto" in a else s.get("restart_auto"):
+        form["restart_auto"] = "on"
+    for d in days:
+        form[f"restart_day_{d}"] = "on"
+    msg = done(gui("POST", "/settings/general", form=form))
+    st = core.restart_status()
+    return {"ok": True, "message": msg, "restart": {k: st[k] for k in ("auto", "time", "days")}}
 
 
 @action("purge_logs", "POST", "/logs/purge", "system.settings", "Einstellungen",

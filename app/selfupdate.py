@@ -17,6 +17,7 @@ import os
 import re
 import socket
 import sys
+import threading
 import time
 import urllib.parse
 
@@ -171,6 +172,80 @@ def info():
     return out
 
 
+# ----------------------------------------------------------------- Neustart und alte Images
+def restart_policy():
+    """Neustart-Regel des eigenen Containers (no, always, unless-stopped, on-failure) oder "" ohne Socket."""
+    try:
+        c = Docker().req("GET", f"/containers/{own_id()}/json")
+        return ((c.get("HostConfig") or {}).get("RestartPolicy") or {}).get("Name") or "no"
+    except (OSError, DockerError):
+        return ""
+
+
+def restart_self(delay=1.5):
+    """Docker startet den eigenen Container neu (unabhaengig von der Neustart-Regel). Laeuft im Hintergrund,
+    damit die Antwort an den Browser noch rausgeht."""
+    d = Docker()
+    cid = own_id()
+    d.req("GET", f"/containers/{cid}/json")   # gibt es den Container? sonst Fehler sofort melden
+
+    def go():
+        time.sleep(delay)
+        try:
+            d.req("POST", f"/containers/{cid}/restart", params={"t": 20}, timeout=120)
+        except (OSError, DockerError) as e:
+            print(f"Neustart über Docker fehlgeschlagen ({e}), Prozess beendet sich.", flush=True)
+            os._exit(1)   # dann startet die Neustart-Regel den Container neu
+    threading.Thread(target=go, daemon=True).start()
+
+
+def old_images(d=None):
+    """Alte MirrorSync-Images, die kein Container mehr verwendet (Label org.opencontainers.image.title=MirrorSync)."""
+    d = d or Docker()
+    me = d.req("GET", f"/containers/{own_id()}/json")
+    used = {c.get("ImageID") for c in d.req("GET", "/containers/json", params={"all": "true"}) or []}
+    out = []
+    for im in d.req("GET", "/images/json") or []:
+        lab = im.get("Labels") or {}
+        if lab.get("org.opencontainers.image.title") != "MirrorSync" or im["Id"] == me["Image"] or im["Id"] in used:
+            continue
+        out.append({"id": im["Id"], "tags": [t for t in im.get("RepoTags") or [] if t != "<none>:<none>"],
+                    "version": lab.get("org.opencontainers.image.version", ""), "size": int(im.get("Size") or 0),
+                    "created": time.strftime("%Y-%m-%d %H:%M", time.localtime(im.get("Created") or 0))})
+    return sorted(out, key=lambda x: x["created"], reverse=True)
+
+
+def remove_image(d, img):
+    """Ein Image entfernen (ohne force). Mehrere Tags: jeden Tag einzeln. Liefert Fehlertext oder None."""
+    try:
+        d.req("DELETE", f"/images/{img['id']}")
+        return None
+    except DockerError as e:
+        if not img.get("tags"):
+            return str(e)
+    try:
+        for t in img["tags"]:
+            d.req("DELETE", f"/images/{urllib.parse.quote(t, safe='')}")
+        return None
+    except DockerError as e:
+        return str(e)
+
+
+def prune_images():
+    """Alle alten MirrorSync-Images entfernen. Liefert {"removed": [...], "failed": [...], "freed": bytes}."""
+    d = Docker()
+    removed, failed, freed = [], [], 0
+    for img in old_images(d):
+        err = remove_image(d, img)
+        label = img["version"] and f"v{img['version']}" or (img["tags"][0] if img["tags"] else img["id"][7:19])
+        if err:
+            failed.append({"image": label, "error": err})
+        else:
+            removed.append(label)
+            freed += img["size"]
+    return {"removed": removed, "failed": failed, "freed": freed}
+
+
 def read_state():
     try:
         with open(STATE_FILE, encoding="utf-8") as f:
@@ -186,7 +261,7 @@ def write_state(st):
     os.replace(tmp, STATE_FILE)
 
 
-def start(by, from_version):
+def start(by, from_version, prune=True):
     """Image holen und, wenn es neuer ist, den Hilfs-Container starten.
     Liefert (status, text): status = started | current | error."""
     d = Docker()
@@ -215,7 +290,7 @@ def start(by, from_version):
         return "error", f"{CONFIG_DIR} ist kein Volume, der Stand des Updates könnte nicht gespeichert werden."
     cfg_bind = (cfg_src["Source"] if cfg_src.get("Type") == "bind" else cfg_src["Name"]) + ":" + CONFIG_DIR
     sock_src = next((m["Source"] for m in me.get("Mounts") or [] if m.get("Destination") == SOCK), SOCK)
-    write_state({"state": "running", "by": by, "from_version": from_version, "image": ref, "old_image_config": old_cfg,
+    write_state({"state": "running", "by": by, "from_version": from_version, "image": ref, "old_image_config": old_cfg, "prune": prune,
                  "started": time.strftime("%Y-%m-%d %H:%M:%S"), "log": ["Neues Image geladen, Update startet."]})
     helper = d.req("POST", "/containers/create", {
         "Image": new["Id"], "Entrypoint": ["python", "/app/selfupdate.py", "--helper", me["Id"]], "Cmd": [],
@@ -378,6 +453,13 @@ def helper(old_id):
         if not healthy:
             raise DockerError(f"Der neue Container hat in {HEALTH_WAIT} Sekunden nicht auf /health geantwortet")
         d.req("DELETE", f"/containers/{old_id}", params={"v": "false"})
+        if log.st.get("prune", True) and old["Image"] != new_img["Id"]:
+            # altes Image aufraeumen; wird es noch verwendet (z. B. von einem anderen Container), bleibt es
+            try:
+                d.req("DELETE", f"/images/{old['Image']}")
+                log("Altes Image entfernt.")
+            except Exception as e:  # noqa: BLE001 - nie ein Grund fuer ein Rollback
+                log(f"Altes Image bleibt: {e}")
         log("Update abgeschlossen, alter Container entfernt.", state="ok", finished=time.strftime("%Y-%m-%d %H:%M:%S"))
     except Exception as e:  # noqa: BLE001 - alles zurueckdrehen
         log(f"Fehler: {str(e).rstrip('.')}. Die bisherige Version wird wieder gestartet.")

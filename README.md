@@ -4,7 +4,7 @@
 
 # MirrorSync – 1:1 mirroring with a web GUI and schedules
 
-Version **1.52.0** · Changes: [CHANGELOG.md](CHANGELOG.md) · [Deutsche Version](README.de.md)
+Version **1.53.0** · Changes: [CHANGELOG.md](CHANGELOG.md) · [Deutsche Version](README.de.md)
 
 A Docker container that **mirrors folders one-way, 1:1** (like FreeFileSync "Mirror"):
 the destination becomes an exact copy of the source, including deletions. The sync engine is
@@ -67,7 +67,7 @@ Changed files are transferred completely (no delta transfer like rsync).
 
 ## Installation
 The ready-made image is in the GitHub Container Registry: `ghcr.io/dermilderjoghurt/mirrorsync`
-(for amd64 and arm64, e.g. Raspberry Pi). Tags: `latest` (newest version), `1.52.0` (fixed version),
+(for amd64 and arm64, e.g. Raspberry Pi). Tags: `latest` (newest version), `1.53.0` (fixed version),
 `1.40` (newest patch of this version). The image is only published when the version number changes, so
 update checkers such as Dockhand or Watchtower only report an update when there really is a new version.
 
@@ -271,6 +271,34 @@ the base folder, otherwise the common parent folder becomes the source.
   (since 1.27.0): the selected folders and files go directly into the destination, e.g. source `NAS:share`
   with selection `10-Temp/` and destination `Family-NAS:share` gives `Family-NAS:share/10-Temp`.
 - Empty field = the whole source folder.
+
+## Restart and old images (since 1.53.0)
+Under **Settings → General → Restart** you can restart the MirrorSync container: by hand with "Restart now" or on a
+schedule (time and weekdays). If jobs are running, the button refuses unless you tick "even if jobs are running" (they
+are then cancelled). The schedule waits until no job is running.
+
+How the restart works:
+- **With the Docker socket** (see self-update): MirrorSync asks Docker to restart its own container. This works
+  regardless of the restart policy.
+- **Without the socket**: MirrorSync exits and Docker starts the container again through its restart policy. For this
+  the compose file must contain `restart: unless-stopped` (or `always`). Without it, **MirrorSync stays off** until you
+  start it by hand. `restart: unless-stopped` is useful anyway: without it MirrorSync does not come back by itself
+  after a host reboot or a crash.
+
+The audit log shows "Restart triggered" (who, how) and "Restart completed". Permission: `system.restart`.
+
+**Old images:** After a successful self-update MirrorSync deletes the old image (can be switched off with "Delete the
+old image after the update"). Under "Self-update" MirrorSync also lists old MirrorSync images that no container uses
+any more and removes them with "Remove old images". Other images are never touched (detected by the label
+`org.opencontainers.image.title=MirrorSync`). Permission: `system.update`.
+
+> **Security:** The Docker socket gives full control over all containers on the host. Only mount it if you need
+> self-update, restart via Docker or cleaning up old images, and give the permissions `system.update` and
+> `system.restart` to admins only. Without the socket the restart still works (via the restart policy), self-update
+> and cleanup do not.
+
+API/MCP: `get_restart`, `restart_container` (`force`), `update_restart_settings` (`restart_auto`, `restart_time`,
+`restart_days`), `list_old_images`, `prune_images`, `selfupdate_prune` in `update_update_settings`.
 
 ## Time windows (since 1.52.0)
 In each job under **Time window**: "Only run within a time window", start, end and weekdays, e.g. Mon–Fri 22:00 to
@@ -860,7 +888,7 @@ MirrorSync can update itself if you mount the Docker socket into the container:
   previous one runs again. Result and steps are shown in the GUI, in the audit log ("Update started / completed /
   failed") and in `config/selfupdate.json`.
 - **Requirements:** the image has to come from a registry (`image: ghcr.io/dermilderjoghurt/mirrorsync:latest`).
-  MirrorSync cannot pull images built with `build: .`. With a fixed version tag (`:1.52.0`) only that tag is pulled
+  MirrorSync cannot pull images built with `build: .`. With a fixed version tag (`:1.53.0`) only that tag is pulled
   again. `/config` has to be a volume or bind mount (it is in the example compose file).
 - **Permission:** `system.update` ("Update MirrorSync", admins have it automatically). Changing the automatic
   update and its time needs `system.settings`.

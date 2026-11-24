@@ -432,7 +432,8 @@ LOG_DEFAULTS = {"log_keep_runs": "50", "log_keep_days": "30", "log_keep_unit": "
                 "geoip_mode": "interval", "geoip_time": "03:00", "geoip_dow": "mon",
                 "lock_attempts": "5", "lock_minutes": "15", "lock_notify": True, "require_2fa_mode": "off",
                 "fail_notify": "", "fail_notify_minutes": "15", "audit_keep_days": "365", "update_check": True, "update_interval": "60", "update_notify": False, "update_notify_channels": [],
-                "selfupdate_auto": False, "selfupdate_time": "04:00"}
+                "selfupdate_auto": False, "selfupdate_time": "04:00", "selfupdate_prune": True,
+                "restart_auto": False, "restart_time": "04:30", "restart_days": [6]}
 RUN_ID_RE = re.compile(r"^[A-Za-z0-9_.-]{1,64}$")
 
 
@@ -489,7 +490,7 @@ def run_selfupdate(by, wait=False):
             selfupdate.write_state({"state": "pulling", "by": by, "from_version": VERSION,
                                     "started": time.strftime("%Y-%m-%d %H:%M:%S"), "log": ["Neues Image wird geladen."],
                                     "recorded": prev.get("recorded") if prev.get("state") in ("ok", "failed") else True})
-            st, text = selfupdate.start(by, VERSION)
+            st, text = selfupdate.start(by, VERSION, prune=bool(load_settings().get("selfupdate_prune", True)))
             if st == "current":
                 selfupdate.write_state({"state": "current", "by": by, "image": text, "checked": time.strftime("%Y-%m-%d %H:%M:%S"),
                                         "recorded": True})
@@ -541,6 +542,77 @@ def _selfupdate_due(s):
     return now >= (s.get("selfupdate_time") or "04:00") and s.get("selfupdate_last_auto") != time.strftime("%Y-%m-%d") and not _running
 
 
+# ---------------------------------------------------------------- Neustart des Containers
+_restart_lock = threading.Lock()
+
+
+def restart_status():
+    s = load_settings()
+    sock, why = selfupdate.available()
+    days = [d for d in (s.get("restart_days") or []) if d in timewin.ALL_DAYS]
+    return {"socket": sock, "policy": selfupdate.restart_policy() if sock else "",
+            "method": "docker" if sock else "exit", "auto": bool(s.get("restart_auto")),
+            "time": s.get("restart_time") or "04:30", "days": days, "days_text": timewin.days_text(days, i18n.translate) if days else "",
+            "last": s.get("restart_last") or {}, "jobs_running": sorted(_running)}
+
+
+def do_restart(by, force=False):
+    """MirrorSync neu starten. Mit Docker-Socket startet Docker den Container neu (unabhaengig von der
+    Neustart-Regel), sonst beendet sich der Prozess und Docker startet ihn ueber restart: unless-stopped/always neu.
+    Liefert (ok, text)."""
+    if _running and not force:
+        return False, i18n.t("Es laufen gerade Aufgaben ({0}). Warten oder „auch wenn Aufgaben laufen“ wählen.", len(_running))
+    if not _restart_lock.acquire(blocking=False):
+        return False, "Es läuft schon ein Neustart oder ein Update."
+    if not _selfupdate_lock.acquire(blocking=False):
+        _restart_lock.release()
+        return False, "Es läuft schon ein Neustart oder ein Update."
+    sock, _ = selfupdate.available()
+    s = load_settings()
+    s["restart_pending"] = {"by": by, "at": time.strftime("%Y-%m-%d %H:%M:%S"), "method": "docker" if sock else "exit",
+                            "stopped_jobs": len(_running)}
+    save_settings(s)
+    audit_add("system", "Neustart ausgelöst", f"v{VERSION}", user=by,
+              detail=(i18n.t("über den Docker-Socket") if sock else i18n.t("Prozess beendet sich, Docker startet neu"))
+              + (i18n.t(", {0} laufende Aufgaben abgebrochen", len(_running)) if _running else ""))
+    for jid in list(_running):
+        stop_job(jid)
+    if sock:
+        try:
+            selfupdate.restart_self()
+            return True, "MirrorSync startet neu. Die Oberfläche ist gleich wieder erreichbar."
+        except Exception as e:  # noqa: BLE001 - dann wie ohne Socket
+            print(f"Neustart über Docker nicht möglich ({e}), Prozess beendet sich.", flush=True)
+
+    def bye():
+        time.sleep(2)
+        print("Neustart: MirrorSync beendet sich, Docker startet den Container neu.", flush=True)
+        os._exit(1)   # Exit-Code ungleich 0: startet auch bei restart: on-failure neu
+    threading.Thread(target=bye, daemon=True).start()
+    return True, "MirrorSync beendet sich und wird von Docker neu gestartet (restart: unless-stopped). Die Oberfläche ist gleich wieder erreichbar."
+
+
+def _restart_record():
+    """Nach einem Neustart einmal ins Audit-Log schreiben."""
+    s = load_settings()
+    p = s.pop("restart_pending", None)
+    if not p:
+        return
+    s["restart_last"] = dict(p, done=time.strftime("%Y-%m-%d %H:%M:%S"))
+    save_settings(s)
+    audit_add("system", "Neustart abgeschlossen", f"v{VERSION}", user=p.get("by"),
+              info={"Ausgelöst": p.get("at", ""), "Wieder da": s["restart_last"]["done"]})
+
+
+def _restart_due(s):
+    if not s.get("restart_auto") or _running:
+        return False
+    now = datetime.datetime.now()
+    days = s.get("restart_days") or []
+    return now.weekday() in days and now.strftime("%H:%M") >= (s.get("restart_time") or "04:30") \
+        and s.get("restart_last_auto") != now.strftime("%Y-%m-%d")
+
+
 def _update_loop():
     """Beim Start (nach kurzer Pause) und danach regelmaessig bei GitHub nach einer neueren Version fragen."""
     time.sleep(30)
@@ -552,6 +624,11 @@ def _update_loop():
                 s["selfupdate_last_auto"] = time.strftime("%Y-%m-%d")
                 save_settings(s)
                 run_selfupdate("Zeitplan")
+            s = load_settings()
+            if _restart_due(s):
+                s["restart_last_auto"] = time.strftime("%Y-%m-%d")
+                save_settings(s)
+                do_restart("Zeitplan")
             s = load_settings()
             if s.get("update_check", True) and update.due(s.get("update_interval", "60")):
                 st = update.check()
@@ -1423,6 +1500,7 @@ ENDPOINT_PERMS = {
     "job_notify_test": "jobs.notify", "job_pause": "jobs.edit",
     "remotes": "remotes.view", "test_remote": "remotes.test", "delete_remote": "remotes.delete",
     "duplicate_job": "jobs.create", "duplicate_remote": "remotes.create",
+    "system_restart": "system.restart", "system_images": "system.update", "system_images_prune": "system.update",
     "auth_remote": "remotes.edit", "browse": "remotes.browse", "browse_list": "remotes.browse",
     "users_page": "users.view", "login_history": "users.view", "login_log_action": "users.manage", "user_unlock": "users.manage", "user_edit": "users.manage", "user_delete": "users.manage",
     "roles_page": "roles.manage", "role_edit": "roles.manage", "role_delete": "roles.manage",
@@ -3320,12 +3398,24 @@ def general_settings():
             s["files_speed"] = sp
             save_settings(s)
             msg = "Gespeichert."
+    elif request.method == "POST" and request.form.get("section") == "restart":
+        tm = (request.form.get("restart_time") or "").strip()
+        days = [d for d in timewin.ALL_DAYS if f"restart_day_{d}" in request.form]
+        if not re.fullmatch(r"([01]\d|2[0-3]):[0-5]\d", tm):
+            err = "Uhrzeit bitte als HH:MM angeben."
+        elif "restart_auto" in request.form and not days:
+            err = "Bitte mindestens einen Wochentag wählen."
+        else:
+            s.update(restart_auto="restart_auto" in request.form, restart_time=tm, restart_days=days)
+            save_settings(s)
+            msg = "Gespeichert."
     elif request.method == "POST" and request.form.get("section") == "selfupdate":
         tm = (request.form.get("selfupdate_time") or "").strip()
         if not re.fullmatch(r"([01]\d|2[0-3]):[0-5]\d", tm):
             err = "Uhrzeit bitte als HH:MM angeben."
         else:
-            s.update(selfupdate_auto="selfupdate_auto" in request.form, selfupdate_time=tm)
+            s.update(selfupdate_auto="selfupdate_auto" in request.form, selfupdate_time=tm,
+                     selfupdate_prune="selfupdate_prune" in request.form)
             save_settings(s)
             msg = "Gespeichert."
     elif request.method == "POST" and request.form.get("section") == "update" and request.form.get("check_only"):
@@ -3405,10 +3495,18 @@ def general_settings():
         usage += sum(os.path.getsize(os.path.join(root, f)) for f in files)
     bw = s.get("bw") or bwlimit.EMPTY
     pk_rp_id, _, _pk_prob = _pk_rp()
+    selfupd = selfupdate_status() if g.access.has("system.update") or g.access.has("system.settings") else None
+    old_imgs = None
+    if selfupd and selfupd.get("available"):
+        try:
+            old_imgs = selfupdate.old_images()
+        except Exception:  # noqa: BLE001 - nur Anzeige
+            old_imgs = None
     return render_template("general.html", s=s, msg=msg, err=err, usage=usage, bw_cfg=bw, geo=geoip.status(), pk_now=pk_rp_id,
                            attribution=Markup(geoip.ATTRIBUTION), my_ip=_client_ip(), my_loc=geoip.locate(_client_ip()),
                            next_geoip=next_run("_geoip"), tz=TZ, upd=update_status(), purge=purge, upd_channels=_notify_channel_list(),
-                           selfupd=selfupdate_status() if g.access.has("system.update") or g.access.has("system.settings") else None,
+                           selfupd=selfupd, old_imgs=old_imgs, restart=restart_status() if g.access.has("system.restart") or g.access.has("system.settings") else None,
+                           day_names=timewin.DAY_NAMES,
                            fwd=request.headers.get("X-Forwarded-For", ""),
                            bw_desc=bwlimit.describe(bw, s.get("bw_unit") or "MB/s"), bw_tt=bwlimit.timetable(bw))
 
@@ -4241,6 +4339,53 @@ def update_state():
     return selfupdate_status()
 
 
+def _back(default="/settings/general"):
+    back = request.form.get("back") or default
+    return redirect(back if back.startswith("/") and not back.startswith("//") else default)
+
+
+@app.post("/system/restart")
+def system_restart():
+    ok, text = do_restart(g.user, force=request.form.get("force") in ("1", "on", "true"))
+    if request.headers.get("Accept", "").startswith("application/json"):
+        return {"ok": ok, "message": i18n.t(text)}, (200 if ok else 409)
+    session["flash" if ok else "flash_err"] = text
+    return _back("/settings/general#restart")
+
+
+@app.get("/system/images")
+def system_images():
+    ok, why = selfupdate.available()
+    if not ok:
+        return {"ok": False, "error": i18n.t("Der Docker-Socket ist nicht eingebunden.")}, 409
+    try:
+        imgs = selfupdate.old_images()
+    except Exception as e:  # noqa: BLE001
+        return {"ok": False, "error": str(e)}, 500
+    return {"ok": True, "images": imgs, "total": sum(i["size"] for i in imgs)}
+
+
+@app.post("/system/images/prune")
+def system_images_prune():
+    ok, why = selfupdate.available()
+    wants_json = request.headers.get("Accept", "").startswith("application/json")
+    if not ok:
+        text, res = "Der Docker-Socket ist nicht eingebunden.", None
+    else:
+        try:
+            res = selfupdate.prune_images()
+            text = i18n.t("{0} alte Images entfernt, {1} MB frei.", len(res["removed"]), round(res["freed"] / 1048576)) + (
+                " " + i18n.t("Nicht entfernt: {0}", "; ".join(f"{x['image']} ({x['error']})" for x in res["failed"])) if res["failed"] else "")
+            audit_add("system", "Alte Images entfernt", ", ".join(res["removed"]) or "–", user=g.user,
+                      detail=f"{round(res['freed'] / 1048576)} MB")
+        except Exception as e:  # noqa: BLE001
+            text, res = str(e), None
+    if wants_json:
+        return ({"ok": True, "message": text, **res}, 200) if res is not None else ({"ok": False, "error": i18n.t(text)}, 409)
+    session["flash" if res is not None else "flash_err"] = text
+    return _back("/settings/general#selfupdate")
+
+
 @app.route("/account", methods=["GET", "POST"])
 def account():
     if request.args.get("done"):
@@ -4669,6 +4814,10 @@ def main():
         print(f"Hinweis: Benutzer {', '.join(grp)} unterscheiden sich nur in Groß-/Kleinschreibung. "
               "Anmeldung klappt nur mit exakter Schreibweise, bitte einen umbenennen oder löschen.", flush=True)
     threading.Thread(target=_geoip_loop, daemon=True).start()
+    try:
+        _restart_record()
+    except Exception as e:  # noqa: BLE001
+        print(f"Neustart: {e}", flush=True)
     threading.Thread(target=_update_loop, daemon=True).start()
     scheduler.start()
     schedule_all()

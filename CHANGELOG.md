@@ -3,6 +3,15 @@
 Version numbers follow [SemVer](https://semver.org/): MAJOR.MINOR.PATCH
 (MAJOR = incompatible change, MINOR = new feature, PATCH = bug fix).
 
+## 1.53.0 – 2026-11-24
+- **Restart the container:** by hand ("Restart now", optionally even while jobs run) or on a schedule (time,
+  weekdays; waits for running jobs). With the Docker socket via Docker, otherwise MirrorSync exits and Docker restarts
+  it via `restart: unless-stopped`. Audit "restart triggered/completed".
+- **Old images:** after a self-update the old image is deleted (can be switched off). List of old MirrorSync images
+  with "Remove old images".
+- New permission `system.restart`. API/MCP: `get_restart`, `restart_container`, `update_restart_settings`,
+  `list_old_images`, `prune_images`, `selfupdate_prune`. README with security notes. All 5 languages.
+
 ## 1.52.0 – 2026-11-24
 - **Time window per job:** start, end (also past midnight) and weekdays. Automatic starts (schedule, chain, full live
   sync) outside the window are postponed and start as soon as the window opens; live rounds outside are skipped. At

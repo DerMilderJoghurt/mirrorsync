@@ -4,7 +4,7 @@
 
 # MirrorSync – 1:1-Spiegelung mit Web-GUI und Zeitplänen
 
-Version **1.52.0** · Änderungen siehe [CHANGELOG.md](CHANGELOG.md) (englisch) · [English version](README.md)
+Version **1.53.0** · Änderungen siehe [CHANGELOG.md](CHANGELOG.md) (englisch) · [English version](README.md)
 
 Ein Docker-Container, der Ordner **einweg 1:1 spiegelt** (wie FreeFileSync „Spiegeln"):
 Das Ziel wird exakt wie die Quelle, inklusive Löschungen. Als Sync-Motor dient
@@ -68,7 +68,7 @@ Geänderte Dateien werden komplett neu übertragen (kein Delta wie bei rsync).
 
 ## Installation
 Das fertige Image liegt in der GitHub Container Registry: `ghcr.io/dermilderjoghurt/mirrorsync`
-(für amd64 und arm64, z. B. Raspberry Pi). Tags: `latest` (neueste Version), `1.52.0` (feste Version),
+(für amd64 und arm64, z. B. Raspberry Pi). Tags: `latest` (neueste Version), `1.53.0` (feste Version),
 `1.40` (neuester Patch dieser Version). Das Image wird nur veröffentlicht, wenn sich die Versionsnummer ändert.
 Update-Prüfer wie Dockhand oder Watchtower melden deshalb nur dann ein Update, wenn es wirklich eine neue Version gibt.
 
@@ -277,6 +277,34 @@ bleibt sie Basisordner, sonst wird der gemeinsame Elternordner zur Quelle.
   Auswahl aus** (seit 1.27.0): Die gewählten Ordner und Dateien landen direkt im Ziel, z. B. Quelle
   `NAS:share` mit Auswahl `10-Temp/` und Ziel `Familie-NAS:share` ergibt `Familie-NAS:share/10-Temp`.
 - Leeres Feld = der ganze Quellordner wie bisher.
+
+## Neustart und alte Images (seit 1.53.0)
+Unter **Einstellungen → Allgemein → Neustart** lässt sich der Container von MirrorSync neu starten: von Hand mit
+„Jetzt neu starten“ oder nach Zeitplan (Uhrzeit und Wochentage). Laufen gerade Aufgaben, lehnt der Knopf ab, außer du
+setzt „auch wenn Aufgaben laufen“ (dann werden sie abgebrochen). Der Zeitplan wartet, bis keine Aufgabe mehr läuft.
+
+So funktioniert der Neustart:
+- **Mit Docker-Socket** (siehe Selbst-Update): MirrorSync bittet Docker, den eigenen Container neu zu starten. Das
+  klappt unabhängig von der Neustart-Regel.
+- **Ohne Socket**: MirrorSync beendet sich selbst und Docker startet den Container über die Neustart-Regel wieder.
+  Dafür muss in der Compose-Datei `restart: unless-stopped` (oder `always`) stehen. Fehlt sie, **bleibt MirrorSync
+  aus**, bis du es von Hand startest. `restart: unless-stopped` ist auch sonst sinnvoll: ohne sie startet MirrorSync
+  nach einem Neustart des Hosts oder einem Absturz nicht von selbst.
+
+Im Audit-Log stehen „Neustart ausgelöst“ (wer, wie) und „Neustart abgeschlossen“. Recht: `system.restart`.
+
+**Alte Images:** Beim Selbst-Update löscht MirrorSync nach einem erfolgreichen Update das alte Image (abschaltbar mit
+„Altes Image nach dem Update löschen“). Unter „Selbst aktualisieren“ listet MirrorSync außerdem alte MirrorSync-Images
+auf, die kein Container mehr verwendet, und entfernt sie mit „Alte Images entfernen“. Andere Images fasst MirrorSync
+nicht an (erkannt am Label `org.opencontainers.image.title=MirrorSync`). Recht: `system.update`.
+
+> **Sicherheit:** Der Docker-Socket gibt volle Kontrolle über alle Container auf dem Host. Binde ihn nur ein, wenn du
+> Selbst-Update, Neustart über Docker oder das Aufräumen alter Images brauchst, und gib die Rechte `system.update` und
+> `system.restart` nur Admins. Ohne Socket funktioniert der Neustart trotzdem (über die Neustart-Regel), Selbst-Update
+> und Aufräumen dann nicht.
+
+API/MCP: `get_restart`, `restart_container` (`force`), `update_restart_settings` (`restart_auto`, `restart_time`,
+`restart_days`), `list_old_images`, `prune_images`, `selfupdate_prune` bei `update_update_settings`.
 
 ## Zeitfenster (seit 1.52.0)
 In jeder Aufgabe unter **Zeitfenster**: „Nur in einem Zeitfenster laufen lassen“, Beginn, Ende und Wochentage, z. B.
@@ -887,7 +915,7 @@ MirrorSync kann sich selbst aktualisieren, wenn du den Docker-Socket in den Cont
   sie entfernt und die bisherige läuft wieder. Ergebnis und Ablauf stehen in der GUI, im Audit-Log
   („Update gestartet / abgeschlossen / fehlgeschlagen“) und in `config/selfupdate.json`.
 - **Voraussetzungen:** Das Image muss aus einem Registry kommen (`image: ghcr.io/dermilderjoghurt/mirrorsync:latest`).
-  Mit `build: .` gebaute Images kann MirrorSync nicht neu holen. Mit festem Versions-Tag (`:1.52.0`) wird nur dieser
+  Mit `build: .` gebaute Images kann MirrorSync nicht neu holen. Mit festem Versions-Tag (`:1.53.0`) wird nur dieser
   Tag neu geholt. `/config` muss als Volume oder Ordner eingebunden sein (ist es in der Beispiel-Compose).
 - **Recht:** `system.update` („MirrorSync aktualisieren“, Admins haben es automatisch). Automatik und Uhrzeit
   ändern braucht `system.settings`.
