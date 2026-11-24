@@ -4,7 +4,7 @@
 
 # MirrorSync – 1:1-Spiegelung mit Web-GUI und Zeitplänen
 
-Version **1.57.0** · Änderungen siehe [CHANGELOG.md](CHANGELOG.md) (englisch) · [English version](README.md)
+Version **1.51.0** · Änderungen siehe [CHANGELOG.md](CHANGELOG.md) (englisch) · [English version](README.md)
 
 Ein Docker-Container, der Ordner **einweg 1:1 spiegelt** (wie FreeFileSync „Spiegeln"):
 Das Ziel wird exakt wie die Quelle, inklusive Löschungen. Als Sync-Motor dient
@@ -68,7 +68,7 @@ Geänderte Dateien werden komplett neu übertragen (kein Delta wie bei rsync).
 
 ## Installation
 Das fertige Image liegt in der GitHub Container Registry: `ghcr.io/dermilderjoghurt/mirrorsync`
-(für amd64 und arm64, z. B. Raspberry Pi). Tags: `latest` (neueste Version), `1.57.0` (feste Version),
+(für amd64 und arm64, z. B. Raspberry Pi). Tags: `latest` (neueste Version), `1.51.0` (feste Version),
 `1.40` (neuester Patch dieser Version). Das Image wird nur veröffentlicht, wenn sich die Versionsnummer ändert.
 Update-Prüfer wie Dockhand oder Watchtower melden deshalb nur dann ein Update, wenn es wirklich eine neue Version gibt.
 
@@ -278,7 +278,7 @@ bleibt sie Basisordner, sonst wird der gemeinsame Elternordner zur Quelle.
   `NAS:share` mit Auswahl `10-Temp/` und Ziel `Familie-NAS:share` ergibt `Familie-NAS:share/10-Temp`.
 - Leeres Feld = der ganze Quellordner wie bisher.
 
-## Diagramme im Dashboard (seit 1.57.0)
+## Diagramme im Dashboard (seit 1.51.0)
 Zusätzlich zu Zahl, Liste, Balken und Statusampel gibt es diese Darstellungen. Im Editor sind nur die wählbar, die zur
 Datenquelle passen:
 
@@ -297,10 +297,10 @@ Neue Zeiträume: 90 und 365 Tage. Ohne Zeitraum zeigen die Diagramme die letzten
 „Laufdauer pro Tag“, „Läufe pro Tag“, „Läufe nach Status“, „Läufe im Kalender“, „Zeitleiste der Läufe“ und ein Tacho
 für den Speicherplatz.
 
-Die übertragene Datenmenge wird ab 1.57.0 bei jedem Lauf gespeichert (Spalte „Übertragen“ in der Liste der Läufe). Für
+Die übertragene Datenmenge wird bei jedem Lauf gespeichert (Spalte „Übertragen“ in der Liste der Läufe). Für
 ältere Läufe liest MirrorSync sie aus dem vorhandenen Log.
 
-## Dashboard-Baukasten und Tabs (seit 1.56.0)
+## Dashboard-Baukasten und Tabs (seit 1.51.0)
 Jede Kachel besteht aus drei Bausteinen, ähnlich wie die selbst zusammengestellten Benachrichtigungen:
 
 - **Datenquelle:** Überblick, laufende Aufträge, Aufgaben, Läufe, nächste Starts, Anmeldungen, Änderungen
@@ -320,7 +320,7 @@ Rechte: jede Datenquelle braucht ihr Recht (`jobs.view`, `users.view` für Anmel
 Audit-Log, `system.settings` für Speicherplatz). API/MCP: `get_dashboard` (Tabs, Kacheln, Inhalte, Bausteine) und
 `update_dashboard` (`tabs` oder `tab` + `tiles`, `reset`).
 
-## Dashboard (seit 1.54.0)
+## Dashboard (seit 1.51.0)
 Ganz oben in der Seitenleiste: **Dashboard** mit Kacheln, die sich alle 5 Sekunden selbst aktualisieren:
 
 | Kachel | Inhalt | Recht |
@@ -335,14 +335,14 @@ Ganz oben in der Seitenleiste: **Dashboard** mit Kacheln, die sich alle 5 Sekund
 | System | Version, verfügbares Update, läuft seit, letzter Neustart | – |
 
 Mit **Anpassen** wählt jeder Benutzer selbst, welche Kacheln er sieht und in welcher Reihenfolge (ziehen oder ↑ ↓).
-Seit 1.55.0 lässt sich jede Kachel an der Ecke unten rechts frei größer und kleiner ziehen, in Breite (1–12 Spalten) und
+Jede Kachel lässt sich an der Ecke unten rechts frei größer und kleiner ziehen, in Breite (1–12 Spalten) und
 Höhe (1–24 Zeilen). Kleinere Kacheln rücken automatisch in freie Lücken: zwei halb so hohe Kacheln stehen so
 untereinander neben einer großen. Passt der Inhalt nicht hinein, lässt er sich in der Kachel scrollen. Auf dem Handy
 stehen alle Kacheln untereinander. „Standard wiederherstellen“ setzt alles zurück. Kacheln, für die das Recht fehlt,
 erscheinen nicht. Das Layout gilt pro Benutzer (und pro API-Key). API/MCP: `get_dashboard`, `update_dashboard`
 (`tiles` mit `id`, `w`, `h`; `reset`).
 
-## Neustart und alte Images (seit 1.53.0)
+## Neustart und alte Images (seit 1.51.0)
 Unter **Einstellungen → Allgemein → Neustart** lässt sich der Container von MirrorSync neu starten: von Hand mit
 „Jetzt neu starten“ oder nach Zeitplan (Uhrzeit und Wochentage). Laufen gerade Aufgaben, lehnt der Knopf ab, außer du
 setzt „auch wenn Aufgaben laufen“ (dann werden sie abgebrochen). Der Zeitplan wartet, bis keine Aufgabe mehr läuft.
@@ -370,7 +370,7 @@ nicht an (erkannt am Label `org.opencontainers.image.title=MirrorSync`). Recht: 
 API/MCP: `get_restart`, `restart_container` (`force`), `update_restart_settings` (`restart_auto`, `restart_time`,
 `restart_days`), `list_old_images`, `prune_images`, `selfupdate_prune` bei `update_update_settings`.
 
-## Zeitfenster (seit 1.52.0)
+## Zeitfenster (seit 1.51.0)
 In jeder Aufgabe unter **Zeitfenster**: „Nur in einem Zeitfenster laufen lassen“, Beginn, Ende und Wochentage, z. B.
 Mo–Fr 22:00 bis 06:00.
 
@@ -979,7 +979,7 @@ MirrorSync kann sich selbst aktualisieren, wenn du den Docker-Socket in den Cont
   sie entfernt und die bisherige läuft wieder. Ergebnis und Ablauf stehen in der GUI, im Audit-Log
   („Update gestartet / abgeschlossen / fehlgeschlagen“) und in `config/selfupdate.json`.
 - **Voraussetzungen:** Das Image muss aus einem Registry kommen (`image: ghcr.io/dermilderjoghurt/mirrorsync:latest`).
-  Mit `build: .` gebaute Images kann MirrorSync nicht neu holen. Mit festem Versions-Tag (`:1.57.0`) wird nur dieser
+  Mit `build: .` gebaute Images kann MirrorSync nicht neu holen. Mit festem Versions-Tag (`:1.51.0`) wird nur dieser
   Tag neu geholt. `/config` muss als Volume oder Ordner eingebunden sein (ist es in der Beispiel-Compose).
 - **Recht:** `system.update` („MirrorSync aktualisieren“, Admins haben es automatisch). Automatik und Uhrzeit
   ändern braucht `system.settings`.

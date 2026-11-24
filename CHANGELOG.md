@@ -3,71 +3,42 @@
 Version numbers follow [SemVer](https://semver.org/): MAJOR.MINOR.PATCH
 (MAJOR = incompatible change, MINOR = new feature, PATCH = bug fix).
 
-## 1.57.0 – 2026-11-24
-- **New charts in the dashboard building blocks:** pie chart, line chart over time, stacked bars per day, gauge,
-  calendar heatmap, number with trend (sparkline) and a run timeline that shows overlaps. Only views that fit the data
-  source are offered.
-- New **metric** filter for runs (count, data transferred, run duration, files copied/deleted, errors) and new periods
-  of 90 and 365 days. The editor hides filters that don't fit the selected view.
-- The transferred data is stored per run (new "Transferred" column); older runs are read from the log.
-- New templates (e.g. "Runs today", "Success rate", "Run duration per day", "Runs in the calendar", "Timeline").
-- Sizes are now also shown in GB/TB. API/MCP (`update_dashboard`, `get_dashboard`) and all 5 languages updated.
-
-## 1.56.0 – 2026-11-24
-- **Dashboard building blocks:** build tiles from a data source (overview, running jobs, jobs, runs, next starts,
-  logins, audit log, disk space, system), a view (number, list, bars, status light) and filters (jobs, status, test
-  runs, period, number of entries). Editor with live preview, extra templates. The default tiles are now templates and
-  can be rebuilt the same way.
-- **Dashboard tabs** like in a browser: add, rename, move, delete; each tab has its own tiles.
-- New data source disk space (drives of /config and /logs, size of the logs; permission `system.settings`).
-- API/MCP: `get_dashboard` returns tabs, tiles, content and building blocks; `update_dashboard` takes `tabs` or `tab` +
-  `tiles`. Layouts from 1.54/1.55 become the first tab. All 5 languages.
-
-## 1.55.0 – 2026-11-24
-- **Arrange the dashboard freely:** drag the bottom right corner of any tile to change its width (1–12 columns) and
-  height (1–24 rows). Smaller tiles move into free gaps automatically, e.g. two half-height tiles stacked next to a big
-  one. Content that does not fit scrolls inside the tile. Layouts from 1.54.0 are taken over.
-- API/MCP: `update_dashboard` takes `w` and `h` per tile (instead of `size`), `get_dashboard` returns them. All 5
-  languages.
-
-## 1.54.0 – 2026-11-24
-- **Dashboard** (new, at the top of the sidebar) with tiles: running jobs, overview, jobs with errors, last 10 runs,
-  next 10 starts, last 10 logins, last 10 changes (audit log), system. Refreshes every 5 seconds. With "Customize" you
-  show and hide tiles, move them (drag or arrows) and make them narrow or wide; saved per user.
-- Permissions: each tile needs the matching permission (`jobs.view`, `users.view`, `system.audit`). API/MCP:
-  `get_dashboard`, `update_dashboard`. Audit "dashboard customized". All 5 languages.
-
-## 1.53.0 – 2026-11-24
-- **Restart the container:** by hand ("Restart now", optionally even while jobs run) or on a schedule (time,
-  weekdays; waits for running jobs). With the Docker socket via Docker, otherwise MirrorSync exits and Docker restarts
-  it via `restart: unless-stopped`. Audit "restart triggered/completed".
-- **Old images:** after a self-update the old image is deleted (can be switched off). List of old MirrorSync images
-  with "Remove old images".
-- New permission `system.restart`. API/MCP: `get_restart`, `restart_container`, `update_restart_settings`,
-  `list_old_images`, `prune_images`, `selfupdate_prune`. README with security notes. All 5 languages.
-
-## 1.52.0 – 2026-11-24
-- **Time window per job:** start, end (also past midnight) and weekdays. Automatic starts (schedule, chain, full live
-  sync) outside the window are postponed and start as soon as the window opens; live rounds outside are skipped. At
-  the end of the window you can choose: let it run, stop and continue in the next window, or stop until the next
-  regular start. The overview shows the window and "waiting for time window", the history "time window ended". Runs
-  started by hand outside the window run to the end.
-- API/MCP: field `window` (`start`, `end`, `days`, `mode`) and `window_wait`. Permissions: like the other job
-  settings (`jobs.edit`). The audit log records changes. All 5 languages.
-
 ## 1.51.0 – 2026-11-24
-- **Duplicate jobs** ("⧉" in the overview and in the job). The copy is switched off, history and two-way state are
-  not carried over.
-- **Duplicate storage locations** under a new name, including password, sign-in and "Visible to".
-- **Change a storage location's protocol later** (e.g. SMB → SFTP), with a warning and the fields asked again. If
-  the setup fails, the old state is restored.
-- **Mirror without deleting:** new option "Don't delete anything in the destination" (`rclone copy` instead of
-  `sync`), also in the preview.
-- **Interface:** Start button as tall as the other buttons, sidebar collapse arrow centered on the edge, open windows
-  such as the audit log details are modal (background doesn't scroll).
-- API/MCP: `duplicate_job`, `duplicate_remote`, `update_remote` with `type`, `no_delete`. Permissions: duplicating
-  needs "create jobs" or "create storage locations", changing the protocol "edit storage locations". Everything is in
-  the audit log. All 5 languages.
+**Dashboard**
+- **Dashboard** at the top of the sidebar, refreshes every 5 seconds. **Tabs** like in a browser (add, rename, move,
+  delete), each with its own tiles; saved per user or API key.
+- **Arrange tiles freely:** drag or move with arrows, drag the bottom right corner to change width (1–12 columns) and
+  height (1–24 rows). Smaller tiles move into free gaps automatically.
+- **Building blocks:** every tile is a data source (overview, running jobs, jobs, runs, next starts, logins, audit
+  log, disk space, system), a view and filters (jobs, status, test runs, period up to 365 days, metric, number of
+  entries). Editor with live preview; the default tiles are templates and can be rebuilt.
+- **Views:** number, number with trend (sparkline), list, bars, stacked bars per day, pie chart, gauge, line chart
+  over time (count, data transferred, run duration …), calendar heatmap, run timeline with overlaps and status light.
+  Only views that fit the data source are offered.
+- The transferred data is stored per run ("Transferred" column); older runs are read from the log.
+
+**Jobs and storage locations**
+- **Time window per job:** start, end (also past midnight) and weekdays. Automatic starts outside are postponed, live
+  rounds are skipped. At the end of the window: let it run, stop and continue in the next window, or stop until the
+  next regular start.
+- **Duplicate jobs and storage locations** ("⧉"); a duplicated job is switched off and has no history.
+- **Change a storage location's protocol later** (e.g. SMB → SFTP); if it fails, the old state is restored.
+- **Mirror without deleting:** option "Don't delete anything in the destination" (`rclone copy` instead of `sync`),
+  also in the preview.
+
+**System**
+- **Restart the container:** by hand or on a schedule (time, weekdays; waits for running jobs). With the Docker socket
+  via Docker, otherwise MirrorSync exits and Docker restarts it via `restart: unless-stopped`.
+- **Old images:** after a self-update the old image is deleted (can be switched off), plus "Remove old images".
+- **Interface:** Start button as tall as the other buttons, sidebar arrow centered on the edge, windows such as the
+  audit details are modal. Sizes also in GB/TB.
+
+**Permissions, API/MCP, languages**
+- New permission `system.restart`; dashboard tiles need the permission of their data source (`jobs.view`,
+  `users.view`, `system.audit`, `system.settings`). Time windows like the other job settings (`jobs.edit`).
+- API/MCP: `get_dashboard`, `update_dashboard`, `duplicate_job`, `duplicate_remote`, `update_remote` with `type`,
+  `no_delete`, `window`, `get_restart`, `restart_container`, `update_restart_settings`, `list_old_images`,
+  `prune_images`, `selfupdate_prune`. Everything in the audit log, all 5 languages.
 
 ## 1.50.0 – 2026-11-23
 - **Tasks window stays open.** While a job was running, the overview (and a job's pages and its live log) reloaded

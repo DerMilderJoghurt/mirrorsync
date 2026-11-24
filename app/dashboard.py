@@ -105,7 +105,7 @@ PRESETS = {
     "runs_timeline": {"title": "Zeitleiste der Läufe (24 Stunden)", "source": "runs", "view": "timeline", "filters": {"period": "1d"}, "w": 12, "h": 7},
 }
 DEFAULT = ["running", "stats", "failed", "last_runs", "next_runs", "logins", "audit", "system"]
-OLD_SIZE = {"s": 4, "w": 8}   # Layouts aus 1.54.0: size s/w
+OLD_SIZE = {"s": 4, "w": 8}   # aeltere Layouts: size s/w
 
 
 def set_audit_categories(cats):
@@ -362,7 +362,7 @@ def clean_tabs(raw, has):
 
 
 def tabs_for(stored, has, tr=lambda x: x):
-    """Gespeicherte Tabs (oder Standard). Layouts bis 1.55.0 (nur eine Kachel-Liste) werden zum ersten Tab."""
+    """Gespeicherte Tabs (oder Standard). Aeltere Layouts (nur eine Kachel-Liste) werden zum ersten Tab."""
     if isinstance(stored, list):
         return [{"id": "main", "name": tr(DEFAULT_TAB), "tiles": layout_for(stored, has)}]
     if not isinstance(stored, dict) or not stored.get("tabs"):

@@ -4,7 +4,7 @@
 
 # MirrorSync – 1:1 mirroring with a web GUI and schedules
 
-Version **1.57.0** · Changes: [CHANGELOG.md](CHANGELOG.md) · [Deutsche Version](README.de.md)
+Version **1.51.0** · Changes: [CHANGELOG.md](CHANGELOG.md) · [Deutsche Version](README.de.md)
 
 A Docker container that **mirrors folders one-way, 1:1** (like FreeFileSync "Mirror"):
 the destination becomes an exact copy of the source, including deletions. The sync engine is
@@ -67,7 +67,7 @@ Changed files are transferred completely (no delta transfer like rsync).
 
 ## Installation
 The ready-made image is in the GitHub Container Registry: `ghcr.io/dermilderjoghurt/mirrorsync`
-(for amd64 and arm64, e.g. Raspberry Pi). Tags: `latest` (newest version), `1.57.0` (fixed version),
+(for amd64 and arm64, e.g. Raspberry Pi). Tags: `latest` (newest version), `1.51.0` (fixed version),
 `1.40` (newest patch of this version). The image is only published when the version number changes, so
 update checkers such as Dockhand or Watchtower only report an update when there really is a new version.
 
@@ -272,7 +272,7 @@ the base folder, otherwise the common parent folder becomes the source.
   with selection `10-Temp/` and destination `Family-NAS:share` gives `Family-NAS:share/10-Temp`.
 - Empty field = the whole source folder.
 
-## Dashboard charts (since 1.57.0)
+## Dashboard charts (since 1.51.0)
 In addition to number, list, bars and status light there are these views. The editor only offers the ones that fit the
 data source:
 
@@ -290,12 +290,12 @@ New periods: 90 and 365 days. Without a period the charts show the last 30 days 
 Ready-made templates: "Runs today", "Success rate (30 days)", "Data transferred per day", "Run duration per day",
 "Runs per day", "Runs by status", "Runs in the calendar", "Run timeline" and a gauge for disk space.
 
-From 1.57.0 the transferred data is stored with every run ("Transferred" column in the list of runs). For older runs
+The transferred data is stored with every run ("Transferred" column in the list of runs). For older runs
 MirrorSync reads it from the existing log.
 
 ![Dashboard charts](docs/screenshots/dashboard-charts.png)
 
-## Dashboard building blocks and tabs (since 1.56.0)
+## Dashboard building blocks and tabs (since 1.51.0)
 Every tile is made of three building blocks, similar to the self-assembled notifications:
 
 - **Data source:** overview, running jobs, jobs, runs, next starts, logins, changes (audit log), disk space (/config,
@@ -317,7 +317,7 @@ log, `system.settings` for disk space). API/MCP: `get_dashboard` (tabs, tiles, c
 
 ![Dashboard tabs](docs/screenshots/dashboard-tabs.png)
 
-## Dashboard (since 1.54.0)
+## Dashboard (since 1.51.0)
 At the top of the sidebar: **Dashboard** with tiles that refresh themselves every 5 seconds:
 
 ![Dashboard](docs/screenshots/dashboard.png)
@@ -333,14 +333,14 @@ At the top of the sidebar: **Dashboard** with tiles that refresh themselves ever
 | Latest changes | the last 10 audit log entries | `system.audit` |
 | System | version, available update, running since, last restart | – |
 
-With **Customize** every user picks which tiles to see and in which order (drag or ↑ ↓). Since 1.55.0 each tile can
+With **Customize** every user picks which tiles to see and in which order (drag or ↑ ↓). Each tile can
 be resized freely by dragging its bottom right corner, in width (1–12 columns) and height (1–24 rows). Smaller tiles
 move into free gaps automatically, so two half-height tiles stack next to a big one. If the content does not fit, it
 scrolls inside the tile. On phones all tiles are stacked. "Restore default" resets everything. Tiles without the
 needed permission are not shown. The layout is per user (and per API key). API/MCP: `get_dashboard`,
 `update_dashboard` (`tiles` with `id`, `w`, `h`; `reset`).
 
-## Restart and old images (since 1.53.0)
+## Restart and old images (since 1.51.0)
 Under **Settings → General → Restart** you can restart the MirrorSync container: by hand with "Restart now" or on a
 schedule (time and weekdays). If jobs are running, the button refuses unless you tick "even if jobs are running" (they
 are then cancelled). The schedule waits until no job is running.
@@ -368,7 +368,7 @@ any more and removes them with "Remove old images". Other images are never touch
 API/MCP: `get_restart`, `restart_container` (`force`), `update_restart_settings` (`restart_auto`, `restart_time`,
 `restart_days`), `list_old_images`, `prune_images`, `selfupdate_prune` in `update_update_settings`.
 
-## Time windows (since 1.52.0)
+## Time windows (since 1.51.0)
 In each job under **Time window**: "Only run within a time window", start, end and weekdays, e.g. Mon–Fri 22:00 to
 06:00.
 
@@ -956,7 +956,7 @@ MirrorSync can update itself if you mount the Docker socket into the container:
   previous one runs again. Result and steps are shown in the GUI, in the audit log ("Update started / completed /
   failed") and in `config/selfupdate.json`.
 - **Requirements:** the image has to come from a registry (`image: ghcr.io/dermilderjoghurt/mirrorsync:latest`).
-  MirrorSync cannot pull images built with `build: .`. With a fixed version tag (`:1.57.0`) only that tag is pulled
+  MirrorSync cannot pull images built with `build: .`. With a fixed version tag (`:1.51.0`) only that tag is pulled
   again. `/config` has to be a volume or bind mount (it is in the example compose file).
 - **Permission:** `system.update` ("Update MirrorSync", admins have it automatically). Changing the automatic
   update and its time needs `system.settings`.
