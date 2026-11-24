@@ -32,11 +32,13 @@ nav svg,.btn svg{width:16px;height:16px;flex:0 0 16px}
 .side-foot button,.side-foot a{all:unset;display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;color:var(--mut);cursor:pointer;font-weight:500}
 .side-foot button:hover,.side-foot a:hover{background:var(--card2);color:var(--fg)}.side-foot svg{width:16px;height:16px}
 .content{flex:1;min-width:0}
-aside{transition:width .18s ease,flex-basis .18s ease}.brand{position:relative}.lbl{white-space:nowrap;overflow:hidden}
-.sidetog{all:unset;position:absolute;right:10px;top:50%;margin-top:-17px;width:24px;height:24px;display:grid;place-items:center;border-radius:6px;color:var(--mut);cursor:pointer}
-.sidetog:hover{background:var(--card2);color:var(--fg)}.sidetog svg{width:16px;height:16px;transition:transform .18s}
+aside{transition:width .18s ease,flex-basis .18s ease}.brand{position:static}.lbl{white-space:nowrap;overflow:hidden}
+.sidetog{all:unset;position:absolute;right:-13px;top:50%;margin-top:-13px;width:24px;height:24px;display:grid;place-items:center;border-radius:50%;background:var(--card);border:1px solid var(--bd2);box-shadow:0 1px 4px rgba(0,0,0,.12);color:var(--mut);cursor:pointer;z-index:20}
+.sidetog:hover{background:var(--card2);color:var(--fg)}.sidetog svg{width:14px;height:14px;transition:transform .18s}
+.btn,form.inline,details.pausemenu{vertical-align:middle}
+html:has(dialog[open]),html:has(dialog[open]) body{overflow:hidden}dialog[open]{overscroll-behavior:contain;max-height:88vh;overflow:auto}dialog::backdrop{background:rgba(0,0,0,.45)}
 :root[data-side=mini] aside{width:64px;flex-basis:64px}:root[data-side=mini] aside .lbl,:root[data-side=mini] .side-foot .ver{display:none}
-:root[data-side=mini] .brand{flex-direction:column;padding:18px 0 14px;gap:8px}:root[data-side=mini] .sidetog{position:static;margin:0}:root[data-side=mini] .sidetog svg{transform:rotate(180deg)}
+:root[data-side=mini] .brand{flex-direction:column;padding:18px 0 14px;gap:8px}:root[data-side=mini] .sidetog svg{transform:rotate(180deg)}
 :root[data-side=mini] nav{padding:0 10px}:root[data-side=mini] nav a,:root[data-side=mini] .side-foot button,:root[data-side=mini] .side-foot a{justify-content:center;padding:9px 0;position:relative}
 :root[data-side=mini] nav a .badge{position:absolute;top:2px;right:2px;margin:0;font-size:10px;padding:0 4px}:root[data-side=mini] .userchip{padding:6px 0}
 .topbar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:22px 32px 6px;flex-wrap:wrap}
@@ -265,7 +267,7 @@ r.dataset.theme=dark?'light':'dark';try{localStorage.setItem('ms-theme',r.datase
 <div class="path">{% if j.direction == "bisync" %}<span title="Zwei-Wege-Sync">{{ j.source }} ⇄ {{ j.eff_dest }}</span>{% else %}{{ j.source }} → {{ j.eff_dest }}{% endif %}</div>
 {% if j.direction == "bisync" and j.bisync_need_resync %}<small class="fehler">Zwei-Wege-Sync abgebrochen, bitte neu zusammenführen.</small>
 {% if can("jobs.run") and not j.running %}<form class="inline" method="post" action="/job/{{ j.id }}/resync" onsubmit="return confirm('Beide Seiten neu zusammenführen? Was nur auf einer Seite liegt, wird auf die andere kopiert. Gelöscht wird nichts.')"><button class="btn sm">Neu zusammenführen</button></form>{% endif %}<br>{% endif %}
-<small>{% if j.direction == "bisync" %}⇄ Zwei-Wege · {% endif %}{% if j.n_select %}☑ nur {{ j.n_select }} {{ "Eintrag" if j.n_select == 1 else "Einträge" }} · {% endif %}{% if j.n_excludes %}{{ j.n_excludes }} Ausschlüsse · {% endif %}{% if j.versioning %}Versionierung · {% endif %}{% if j.notify_summary %}🔔 {{ j.notify_summary }}{% endif %}{% if j.dry_run %} · nur Testlauf{% endif %}</small></td>
+<small>{% if j.direction == "bisync" %}⇄ Zwei-Wege · {% endif %}{% if j.n_select %}☑ nur {{ j.n_select }} {{ "Eintrag" if j.n_select == 1 else "Einträge" }} · {% endif %}{% if j.n_excludes %}{{ j.n_excludes }} Ausschlüsse · {% endif %}{% if j.no_delete and j.direction != "bisync" %}ohne Löschen · {% endif %}{% if j.versioning %}Versionierung · {% endif %}{% if j.notify_summary %}🔔 {{ j.notify_summary }}{% endif %}{% if j.dry_run %} · nur Testlauf{% endif %}</small></td>
 <td class="hide-sm">{% if j.trig == "after" %}{% if j.parent_name %}<span title="startet nach einer anderen Aufgabe">⛓ nach „{{ j.parent_name }}“</span><br><small>{{ "immer" if j.after_when == "always" else "nur bei Erfolg" }}{% if not j.enabled %} · <span class="fehler">aus</span>{% endif %}</small>{% else %}<span class="fehler">Vorgänger fehlt</span>{% endif %}
 {% elif j.trig == "time" and j.enabled and j.next_run %}{% if j.schedule_text %}{{ j.schedule_text }}{% else %}<code>{{ j.schedule }}</code>{% endif %}
 {% elif j.trig == "live" and j.enabled %}<span title="gleicht laufend Quelle und Ziel ab">⚡ {{ j.live_text }}</span><br><small>{{ j.live_full_text }}{% if j.next_run %}, nächster {{ j.next_run }}{% endif %}</small>{% if j.live_fail_count %}<br><small class="fehler">{{ j.live_fail_count }} Live-Läufe in Folge fehlgeschlagen</small>{% elif j.live_checked %}<br><small class="mut">zuletzt geprüft {{ j.live_checked[11:16] }}</small>{% endif %}
@@ -293,7 +295,7 @@ r.dataset.theme=dark?'light':'dark';try{localStorage.setItem('ms-theme',r.datase
 <form method="post" action="/job/{{ j.id }}/pause"><input type="hidden" name="hours" value="168"><button class="btn sm">1 Woche</button></form>
 <form method="post" action="/job/{{ j.id }}/pause" class="pdate"><input type="datetime-local" name="until" required><button class="btn sm pri">bis</button></form>
 </div></details>{% endif %}{% endif %}
-{% if can("jobs.logs") %}<a class="btn sm" href="/job/{{ j.id }}/log">Log</a>{% endif %} <a class="btn sm" href="/job/{{ j.id }}">{{ "Bearbeiten" if can("jobs.edit") else "Ansehen" }}</a>
+{% if can("jobs.logs") %}<a class="btn sm" href="/job/{{ j.id }}/log">Log</a>{% endif %} <a class="btn sm" href="/job/{{ j.id }}">{{ "Bearbeiten" if can("jobs.edit") else "Ansehen" }}</a>{% if can("jobs.create") %}<form class="inline" method="post" action="/job/{{ j.id }}/duplicate"><button class="btn sm" title="Duplizieren: Kopie dieser Aufgabe anlegen (ausgeschaltet)" aria-label="Duplizieren">⧉</button></form>{% endif %}
 {% if can("jobs.delete") %}<form class="inline" method="post" action="/job/{{ j.id }}/delete" data-q="{{ _('Aufgabe „{0}“ wirklich entfernen? Die Dateien in Quelle und Ziel bleiben unberührt.', j.name) }}" onsubmit="return confirm(this.dataset.q)"><button class="btn sm del" title="Aufgabe entfernen">Entfernen</button></form>{% endif %}</td>
 </tr>{% endfor %}</table>{% endif %}
 </div>
@@ -302,8 +304,9 @@ r.dataset.theme=dark?'light':'dark';try{localStorage.setItem('ms-theme',r.datase
 
 "job.html": r"""{% extends "base.html" %}{% block title %}{{ job.name if job_id else "Neue Aufgabe" }}{% endblock %}
 {% block subtitle %}<p>{{ "Aufgabe bearbeiten" if job_id else "Neue Spiegel-Aufgabe anlegen" }}</p>{% endblock %}
-{% block actions %}{% if job_id %}<a class="btn" href="/job/{{ job_id }}/log">Log</a>{% endif %}{% endblock %}
+{% block actions %}{% if job_id %}{% if can("jobs.create") %}<form class="inline" method="post" action="/job/{{ job_id }}/duplicate"><button class="btn" title="Kopie dieser Aufgabe anlegen (ausgeschaltet)">⧉ Duplizieren</button></form> {% endif %}<a class="btn" href="/job/{{ job_id }}/log">Log</a>{% endif %}{% endblock %}
 {% block body %}
+{% if msg %}<div class="msg ok">{{ msg }}</div>{% endif %}
 {% if error %}<div class="msg err">{{ error }}</div>{% endif %}
 {% set editable = (can("jobs.edit") if job_id else can("jobs.create")) %}{% if not editable %}<div class="msg info">Nur ansehen: Deine Rolle darf diese Aufgabe nicht ändern.</div>{% endif %}
 <aside class="fbpanel" id="fbpanel" aria-hidden="true">
@@ -584,6 +587,7 @@ const TZN='{{ tz }}';
 <button type="button" class="btn sm" style="margin-top:8px{{ ';display:none' if not can('remotes.browse') }}" onclick="openFB('ex')">{{ ICON.plus }} Ordner oder Dateien aus der Quelle ausschließen</button>
 <div class="hint">Ein Eintrag pro Zeile, relativ zur Quelle. <code>/Temp/</code> = Ordner Temp direkt in der Quelle,
 <code>Temp/</code> = jeder Ordner namens Temp, <code>/Projekte/alt/bericht.docx</code> = eine Datei, <code>*.tmp</code> = alle .tmp-Dateien.</div>
+<div class="ow-only"><label class="check"><input type="checkbox" name="no_delete" {{ "checked" if job.no_delete }}> Im Ziel nichts löschen: nur Neues und Geändertes kopieren (<code>rclone copy</code> statt <code>sync</code>). Was in der Quelle gelöscht wurde, bleibt im Ziel liegen.</label></div>
 <div class="ow-only"><label class="check"><input type="checkbox" name="delete_excluded" {{ "checked" if job.delete_excluded }}> Ausgeschlossenes auch im Ziel löschen (sonst bleibt es dort unangetastet liegen)</label>
 <div class="hint">Bei einer Auswahl (☑) gilt das nicht: Dann bleibt im Ziel alles außerhalb der Auswahl immer unberührt.</div></div>
 <div class="hint tw-only">Beim Zwei-Wege-Sync gelten die Ausschlüsse für beide Seiten: Ausgeschlossenes wird auf keiner Seite angefasst.</div>
@@ -857,7 +861,10 @@ document.addEventListener('DOMContentLoaded',()=>{
 {% for r in remotes %}<tr><td><b>{{ r.name }}</b>{% if r.no_token %}<br><span class="tag fehler">Anmeldung fehlt</span>{% endif %}</td><td>{{ r.type }}</td><td class="hide-sm"><code>{{ r.name }}:pfad/zum/ordner</code></td>
 <td style="white-space:nowrap">{% if can("remotes.test") %}<form class="inline" method="post" action="/remotes/{{ r.name }}/test"><button class="btn sm">Testen</button></form>{% endif %}{% if can("remotes.edit") %}
 {% if r.oauth %}<form class="inline" method="post" action="/remotes/{{ r.name }}/auth"><button class="btn sm {{ 'pri' if r.no_token }}">Anmelden</button></form>{% endif %}
-<a class="btn sm" href="/remotes/{{ r.name }}/edit">Bearbeiten</a>{% endif %}{% if can("remotes.delete") %}
+<a class="btn sm" href="/remotes/{{ r.name }}/edit">Bearbeiten</a>{% endif %}{% if can("remotes.create") %}
+<details class="pausemenu"><summary class="btn sm" title="Kopie mit denselben Zugangsdaten anlegen">⧉ Duplizieren</summary><div class="pmenu">
+<b><span>Kopie von</span> {{ r.name }}</b><form method="post" action="/remotes/{{ r.name }}/duplicate" style="display:flex;gap:6px;margin-top:6px"><input type="text" name="new_name" value="{{ r.name }}-kopie" required pattern="[A-Za-z0-9_\-]+" style="height:30px;width:170px" aria-label="Neuer Name"><button class="btn sm pri">Anlegen</button></form>
+<div class="hint">Name nur aus Buchstaben, Ziffern, - und _. Passwort und Anmeldung werden mitkopiert.</div></div></details>{% endif %}{% if can("remotes.delete") %}
 <form class="inline" method="post" action="/remotes/{{ r.name }}/delete" onsubmit="return confirm('Speicherort {{ r.name }} entfernen?')"><button class="btn sm del">Entfernen</button></form>{% endif %}</td></tr>
 {% endfor %}</table>{% else %}<div class="empty">Noch keine Speicherorte angelegt.</div>{% endif %}
 <p class="hint" style="padding:0 10px 8px">Alle rclone-Speicherarten werden unterstützt (SMB, WebDAV, SFTP, FTP, S3, B2, Azure, Google Drive, OneDrive, Dropbox, pCloud, MEGA, crypt und rund 45 weitere).
@@ -1212,7 +1219,8 @@ if(LOCS.length){const q=new URLSearchParams(location.search);const ok=v=>LOCS.so
 <div class="row">
 <div><label>Name</label><input type="text" name="name" value="{{ name or form.get('name','') }}" {{ "disabled" if name }} placeholder="z. B. nas" required>
 <div class="hint">Im Job dann als <code>name:pfad</code> verwenden.</div></div>
-<div><label>Typ</label><select name="type" id="type" {{ "disabled" if name }} onchange="render()"></select></div></div>
+<div><label>Typ</label><select name="type" id="type" onchange="render()"></select></div></div>
+{% if name %}<div id="typewarn" class="msg err" style="display:none;margin-top:14px">Achtung: Du wechselst das Protokoll. Beim Speichern wird der Speicherort mit dem neuen Typ neu eingerichtet, alle Felder werden neu abgefragt und das Passwort muss neu eingegeben werden. Aufgaben, die ihn verwenden, behalten den Namen. Pfade können sich je nach Protokoll unterscheiden (z. B. SMB: <code>freigabe/ordner</code>, SFTP: <code>/pfad</code>). Schlägt die Einrichtung fehl, bleibt der alte Stand erhalten.</div>{% endif %}
 <div id="oauth" class="msg info" style="display:none;margin-top:14px">Dieser Dienst nutzt eine Anmeldung im Browser. Nach dem Speichern führt dich der nächste Schritt durch die Anmeldung
 (einmal <code>rclone authorize</code> auf deinem PC ausführen und das Ergebnis hier einfügen). Client-ID und Secret kannst du leer lassen.</div>
 <div id="fields"></div>
@@ -1234,7 +1242,9 @@ P.forEach(p=>(p.common?g1:g2).append(opt(p.name,p.common?p.label:p.name+' – '+
 sel.append(g1,g2); sel.value=EX.type||FORM.type||'smb';
 function matches(o,prov){ if(!o.Provider) return true; let neg=o.Provider.startsWith('!'); const l=o.Provider.replace(/^!/,'').split(',');
   return neg? !l.includes(prov) : l.includes(prov); }
-function val(n){ if(('opt_'+n) in FORM) return FORM['opt_'+n]; return EX[n]!==undefined?String(EX[n]):''; }
+const KEEP=['host','user'];
+function same(){return !EDIT||sel.value===EX.type}
+function val(n){ if(('opt_'+n) in FORM) return FORM['opt_'+n]; if(!same()&&!KEEP.includes(n)) return ''; return EX[n]!==undefined?String(EX[n]):''; }
 function field(o){
   const w=document.createElement('div'); w.dataset.provider=o.Provider||'';
   const l=document.createElement('label'); l.textContent=(DE[o.Name]||o.Help.split('\n')[0])+(o.Required?' *':''); w.append(l);
@@ -1244,10 +1254,10 @@ function field(o){
   else if(ex.length && (o.Exclusive||o.Name==='provider')){ i=document.createElement('select'); i.append(opt('','– bitte wählen –'));
     ex.forEach(e=>i.append(opt(e.Value,e.Value+(e.Help?' – '+e.Help.split('\n')[0].slice(0,80):'')))); }
   else { i=document.createElement('input'); i.type=(o.IsPassword||(o.Sensitive&&/secret|pass|_key$/.test(o.Name)))?'password':'text'; i.autocomplete='off';
-    i.placeholder=o.IsPassword&&EDIT?'(unverändert)':(o.DefaultStr||'');
+    i.placeholder=o.IsPassword&&EDIT&&same()?'(unverändert)':(o.DefaultStr||'');
     if(ex.length){const id='dl_'+o.Name+Math.random().toString(36).slice(2,6);const dl=document.createElement('datalist');dl.id=id;
       ex.forEach(e=>dl.append(opt(e.Value,e.Help?e.Help.split('\n')[0]:'')));w.append(dl);i.setAttribute('list',id);} }
-  i.name='opt_'+o.Name; i.value=o.IsPassword?'':val(o.Name); if(o.Required && !(o.IsPassword&&EDIT)) i.required=true;
+  i.name='opt_'+o.Name; i.value=o.IsPassword?'':val(o.Name); if(o.Required && !(o.IsPassword&&EDIT&&same())) i.required=true;
   if(o.Name==='provider'){i.onchange=filter;i.oninput=filter;}
   w.append(i);
   const h=document.createElement('div'); h.className='hint'; const rest=o.Help.split('\n').slice(DE[o.Name]?0:1).join(' ').trim();
@@ -1263,9 +1273,11 @@ function filter(){
 function render(){
   const p=P.find(x=>x.name===sel.value); const F=document.getElementById('fields'), A=document.getElementById('adv'); F.innerHTML='';A.innerHTML='';
   document.getElementById('oauth').style.display=p.oauth?'block':'none';
+  const tw=document.getElementById('typewarn');if(tw)tw.style.display=same()?'none':'block';
   p.options.forEach(o=>(o.Advanced?A:F).append(field(o)));
   // Neuer Speicherort: Standard-Port des Typs vorausfuellen (bleibt aenderbar)
   const po=document.querySelector('#fields [name=opt_port],#adv [name=opt_port]'), pd=(p.options.find(o=>o.Name==='port')||{}).DefaultStr;
+  if(po && !same() && pd && (!EDIT||!('opt_port' in FORM))) po.value=pd;
   if(po && !EDIT && !po.value && pd) po.value=pd;
   const tl=document.querySelector('[name=opt_tls]');
   if(po && tl && sel.value==='ftp') tl.addEventListener('change',()=>{ if(['','21','990'].includes(po.value)) po.value=tl.value==='true'?'990':'21'; });

@@ -3,6 +3,20 @@
 Version numbers follow [SemVer](https://semver.org/): MAJOR.MINOR.PATCH
 (MAJOR = incompatible change, MINOR = new feature, PATCH = bug fix).
 
+## 1.51.0 – 2026-11-24
+- **Duplicate jobs** ("⧉" in the overview and in the job). The copy is switched off, history and two-way state are
+  not carried over.
+- **Duplicate storage locations** under a new name, including password, sign-in and "Visible to".
+- **Change a storage location's protocol later** (e.g. SMB → SFTP), with a warning and the fields asked again. If
+  the setup fails, the old state is restored.
+- **Mirror without deleting:** new option "Don't delete anything in the destination" (`rclone copy` instead of
+  `sync`), also in the preview.
+- **Interface:** Start button as tall as the other buttons, sidebar collapse arrow centered on the edge, open windows
+  such as the audit log details are modal (background doesn't scroll).
+- API/MCP: `duplicate_job`, `duplicate_remote`, `update_remote` with `type`, `no_delete`. Permissions: duplicating
+  needs "create jobs" or "create storage locations", changing the protocol "edit storage locations". Everything is in
+  the audit log. All 5 languages.
+
 ## 1.50.0 – 2026-11-23
 - **Tasks window stays open.** While a job was running, the overview (and a job's pages and its live log) reloaded
   every 3 seconds and closed the "Tasks" window at the top right. Reloading now pauses while that window, a menu or

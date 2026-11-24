@@ -4,7 +4,7 @@
 
 # MirrorSync – 1:1-Spiegelung mit Web-GUI und Zeitplänen
 
-Version **1.50.0** · Änderungen siehe [CHANGELOG.md](CHANGELOG.md) (englisch) · [English version](README.md)
+Version **1.51.0** · Änderungen siehe [CHANGELOG.md](CHANGELOG.md) (englisch) · [English version](README.md)
 
 Ein Docker-Container, der Ordner **einweg 1:1 spiegelt** (wie FreeFileSync „Spiegeln"):
 Das Ziel wird exakt wie die Quelle, inklusive Löschungen. Als Sync-Motor dient
@@ -68,7 +68,7 @@ Geänderte Dateien werden komplett neu übertragen (kein Delta wie bei rsync).
 
 ## Installation
 Das fertige Image liegt in der GitHub Container Registry: `ghcr.io/dermilderjoghurt/mirrorsync`
-(für amd64 und arm64, z. B. Raspberry Pi). Tags: `latest` (neueste Version), `1.50.0` (feste Version),
+(für amd64 und arm64, z. B. Raspberry Pi). Tags: `latest` (neueste Version), `1.51.0` (feste Version),
 `1.40` (neuester Patch dieser Version). Das Image wird nur veröffentlicht, wenn sich die Versionsnummer ändert.
 Update-Prüfer wie Dockhand oder Watchtower melden deshalb nur dann ein Update, wenn es wirklich eine neue Version gibt.
 
@@ -277,6 +277,25 @@ bleibt sie Basisordner, sonst wird der gemeinsame Elternordner zur Quelle.
   Auswahl aus** (seit 1.27.0): Die gewählten Ordner und Dateien landen direkt im Ziel, z. B. Quelle
   `NAS:share` mit Auswahl `10-Temp/` und Ziel `Familie-NAS:share` ergibt `Familie-NAS:share/10-Temp`.
 - Leeres Feld = der ganze Quellordner wie bisher.
+
+## Duplizieren, Protokoll wechseln, Spiegeln ohne Löschen (seit 1.51.0)
+- **Aufgabe duplizieren:** „⧉“ in der Übersicht oder „⧉ Duplizieren“ in der Aufgabe. Die Kopie heißt „Name (Kopie)“,
+  übernimmt alle Einstellungen ohne Verlauf und ist **ausgeschaltet**, damit sie nicht doppelt läuft. Recht
+  „Aufgaben anlegen“.
+- **Speicherort duplizieren:** „⧉ Duplizieren“ unter Speicherorte, neuen Namen eingeben. Passwort, Anmeldung (Token)
+  und „Sichtbar für“ werden mitkopiert. Recht „Speicherorte anlegen“.
+- **Protokoll nachträglich ändern:** Beim Bearbeiten lässt sich der Typ umstellen (z. B. SMB → SFTP). Es kommt eine
+  Warnung, alle Felder werden neu abgefragt (Server und Benutzer bleiben vorausgefüllt), das Passwort muss neu
+  eingegeben werden. Der Name bleibt, Aufgaben behalten also ihren Speicherort. Schlägt die Einrichtung fehl, bleibt
+  der alte Stand erhalten.
+- **Spiegeln ohne Löschen:** Option „Im Ziel nichts löschen“ unter Optionen. Dann läuft `rclone copy` statt
+  `rclone sync`: Neues und Geändertes wird kopiert, was in der Quelle gelöscht wurde, bleibt im Ziel. Die Vorschau
+  zeigt dann auch keine Löschungen. Gilt nur für Spiegeln, nicht für Zwei-Wege.
+- Außerdem: Die Knöpfe einer Zeile sind gleich hoch, der Pfeil zum Einklappen der Seitenleiste sitzt mittig am
+  Rand, und offene Fenster (z. B. Details im Audit-Log) sind modal: Die Seite dahinter scrollt nicht mit.
+- API/MCP: `duplicate_job` (`POST /api/v1/jobs/{id}/duplicate`, optional `name`), `duplicate_remote`
+  (`POST /api/v1/remotes/{name}/duplicate` mit `new_name`), `update_remote` mit `type`, Feld `no_delete` bei
+  Aufgaben und in der Vorschau.
 
 ## Änderungen erkennen und Tempo (seit 1.50.0)
 Unter **Optionen** jeder Aufgabe:
@@ -849,7 +868,7 @@ MirrorSync kann sich selbst aktualisieren, wenn du den Docker-Socket in den Cont
   sie entfernt und die bisherige läuft wieder. Ergebnis und Ablauf stehen in der GUI, im Audit-Log
   („Update gestartet / abgeschlossen / fehlgeschlagen“) und in `config/selfupdate.json`.
 - **Voraussetzungen:** Das Image muss aus einem Registry kommen (`image: ghcr.io/dermilderjoghurt/mirrorsync:latest`).
-  Mit `build: .` gebaute Images kann MirrorSync nicht neu holen. Mit festem Versions-Tag (`:1.50.0`) wird nur dieser
+  Mit `build: .` gebaute Images kann MirrorSync nicht neu holen. Mit festem Versions-Tag (`:1.51.0`) wird nur dieser
   Tag neu geholt. `/config` muss als Volume oder Ordner eingebunden sein (ist es in der Beispiel-Compose).
 - **Recht:** `system.update` („MirrorSync aktualisieren“, Admins haben es automatisch). Automatik und Uhrzeit
   ändern braucht `system.settings`.

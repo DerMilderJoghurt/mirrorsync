@@ -2,6 +2,7 @@
 
 Sync-Motor ist rclone (SMB, WebDAV, SFTP/SSH, FTP, S3, lokale Ordner, ...).
 """
+import copy
 import datetime
 import hmac
 import ipaddress
@@ -393,7 +394,7 @@ def build_sync_cmd(job, dry_run, mode="full", max_age=None):
     stamp = datetime.datetime.now().strftime("%Y-%m-%d_%H%M%S")
     delta = mode == "delta"
     cmd = [
-        "rclone", "copy" if delta else "sync", job["source"], effective_dest(job),
+        "rclone", "copy" if (delta or job.get("no_delete")) else "sync", job["source"], effective_dest(job),
         "--config", RCLONE_CONF,
         "--create-empty-src-dirs",
         "--log-level", "INFO",
@@ -403,6 +404,8 @@ def build_sync_cmd(job, dry_run, mode="full", max_age=None):
         cmd.append("--dry-run")
     if delta:
         cmd += ["--max-age", f"{int(max_age or 3600)}s"]
+    if job.get("no_delete"):
+        delta = True   # wie copy: kein --max-delete, kein --delete-excluded
     if str(job.get("max_delete", "")).strip() and not delta:
         cmd += ["--max-delete", str(job["max_delete"]).strip()]
     if job.get("versioning"):
@@ -1372,6 +1375,7 @@ ENDPOINT_PERMS = {
     "job_preview": "jobs.preview", "job_preview_page": "jobs.preview", "update_apply": "system.update", "update_state": "system.update", "index": "jobs.view", "jobs_running": "jobs.view", "schedules": "jobs.view", "schedules_json": "jobs.view", "schedule_job": "jobs.edit", "schedule_chains": "jobs.edit", "show_log": "jobs.logs", "show_run": "jobs.logs", "download_run": "jobs.logs", "delete_job": "jobs.delete", "stop": "jobs.run",
     "job_notify_test": "jobs.notify", "job_pause": "jobs.edit",
     "remotes": "remotes.view", "test_remote": "remotes.test", "delete_remote": "remotes.delete",
+    "duplicate_job": "jobs.create", "duplicate_remote": "remotes.create",
     "auth_remote": "remotes.edit", "browse": "remotes.browse", "browse_list": "remotes.browse",
     "users_page": "users.view", "login_history": "users.view", "login_log_action": "users.manage", "user_unlock": "users.manage", "user_edit": "users.manage", "user_delete": "users.manage",
     "roles_page": "roles.manage", "role_edit": "roles.manage", "role_delete": "roles.manage",
@@ -1404,7 +1408,7 @@ def scope_ok():
     acc = g.access
     if "job_id" in va and va["job_id"]:
         return acc.job_ok(va["job_id"], load_jobs().get(va["job_id"]))
-    if request.endpoint in ("edit_remote", "remote_wizard", "test_remote", "delete_remote", "auth_remote") and va.get("name"):
+    if request.endpoint in ("edit_remote", "remote_wizard", "test_remote", "delete_remote", "auth_remote", "duplicate_remote") and va.get("name"):
         return acc.remote_ok(va["name"])
     if request.endpoint == "browse":
         path = request.args.get("path", "").strip()
@@ -1621,6 +1625,7 @@ WRITE_METHODS = ("POST", "PUT", "PATCH", "DELETE")
 AUDIT_EP = {
     "edit_job": ["job"], "delete_job": ["job"], "job_pause": ["job"], "schedule_job": ["job"], "schedule_chains": ["job"],
     "edit_remote": ["remote"], "remote_wizard": ["remote"], "auth_remote": ["remote"], "delete_remote": ["remote"],
+    "duplicate_job": ["job"], "duplicate_remote": ["remote"],
     "settings_page": ["settings"], "general_settings": ["settings"],
     "access_settings": ["access"], "access_block": ["access"], "access_unblock": ["access"],
     "role_edit": ["role"], "role_delete": ["role", "user"], "user_edit": ["user", "group"], "user_delete": ["user", "group"],
@@ -2347,7 +2352,7 @@ def apply_job_form(f, job, old, job_id, jobs, api=False):
         extra_flags=f.get("extra_flags", "").strip(),
         excludes=f.get("excludes", "").replace("\r\n", "\n").strip(),
         selection=f.get("selection", "").replace("\r\n", "\n").strip()[:20000],
-        delete_excluded="delete_excluded" in f,
+        delete_excluded="delete_excluded" in f, no_delete="no_delete" in f and f.get("direction") != "bisync",
         include_source_dir="include_source_dir" in f and not has_selection({"selection": f.get("selection", "")}),
         trigger=f.get("trigger") if f.get("trigger") in ("time", "after", "manual", "live") else "time",
         direction="bisync" if f.get("direction") == "bisync" else "mirror",
@@ -2517,7 +2522,7 @@ def edit_job(job_id=None):
               if jid != job_id and g.access.job_ok(jid, j)]
     followers = [j["name"] for jid, j in jobs.items() if job_id and trigger_of(j) == "after" and j.get("after_job") == job_id]
     jtpl = msgtpl.editor_data(msgtpl.JOB_EVENTS, job.get("msg_tpl"), settings.get("msg_templates"))
-    return render_template("job.html", job=job, job_id=job_id, error=error, remotes=remotes, tz=TZ, jtpl=jtpl, vis_opts=vis_options(),
+    return render_template("job.html", job=job, job_id=job_id, error=error, msg=session.pop("flash", None) if request.method == "GET" else None, remotes=remotes, tz=TZ, jtpl=jtpl, vis_opts=vis_options(),
                            glob=glob, has_token=has_token, others=others, followers=followers, bw_cfg=job.get("bw") or settings.get("bw") or bwlimit.EMPTY)
 
 
@@ -2529,7 +2534,7 @@ def parse_bw(raw):
     return data if isinstance(data, dict) else {}
 
 
-PREVIEW_KEYS = ("source", "dest", "selection", "excludes", "include_source_dir", "direction", "delete_excluded", "compare", "compare_window", "checksum")
+PREVIEW_KEYS = ("source", "dest", "selection", "excludes", "include_source_dir", "direction", "delete_excluded", "no_delete", "compare", "compare_window", "checksum")
 
 
 def preview_job_from(f, saved=None):
@@ -2541,7 +2546,8 @@ def preview_job_from(f, saved=None):
                    excludes=str(f.get("excludes") or "").replace("\r\n", "\n").strip(),
                    include_source_dir=f.get("include_source_dir") not in (None, "", False, "0", "false", "off"),
                    direction="bisync" if f.get("direction") == "bisync" else "mirror",
-                   delete_excluded=f.get("delete_excluded") not in (None, "", False, "0", "false", "off"))
+                   delete_excluded=f.get("delete_excluded") not in (None, "", False, "0", "false", "off"),
+                   no_delete=f.get("no_delete") not in (None, "", False, "0", "false", "off"))
         if has_selection(job):
             job["include_source_dir"] = False
     if f is not None and f.get("compare") in COMPARE_MODES:
@@ -2572,7 +2578,8 @@ def preview_job(job):
             flt += ["--exclude", pattern]
     dest = effective_dest(job)
     bis = is_bisync(job)
-    dst_flt = [] if (job.get("delete_excluded") and not bis and not selection_list(job)) else flt
+    nodel = bool(job.get("no_delete")) and not bis
+    dst_flt = [] if (job.get("delete_excluded") and not bis and not nodel and not selection_list(job)) else flt
     res = {}
 
     cmp = compare_of(job)
@@ -2607,7 +2614,7 @@ def preview_job(job):
             dst_items = json.loads(out or "[]")
         except ValueError:
             return None, "Ziel: unerwartete Antwort von rclone."
-    entries = preview.compute(src_items, dst_items, "bisync" if bis else "mirror", compare=cmp, window=compare_window(job))
+    entries = preview.compute(src_items, dst_items, "bisync" if bis else "mirror", delete_extra=not nodel, compare=cmp, window=compare_window(job))
     tree, truncated = preview.build_tree(entries)
     return {"source": job["source"], "dest": dest, "mode": "bisync" if bis else "mirror", "dest_missing": dest_missing,
             "selection": selection_list(job), "summary": preview.summary(entries), "truncated": truncated,
@@ -2676,6 +2683,41 @@ def delete_job(job_id):
     if name is not None and not getattr(g, "bridge", None):
         session["flash"] = i18n.t("Aufgabe „{0}“ entfernt.", name)
     return redirect(url_for("index"))
+
+
+# Beim Duplizieren nicht mitkopiert: Verlauf, Laufzustand, Zwei-Wege-Status und Live-Zustand
+DUP_SKIP = ("history", "last_status", "last_run", "bisync_ready", "bisync_need_resync", "live_state", "live_last",
+            "paused_by", "owner")
+
+
+def duplicate_job_data(job_id, name=None, user=None):
+    """Kopie einer Aufgabe anlegen (abgeschaltet, damit sie nicht doppelt startet). Liefert (neue_id, aufgabe)."""
+    with _lock:
+        jobs = load_jobs()
+        src = jobs[job_id]
+        new = {k: copy.deepcopy(v) for k, v in src.items() if k not in DUP_SKIP and not k.startswith("_")}
+        names = {j.get("name") for j in jobs.values()}
+        base = (name or "").strip() or i18n.t("{0} (Kopie)", src.get("name", ""))
+        nm, n = base, 2
+        while not name and nm in names:
+            nm, n = f"{base} {n}", n + 1
+        new.update(name=nm, enabled=False, owner=user or g.user)
+        if trigger_of(src) == "live":
+            new["enabled"] = False
+        nid = uuid.uuid4().hex[:8]
+        jobs[nid] = new
+        save_jobs(jobs)
+    schedule_all()
+    return nid, new
+
+
+@app.post("/job/<job_id>/duplicate")
+def duplicate_job(job_id):
+    if job_id not in load_jobs():
+        abort(404)
+    nid, new = duplicate_job_data(job_id, request.form.get("name"))
+    session["flash"] = i18n.t("Kopie „{0}“ angelegt. Sie ist noch ausgeschaltet: Ziel prüfen und dann einschalten.", new["name"])
+    return redirect(url_for("edit_job", job_id=nid))
 
 
 @app.post("/job/<job_id>/run")
@@ -2969,13 +3011,14 @@ def edit_remote(name=None):
     if request.method == "POST":
         f = request.form
         new_name = name or f.get("name", "").strip()
-        typ = existing["type"] if existing else f.get("type", "")
+        typ = f.get("type", "") if (not existing or f.get("type")) else existing["type"]
+        type_changed = bool(existing) and typ != existing["type"]
         err = None
         if not new_name or not new_name.replace("-", "").replace("_", "").isalnum():
             err = "Name nur aus Buchstaben, Ziffern, - und _."
         elif not name and any(r["name"] == new_name for r in list_remotes()):
             err = f"Ein Speicherort '{new_name}' existiert schon."
-        elif not name and typ not in {p["name"] for p in providers()}:
+        elif (not name or type_changed) and typ not in {p["name"] for p in providers()}:
             err = "Unbekannter Typ."
         vis, vis_err = vis_from_form(f) if (g.access.has("remotes.edit") or not name) else (remote_vis_map().get(name, "all"), None)
         if not err and vis_err:
@@ -2995,6 +3038,21 @@ def edit_remote(name=None):
         for key, val in f.items():
             if key.startswith("opt_") and val.strip() != "":
                 params.append(f"{key[4:]}={val.strip()}")
+        if name and type_changed:
+            # Protokoll gewechselt: Speicherort mit dem neuen Typ neu anlegen, alter Abschnitt als Sicherung
+            with _conf_lock:
+                backup_body = _conf_section(name)
+                rclone("config", "delete", name)
+            q, err = _config_step(["config", "create", name, typ, *params, "--obscure"])
+            if err and not q and backup_body is not None:
+                with _conf_lock:
+                    rclone("config", "delete", name)
+                    with open(RCLONE_CONF, "a", encoding="utf-8") as fh:
+                        fh.write(f"\n[{name}]\n{backup_body.rstrip()}\n")
+                return render_template("remote_edit.html", name=name, existing=_safe(existing), providers=providers_tr(),
+                                       form=f, vis=vis, vis_opts=vis_options(),
+                                       err=i18n.t("Wechsel auf {0} fehlgeschlagen, der Speicherort bleibt wie er war: {1}", typ, err))
+            return _after_step(name, q, err, i18n.t("Speicherort '{0}' auf {1} umgestellt. Jetzt mit „Testen“ prüfen.", name, typ))
         if name:
             q, err = _config_step(["config", "update", name, *params, "--obscure"])
         else:
@@ -3003,6 +3061,53 @@ def edit_remote(name=None):
     return render_template("remote_edit.html", name=name, existing=_safe(existing), err=None,
                            providers=providers_tr(), form={}, vis=remote_vis_map().get(name, "all") if name else "all",
                            vis_opts=vis_options())
+
+
+_conf_lock = threading.Lock()
+
+
+def _conf_section(name):
+    """Abschnitt [name] aus rclone.conf als Text (mit bereits verschleierten Passwoertern und Tokens) oder None."""
+    try:
+        text = open(RCLONE_CONF, encoding="utf-8").read()
+    except OSError:
+        return None
+    m = re.search(r"(?ms)^\[" + re.escape(name) + r"\][ \t]*\n(.*?)(?=^\[|\Z)", text)
+    return m.group(1) if m else None
+
+
+def valid_remote_name(n):
+    return bool(n) and n.replace("-", "").replace("_", "").isalnum()
+
+
+def duplicate_remote_data(name, new_name):
+    """Speicherort samt Zugangsdaten unter neuem Namen kopieren. Liefert Fehlertext oder None."""
+    new_name = (new_name or "").strip()
+    if not valid_remote_name(new_name):
+        return "Name nur aus Buchstaben, Ziffern, - und _."
+    if any(r["name"] == new_name for r in list_remotes()):
+        return i18n.t("Ein Speicherort '{0}' existiert schon.", new_name)
+    with _conf_lock:
+        body = _conf_section(name)
+        if body is None:
+            return i18n.t("Speicherort '{0}' nicht gefunden.", name)
+        with open(RCLONE_CONF, "a", encoding="utf-8") as fh:
+            fh.write(f"\n[{new_name}]\n{body.rstrip()}\n")
+    meta = DB.get_map("remote_meta")
+    if name in meta:
+        meta[new_name] = copy.deepcopy(meta[name])
+        DB.put_map("remote_meta", meta)
+    return None
+
+
+@app.post("/remotes/<name>/duplicate")
+def duplicate_remote(name):
+    if remote_config(name) is None:
+        abort(404)
+    err = duplicate_remote_data(name, request.form.get("new_name"))
+    if err:
+        return render_remotes(err=i18n.t(err))
+    return render_remotes(msg=i18n.t("Speicherort '{0}' als '{1}' kopiert, mit denselben Zugangsdaten.", name, request.form.get("new_name", "").strip()))
 
 
 @app.route("/remotes/<name>/wizard", methods=["GET", "POST"])

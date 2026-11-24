@@ -30,7 +30,7 @@ LABELS = {
     "autobackup_logs": "Logs mitsichern", "autobackup_password": "Sicherungs-Passwort", "autobackup_notify": "Sicherung melden",
     "autobackup_notify_skip": "auch ohne Änderung melden", "autobackup_channels": "Sicherung: Kanäle", "language": "Sprache", "lang": "Sprache",
     "name": "Name", "source": "Quelle", "dest": "Ziel", "schedule": "Zeitplan", "enabled": "aktiv", "dry_run": "nur Testlauf",
-    "versioning": "Versionierung", "checksum": "Prüfsumme", "compare": "Änderung erkennen an", "compare_window": "Toleranz (Sekunden)", "speed": "Tempo", "max_delete": "max. Löschungen", "extra_flags": "zusätzliche Optionen",
+    "versioning": "Versionierung", "checksum": "Prüfsumme", "no_delete": "Im Ziel nichts löschen", "compare": "Änderung erkennen an", "compare_window": "Toleranz (Sekunden)", "speed": "Tempo", "max_delete": "max. Löschungen", "extra_flags": "zusätzliche Optionen",
     "excludes": "Ausschlüsse", "selection": "Auswahl", "delete_excluded": "Ausgeschlossenes löschen", "include_source_dir": "Quellordner mitkopieren",
     "trigger": "Startart", "after_job": "nach Aufgabe", "after_when": "Bedingung", "live_interval": "Live-Intervall (Min.)",
     "live_full": "voller Abgleich", "live_mode": "Live-Modus", "direction": "Art", "bisync_conflict": "Konfliktregel", "bisync_max_delete": "Löschschutz (%)", "bw_mode": "Bandbreite", "bw": "eigene Bandbreite", "notify_mode": "Benachrichtigung",

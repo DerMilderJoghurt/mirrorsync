@@ -265,15 +265,45 @@ def a_create_remote(a):
 
 
 @action("update_remote", "PATCH", "/remotes/{name}", "remotes.edit", "Speicherorte",
-        "Optionen eines Speicherorts ändern (nur die angegebenen; Passwörter nur setzen) und/oder visible_to.",
-        {"name": S(STR), "options": {"type": "object"}, "visible_to": VIS_PROP}, ["name"])
+        "Optionen eines Speicherorts ändern (nur die angegebenen; Passwörter nur setzen) und/oder visible_to. Mit type "
+        "wird das Protokoll gewechselt (z. B. smb → sftp): Der Speicherort wird mit dem neuen Typ neu eingerichtet, dafür "
+        "alle nötigen options inklusive Passwort angeben. Schlägt das fehl, bleibt der alte Stand erhalten.",
+        {"name": S(STR), "type": S(STR, "neues Protokoll (optional)"), "options": {"type": "object"}, "visible_to": VIS_PROP}, ["name"])
 def a_update_remote(a):
-    _check_keys(a, ("name", "options", "visible_to"))
+    _check_keys(a, ("name", "type", "options", "visible_to"))
     name = a["name"]
     _remote_view(name)
     form = {f"opt_{k}": ("true" if v is True else "false" if v is False else str(v)) for k, v in (a.get("options") or {}).items()}
+    if a.get("type"):
+        form["type"] = str(a["type"])
     _vis_form(form, a["visible_to"] if "visible_to" in a else core.remote_vis_map().get(name, "all"))
     return _remote_result(gui("POST", f"/remotes/{name}/edit", form=form), name)
+
+
+@action("duplicate_remote", "POST", "/remotes/{name}/duplicate", "remotes.create", "Speicherorte",
+        "Speicherort unter neuem Namen kopieren, mit denselben Zugangsdaten (Passwort, Anmeldung) und „Sichtbar für“.",
+        {"name": S(STR), "new_name": S(STR, "Name der Kopie (Buchstaben, Ziffern, - und _)")}, ["name", "new_name"])
+def a_duplicate_remote(a):
+    _check_keys(a, ("name", "new_name"))
+    _remote_view(a["name"])
+    msg = done(gui("POST", f"/remotes/{a['name']}/duplicate", form={"new_name": a.get("new_name", "")}))
+    return {"ok": True, "message": msg, "name": a["new_name"].strip(), "remote": _remote_view(a["new_name"].strip())}
+
+
+@action("duplicate_job", "POST", "/jobs/{job_id}/duplicate", "jobs.create", "Aufgaben",
+        "Aufgabe kopieren (alle Einstellungen ohne Verlauf). Die Kopie ist ausgeschaltet, damit sie nicht doppelt läuft: "
+        "anpassen und mit update_job enabled=true einschalten. Ohne name heißt sie „<Name> (Kopie)“.",
+        {"job_id": S(STR), "name": S(STR, "Name der Kopie (optional)")}, ["job_id"])
+def a_duplicate_job(a):
+    _check_keys(a, ("job_id", "name"))
+    r = gui("POST", f"/job/{a['job_id']}/duplicate", form={"name": a.get("name") or ""})
+    msg = done(r)
+    loc = r["resp"].headers.get("Location", "")
+    nid = loc.rstrip("/").rsplit("/", 1)[-1]
+    job = core.load_jobs().get(nid)
+    if not job:
+        raise ApiError(500, _t("Kopie wurde nicht angelegt."))
+    return {"ok": True, "message": msg, "job": api.public_job(nid, job)}
 
 
 @action("answer_remote", "POST", "/remotes/{name}/answer", "remotes.edit", "Speicherorte",
@@ -499,6 +529,7 @@ PREVIEW_PROPS = {
     "selection": dict(STRS, description="nur diese Dateien/Ordner (relativ zur Quelle, Ordner mit / am Ende)"),
     "excludes": dict(STRS, description="Ausschlüsse"), "include_source_dir": S(BOOL, "Quellordner selbst mitkopieren"),
     "direction": S(STR, "mirror oder bisync", enum=["mirror", "bisync"]), "delete_excluded": S(BOOL, "Ausgeschlossenes im Ziel löschen"),
+    "no_delete": S(BOOL, "im Ziel nichts löschen (wie die Option der Aufgabe)"),
     "compare": S(STR, "woran eine Änderung erkannt wird (überschreibt die gespeicherte Einstellung): standard, size, checksum oder tolerant",
                  enum=["standard", "size", "checksum", "tolerant"]),
     "compare_window": S(INT, "bei compare=tolerant: erlaubte Abweichung der Änderungszeit in Sekunden"),
@@ -603,7 +634,8 @@ def _preview(path, a):
         form = {"source": base.get("source") or "", "dest": base.get("dest") or "",
                 "selection": _lines(base.get("selection")), "excludes": _lines(base.get("excludes")),
                 "include_source_dir": _bool(base.get("include_source_dir") or False),
-                "direction": base.get("direction") or "mirror", "delete_excluded": _bool(base.get("delete_excluded") or False)}
+                "direction": base.get("direction") or "mirror", "delete_excluded": _bool(base.get("delete_excluded") or False),
+                "no_delete": _bool(base.get("no_delete") or False)}
     if "compare" in a or "compare_window" in a:
         if a.get("compare") is not None and a.get("compare") not in core.COMPARE_MODES:
             raise ApiError(400, _t("compare: nur {0}.").replace("{0}", ", ".join(core.COMPARE_MODES)))

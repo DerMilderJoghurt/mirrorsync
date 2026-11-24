@@ -4,7 +4,7 @@
 
 # MirrorSync – 1:1 mirroring with a web GUI and schedules
 
-Version **1.50.0** · Changes: [CHANGELOG.md](CHANGELOG.md) · [Deutsche Version](README.de.md)
+Version **1.51.0** · Changes: [CHANGELOG.md](CHANGELOG.md) · [Deutsche Version](README.de.md)
 
 A Docker container that **mirrors folders one-way, 1:1** (like FreeFileSync "Mirror"):
 the destination becomes an exact copy of the source, including deletions. The sync engine is
@@ -67,7 +67,7 @@ Changed files are transferred completely (no delta transfer like rsync).
 
 ## Installation
 The ready-made image is in the GitHub Container Registry: `ghcr.io/dermilderjoghurt/mirrorsync`
-(for amd64 and arm64, e.g. Raspberry Pi). Tags: `latest` (newest version), `1.50.0` (fixed version),
+(for amd64 and arm64, e.g. Raspberry Pi). Tags: `latest` (newest version), `1.51.0` (fixed version),
 `1.40` (newest patch of this version). The image is only published when the version number changes, so
 update checkers such as Dockhand or Watchtower only report an update when there really is a new version.
 
@@ -271,6 +271,23 @@ the base folder, otherwise the common parent folder becomes the source.
   (since 1.27.0): the selected folders and files go directly into the destination, e.g. source `NAS:share`
   with selection `10-Temp/` and destination `Family-NAS:share` gives `Family-NAS:share/10-Temp`.
 - Empty field = the whole source folder.
+
+## Duplicate, change protocol, mirror without deleting (since 1.51.0)
+- **Duplicate a job:** "⧉" in the overview or "⧉ Duplicate" in the job. The copy is called "Name (copy)", takes over
+  all settings without history and is **switched off** so it doesn't run twice. Permission "create jobs".
+- **Duplicate a storage location:** "⧉ Duplicate" under Storage locations, enter a new name. Password, sign-in
+  (token) and "Visible to" are copied too. Permission "create storage locations".
+- **Change the protocol later:** when editing, the type can be switched (e.g. SMB → SFTP). A warning appears, all
+  fields are asked again (server and user stay prefilled) and the password must be entered again. The name stays, so
+  jobs keep their storage location. If the setup fails, the old state is kept.
+- **Mirror without deleting:** option "Don't delete anything in the destination" under Options. Then `rclone copy`
+  runs instead of `rclone sync`: new and changed files are copied, what was deleted in the source stays in the
+  destination. The preview then shows no deletions either. Only for mirroring, not for two-way.
+- Also: the buttons of a row have the same height, the arrow to collapse the sidebar sits centered on the edge, and
+  open windows (e.g. details in the audit log) are modal: the page behind them doesn't scroll.
+- API/MCP: `duplicate_job` (`POST /api/v1/jobs/{id}/duplicate`, optional `name`), `duplicate_remote`
+  (`POST /api/v1/remotes/{name}/duplicate` with `new_name`), `update_remote` with `type`, field `no_delete` on jobs
+  and in the preview.
 
 ## Detecting changes and speed (since 1.50.0)
 Under **Options** of each job:
@@ -824,7 +841,7 @@ MirrorSync can update itself if you mount the Docker socket into the container:
   previous one runs again. Result and steps are shown in the GUI, in the audit log ("Update started / completed /
   failed") and in `config/selfupdate.json`.
 - **Requirements:** the image has to come from a registry (`image: ghcr.io/dermilderjoghurt/mirrorsync:latest`).
-  MirrorSync cannot pull images built with `build: .`. With a fixed version tag (`:1.50.0`) only that tag is pulled
+  MirrorSync cannot pull images built with `build: .`. With a fixed version tag (`:1.51.0`) only that tag is pulled
   again. `/config` has to be a volume or bind mount (it is in the example compose file).
 - **Permission:** `system.update` ("Update MirrorSync", admins have it automatically). Changing the automatic
   update and its time needs `system.settings`.

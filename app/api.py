@@ -286,7 +286,7 @@ def public_job(jid, j, history=False):
     return out
 
 
-BOOL_FIELDS = ("enabled", "dry_run", "versioning", "checksum", "delete_excluded", "include_source_dir", "paused",
+BOOL_FIELDS = ("enabled", "dry_run", "versioning", "checksum", "delete_excluded", "no_delete", "include_source_dir", "paused",
                "notify_webhook", "notify_smtp", "notify_telegram", "notify_apprise")
 TEXT_FIELDS = ("name", "source", "dest", "schedule", "max_delete", "extra_flags", "excludes", "selection", "trigger",
                "after_job", "after_when", "paused_until", "pause_chain", "live_interval", "live_full", "live_mode", "direction", "bisync_conflict", "bisync_max_delete", "bw_mode", "versions_keep", "versions_days",
@@ -753,7 +753,9 @@ def openapi():
                 "compare_window": {"type": "integer", "description": "bei compare=tolerant: erlaubte Abweichung der Änderungszeit in Sekunden (1–86400, Standard 2)"},
                 "speed": {"type": "string", "enum": ["gentle", "normal", "fast", "max"],
                           "description": "Tempo: gentle = 2 parallele Übertragungen (schont Server und Leitung), normal = rclone-Standard (4), fast = 8 und schnelles Auflisten, max = 16 und schnelles Auflisten. Eigene --transfers/--checkers in extra_flags haben Vorrang"},
-                "delete_excluded": {"type": "boolean"}, "max_delete": {"type": "string", "example": "500"},
+                "delete_excluded": {"type": "boolean"},
+                "no_delete": {"type": "boolean", "description": "Spiegeln: im Ziel nichts löschen, nur Neues und Geändertes kopieren (rclone copy statt sync)"},
+                "max_delete": {"type": "string", "example": "500"},
                 "paused": {"type": "boolean"}, "notify_mode": {"type": "string", "enum": ["global", "custom", "off"]},
                 "notify_when": {"type": "string", "enum": ["fail", "always"]},
                 "notify_webhook": {"type": "boolean"}, "notify_webhook_url": {"type": "string"},
