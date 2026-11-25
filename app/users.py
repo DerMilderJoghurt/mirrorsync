@@ -62,9 +62,13 @@ class Store:
         return [n for n, u in self.load().items() if u.get("role") == "admin"]
 
 
+CURRENT_VERSION = ""   # von app.py gesetzt: neue Benutzer sehen die Versionshinweise erst nach dem naechsten Update
+
+
 def new_user(password, role):
     return {"hash": hash_password(password), "role": role, "totp_secret": "", "totp_enabled": False,
-            "backup_codes": [], "sv": 1, "created": time.strftime("%Y-%m-%d %H:%M"), "last_login": ""}
+            "backup_codes": [], "sv": 1, "created": time.strftime("%Y-%m-%d %H:%M"), "last_login": "",
+            "seen_version": CURRENT_VERSION}
 
 
 def hash_password(pw):

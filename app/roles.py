@@ -18,6 +18,9 @@ PERM_GROUPS = [
         ("jobs.notify", "Benachrichtigungen der Aufgabe ändern"),
         ("jobs.advanced", "zusätzliche rclone-Optionen ändern"),
         ("jobs.twoway", "Zwei-Wege-Sync einrichten (schreibt auch in die Quelle)"),
+        ("jobs.approve", "Lauf nach einer Löschwarnung freigeben oder die Warnung verwerfen"),
+        ("jobs.restore", "Papierkorb/Versionen durchsuchen, Dateien herunterladen und wiederherstellen"),
+        ("jobs.scripts", "Skripte vor/nach dem Lauf, Snapshots und Wake-on-LAN einrichten (führt Befehle im Container oder per SSH aus)"),
     ]),
     ("Speicherorte", [
         ("remotes.view", "ansehen"),
@@ -50,6 +53,7 @@ PERM_GROUPS = [
         ("system.api", "API-Keys verwalten (nur mit Rechten, die man selbst hat)"),
         ("system.update", "MirrorSync aktualisieren (Selbst-Update über den Docker-Socket)"),
         ("system.restart", "MirrorSync neu starten (Container)"),
+        ("system.monitor", "Health-Status (/health/jobs) und Prometheus-Metriken (/metrics) abrufen"),
     ]),
 ]
 ALL_PERMS = [p for _, perms in PERM_GROUPS for p, _ in perms]
@@ -59,6 +63,7 @@ IMPLIES = {
     "jobs.create": ["jobs.view"], "jobs.edit": ["jobs.view"], "jobs.delete": ["jobs.view"],
     "jobs.run": ["jobs.view"], "jobs.dryrun": ["jobs.view"], "jobs.logs": ["jobs.view"],
     "jobs.notify": ["jobs.view"], "jobs.preview": ["jobs.view"], "jobs.advanced": ["jobs.view"], "jobs.twoway": ["jobs.view"],
+    "jobs.approve": ["jobs.view", "jobs.logs"], "jobs.restore": ["jobs.view"], "jobs.scripts": ["jobs.view"],
     "remotes.test": ["remotes.view"], "remotes.browse": ["remotes.view"], "remotes.create": ["remotes.view"],
     "remotes.edit": ["remotes.view"], "remotes.delete": ["remotes.view"],
     "files.edit": ["files.view"], "files.delete": ["files.view"],
@@ -70,7 +75,8 @@ DEFAULT_ROLES = {
               "jobs": "all", "remotes": "all", "builtin": True, "locked": True},
     "operator": {"name": "Operator", "description": "Aufgaben anlegen, bearbeiten, starten; Speicherorte ansehen und testen",
                  "perms": ["jobs.view", "jobs.create", "jobs.edit", "jobs.delete", "jobs.run", "jobs.dryrun", "jobs.preview",
-                           "jobs.logs", "jobs.notify", "jobs.advanced", "jobs.twoway", "remotes.view", "remotes.test", "remotes.browse", "local.paths"],
+                           "jobs.logs", "jobs.notify", "jobs.advanced", "jobs.twoway", "jobs.approve", "jobs.restore", "remotes.view", "remotes.test",
+                           "remotes.browse", "local.paths"],
                  "jobs": "all", "remotes": "all", "builtin": True},
     "viewer": {"name": "Nur lesen", "description": "Aufgaben, Status und Logs ansehen",
                "perms": ["jobs.view", "jobs.logs", "remotes.view"], "jobs": "all", "remotes": "all", "builtin": True},
@@ -97,6 +103,11 @@ class RoleStore:
                 if rid not in data:
                     data[rid] = json.loads(json.dumps(role))
                     changed = True
+            op = data.get("operator")
+            if op and op.get("builtin") and not self.db.meta("roles_1_52"):   # neue Rechte 1.52.0 fuer die Vorlage Operator
+                op["perms"] = normalize(list(op.get("perms", [])) + ["jobs.approve", "jobs.restore"])
+                self.db.set_meta("roles_1_52", "1")
+                changed = True
             if data["admin"].get("perms") != ALL_PERMS:
                 data["admin"].update(perms=list(ALL_PERMS), jobs="all", remotes="all", locked=True)
                 changed = True

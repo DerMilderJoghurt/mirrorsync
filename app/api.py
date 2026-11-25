@@ -266,6 +266,12 @@ def _next_start(jid):
 
 def public_job(jid, j, history=False):
     out = {k: v for k, v in j.items() if k not in SECRET_JOB and k != "history"}
+    if not g.access.has("jobs.scripts"):   # Befehle koennen Zugangsdaten enthalten
+        for k in SCRIPT_TEXT:
+            if out.get(k):
+                out[k] = "•••"
+    out.update(nosync=core.nosync_on(j), verify=core.verify_of(j), delete_hold=j.get("delete_hold") or None,
+               retry_pending=j.get("retry_pending") or None)
     out.setdefault("msg_tpl_on", False)
     out.setdefault("visible_to", "all")
     out["live_mode"] = core.live_mode(j)
@@ -287,11 +293,16 @@ def public_job(jid, j, history=False):
 
 
 BOOL_FIELDS = ("enabled", "dry_run", "versioning", "checksum", "delete_excluded", "no_delete", "include_source_dir", "paused",
-               "notify_webhook", "notify_smtp", "notify_telegram", "notify_apprise")
+               "notify_webhook", "notify_smtp", "notify_telegram", "notify_apprise", "nosync", "snapshot_sudo", "wol_sleep")
 TEXT_FIELDS = ("name", "source", "dest", "schedule", "max_delete", "extra_flags", "excludes", "selection", "trigger",
                "after_job", "after_when", "paused_until", "pause_chain", "live_interval", "live_full", "live_mode", "direction", "bisync_conflict", "bisync_max_delete", "bw_mode", "versions_keep", "versions_days",
                "notify_mode", "notify_when", "notify_webhook_url", "notify_smtp_to", "notify_telegram_chat_id",
-               "notify_telegram_token", "notify_apprise_urls", "notify_apprise_tag", "compare", "compare_window", "speed")
+               "notify_telegram_token", "notify_apprise_urls", "notify_apprise_tag", "compare", "compare_window", "speed",
+               "verify", "verify_method", "delete_guard", "delete_guard_min", "space_check", "space_min_gb", "retry", "retry_on",
+               "health_max_age", "script_pre", "script_post", "script_host", "script_timeout", "script_pre_fail", "script_post_when",
+               "snapshot", "snapshot_host", "snapshot_target", "snapshot_dir", "snapshot_cmd", "snapshot_keep",
+               "wol_mac", "wol_broadcast", "wol_port", "wol_wait", "wol_check", "wol_sleep_cmd", "wol_sleep_host")
+SCRIPT_TEXT = ("script_pre", "script_post", "snapshot_cmd")
 
 
 class Fields(dict):
@@ -321,7 +332,8 @@ def _fields(base, data):
             if not isinstance(v, dict) or any(e not in core.msgtpl.JOB_EVENTS for e in v):
                 raise ApiError(400, core.i18n.t("msg_tpl: nur die Ereignisse {0}.", ", ".join(core.msgtpl.JOB_EVENTS)))
             src[k] = v
-        elif k not in ("id", "history", "running", "next_run", "next_start", "next_start_kind", "effective_dest", "is_paused", "owner", "bisync_ready", "bisync_need_resync"):
+        elif k not in ("id", "history", "running", "next_run", "next_start", "next_start_kind", "effective_dest", "is_paused", "owner",
+                       "bisync_ready", "bisync_need_resync", "delete_hold", "retry_pending", "last_verify", "dest_space", "nosync_dirs"):
             raise ApiError(400, f"Unbekanntes Feld: {k}")
     for k, allowed in (("compare", core.COMPARE_MODES), ("speed", core.SPEEDS)):
         if k in data and data[k] not in allowed:
@@ -600,7 +612,11 @@ JOB_ID = {"job_id": {"type": "string", "description": "ID der Aufgabe (siehe lis
 JOB_FIELDS = {"type": "object", "description": "Felder der Aufgabe, z. B. name, source, dest, trigger (time|after|live|manual), "
               "schedule (Cron), selection, excludes, enabled, dry_run, versioning, max_delete, compare (standard|size|checksum|tolerant: "
               "woran eine Änderung erkannt wird), compare_window (Sekunden bei tolerant), speed (gentle|normal|fast|max), no_delete "
-              "(im Ziel nichts löschen), window ({start, end, days, mode} Zeitfenster oder null)", "additionalProperties": True}
+              "(im Ziel nichts löschen), window ({start, end, days, mode} Zeitfenster oder null), verify (off|always|daily|weekly: Prüflauf), "
+              "verify_method (auto|size|download), delete_guard (Prozent, Löschwarnung), space_check (off|warn|stop), space_min_gb, retry "
+              "(Minuten, z. B. \"5, 15, 60\"), retry_on (network|any), nosync, health_max_age (Stunden), script_pre, script_post, script_host, "
+              "snapshot (off|zfs|btrfs|command), snapshot_target, snapshot_dir, snapshot_cmd, snapshot_keep, wol_mac, wol_broadcast, wol_wait, "
+              "wol_check, wol_sleep, wol_sleep_cmd, wol_sleep_host (vollständig in der OpenAPI-Beschreibung)", "additionalProperties": True}
 TOOLS = [
     ("status", "Überblick: Version, laufende, fehlgeschlagene und pausierte Aufgaben, Rechte des Keys.", None,
      _schema(), lambda a: op_status(), True),
@@ -690,7 +706,9 @@ def mcp_handle(msg):
             "instructions": core.i18n.translate("MirrorSync spiegelt Ordner per rclone (einweg, 1:1). Mit list_jobs die Aufgaben finden, "
                             "mit run_job starten (dry_run=true zum Testen), mit job_log und job_history Ergebnisse prüfen.") + " " + core.i18n.t("Angemeldet als {0}; nur Tools mit passendem Recht sind sichtbar.", g.user) + " " + core.i18n.translate(
                 "Außerdem lassen sich Speicherorte, Zeitpläne, Benutzer, Rollen, API-Keys, Benachrichtigungen, Vorlagen, "
-                "Einstellungen, Zugriffsregeln und Sicherungen ansehen, ändern und löschen, mit denselben Prüfungen wie in der GUI.")}}
+                "Einstellungen, Zugriffsregeln und Sicherungen ansehen, ändern und löschen, mit denselben Prüfungen wie in der GUI.") + " " + core.i18n.translate(
+                "Prüfen: verify_job und get_health. Löschwarnungen mit approve_job freigeben. Gelöschte oder überschriebene Dateien "
+                "mit list_versions und restore_versions zurückholen. Statistik mit get_stats, Versionshinweise mit get_changelog.")}}
     if method == "ping":
         return {"jsonrpc": "2.0", "id": rid, "result": {}}
     if method == "tools/list":
@@ -784,7 +802,38 @@ def openapi():
                 "pause_chain": {"type": "string", "enum": ["skip", "stop"]},
                 "versions_keep": {"type": "string", "description": "bei versioning: so viele Stände behalten (leer = alle)"},
                 "versions_days": {"type": "string", "description": "bei versioning: Stände älter als so viele Tage entfernen (leer = unbegrenzt)"},
-                "visible_to": {"description": "\"all\" (alle mit Recht) oder Liste aus user:<Name> und group:<Gruppen-ID>; Admins und Besitzer sehen die Aufgabe immer"}}}}},
+                "visible_to": {"description": "\"all\" (alle mit Recht) oder Liste aus user:<Name> und group:<Gruppen-ID>; Admins und Besitzer sehen die Aufgabe immer"},
+                "verify": {"type": "string", "enum": ["off", "always", "daily", "weekly"], "description": "Prüflauf nach dem Lauf (rclone check): off, always = nach jedem Lauf, daily/weekly = höchstens einmal am Tag bzw. in der Woche. Abweichungen machen den Lauf zum Fehler"},
+                "verify_method": {"type": "string", "enum": ["auto", "size", "download"], "description": "auto = Prüfsumme, wenn beide Seiten eine gemeinsame haben, sonst Größe; size = nur Größe; download = Inhalt Byte für Byte (liest alles)"},
+                "delete_guard": {"type": "string", "description": "Löschwarnung: Lauf anhalten und Freigabe verlangen, wenn mindestens so viel Prozent der Dateien im Ziel gelöscht würden (1–100, leer = aus)"},
+                "delete_guard_min": {"type": "string", "description": "Löschwarnung erst ab so vielen Löschungen (Standard 10)"},
+                "space_check": {"type": "string", "enum": ["off", "warn", "stop"], "description": "Speicher am Ziel vor dem Lauf prüfen: warn = melden und trotzdem laufen, stop = abbrechen"},
+                "space_min_gb": {"type": "string", "description": "Mindestens so viel GB sollen am Ziel nach dem Lauf frei bleiben (leer = nur benötigten Platz prüfen)"},
+                "retry": {"type": "string", "example": "5, 15, 60", "description": "Nach einem Fehler neu versuchen nach so vielen Minuten (durch Komma, höchstens 10 Versuche; leer = aus)"},
+                "retry_on": {"type": "string", "enum": ["network", "any"], "description": "network = nur bei Netzwerkfehlern (Standard), any = bei jedem Fehler"},
+                "nosync": {"type": "boolean", "description": "Ordner mit einer Datei .nosync überspringen (im Ziel bleiben sie unberührt)"},
+                "health_max_age": {"type": "string", "description": "Für /health/jobs: überfällig, wenn der letzte Lauf älter als so viele Stunden ist (leer = aus dem Zeitplan berechnet)"},
+                "script_pre": {"type": "string", "description": "Befehl(e) vor dem Lauf (sh). Braucht Recht jobs.scripts"},
+                "script_post": {"type": "string", "description": "Befehl(e) nach dem Lauf; Umgebungsvariable MS_STATUS = ok oder fehler"},
+                "script_host": {"type": "string", "description": "leer = im Container, sonst Name eines SFTP-Speicherorts (per SSH)"},
+                "script_timeout": {"type": "string", "description": "Zeitlimit je Skript in Sekunden (Standard 600)"},
+                "script_pre_fail": {"type": "string", "enum": ["abort", "continue"]},
+                "script_post_when": {"type": "string", "enum": ["always", "ok", "fail"]},
+                "snapshot": {"type": "string", "enum": ["off", "zfs", "btrfs", "command"], "description": "Snapshot am Ziel nach jedem erfolgreichen Lauf"},
+                "snapshot_host": {"type": "string", "description": "leer = im Container, sonst SFTP-Speicherort (SSH)"},
+                "snapshot_target": {"type": "string", "description": "ZFS-Dataset (pool/backup) bzw. Btrfs-Subvolume (/mnt/backup)"},
+                "snapshot_dir": {"type": "string", "description": "Btrfs: Ordner für die Snapshots (außerhalb des Ziels)"},
+                "snapshot_cmd": {"type": "string", "description": "Eigener Befehl, Platzhalter {name}, {date}, {job}, {job_id}, {dest}"},
+                "snapshot_keep": {"type": "string", "description": "so viele MirrorSync-Snapshots behalten (leer = alle)"},
+                "snapshot_sudo": {"type": "boolean", "description": "Befehle mit sudo -n ausführen"},
+                "wol_mac": {"type": "string", "description": "Wake-on-LAN: MAC-Adresse des Zielservers (leer = aus)"},
+                "wol_broadcast": {"type": "string", "description": "Broadcast-Adresse (Standard 255.255.255.255, z. B. 192.168.1.255)"},
+                "wol_port": {"type": "string", "description": "UDP-Port (Standard 9)"},
+                "wol_wait": {"type": "string", "description": "höchstens so viele Sekunden auf das Aufwachen warten (Standard 300)"},
+                "wol_check": {"type": "string", "description": "Erreichbarkeit prüfen über Host:Port (leer = Host des Ziel-Speicherorts)"},
+                "wol_sleep": {"type": "boolean", "description": "nach dem Lauf wieder schlafen legen (nur, wenn MirrorSync ihn geweckt hat)"},
+                "wol_sleep_cmd": {"type": "string", "description": "Befehl zum Schlafenlegen (Standard systemctl suspend)"},
+                "wol_sleep_host": {"type": "string", "description": "SFTP-Speicherort, über den der Befehl läuft (leer = Ziel, wenn SFTP)"}}}}},
         "security": [{"bearer": []}],
         "paths": {
             "/status": {"get": op("Überblick und Rechte des Keys", tag="System")},

@@ -23,7 +23,7 @@ ADMIN = "role:admin"      # Sicherung, Export und Import: wie in der GUI nur die
 
 
 # ---------------------------------------------------------------- interner GUI-Aufruf
-def gui(method, path, form=None, js=None, files=None, client=None):
+def gui(method, path, form=None, js=None, files=None, client=None, headers=None):
     br = {"user": g.user, "role": g.role, "access": g.access, "lang": g.get("user_lang") or "",
           "key": g.get("api_key"), "out": {},
           "via": "MCP" if has_request_context() and request.path.startswith("/mcp") else "REST-API"}
@@ -40,7 +40,7 @@ def gui(method, path, form=None, js=None, files=None, client=None):
     saved = dict(g.__dict__)
     c = client or core.app.test_client()
     try:
-        resp = c.open(path, method=method, data=data, json=js,
+        resp = c.open(path, method=method, data=data, json=js, headers=headers,
                       environ_base={"REMOTE_ADDR": core._client_ip(), "mirrorsync.bridge": br})
     finally:   # g gehoert zum gemeinsamen App-Kontext: Zustand der aeusseren Anfrage wiederherstellen
         g.__dict__.clear()
@@ -354,6 +354,9 @@ def _notify_view():
     for k in core.notify.SECRET_FIELDS:
         out[f"{k}_set"] = bool(s.get(k))
     out["apprise_urls_masked"] = [core.notify.mask_url(u) for u in core.notify.apprise_list(s.get("apprise_urls"))]
+    for k, d in core.notify.LIST_DEFAULTS.items():
+        out[k] = s.get(k, d)
+    out["quiet_active"] = core.notify.quiet_now(s)
     return out
 
 
@@ -366,12 +369,15 @@ def a_get_notify(a):
 
 @action("update_notifications", "PATCH", "/settings/notifications", "notify.edit", "Benachrichtigungen",
         "Benachrichtigungen ändern (nur angegebene Felder). when: always|fail|never. Geheimnisse (smtp_pass, telegram_token, "
-        "apprise_urls, apprise_api_key) nur setzen; leerer Text löscht sie.", {"fields": {"type": "object"}}, ["fields"])
+        "apprise_urls, apprise_api_key) nur setzen; leerer Text löscht sie. Ruhezeiten: quiet_enabled, quiet_start/quiet_end (HH:MM), "
+        "quiet_mode (errors = nur Fehler melden, none = gar nichts), quiet_days (Wochentage 0=Mo…6=So, leer = jeden Tag). "
+        "Wochenbericht: report_enabled, report_time (HH:MM), report_days (0=Mo…6=So), report_period (Tage), "
+        "report_channels (webhook, smtp, telegram, apprise).", {"fields": {"type": "object"}}, ["fields"])
 def a_update_notify(a):
     ch = a.get("fields") or {}
     if not isinstance(ch, dict):
         raise ApiError(400, _t("JSON-Objekt erwartet."))
-    _check_keys(ch, core.notify.DEFAULTS)
+    _check_keys(ch, list(core.notify.DEFAULTS) + list(core.notify.LIST_DEFAULTS))
     return {"ok": True, "message": _save_notify(ch), "settings": _notify_view()}
 
 
@@ -390,6 +396,14 @@ def _save_notify(ch, test=None):
                     form[k + "_clear"] = True
         else:
             form[k] = "" if v is None else str(v)
+    for k, d in core.notify.LIST_DEFAULTS.items():   # Wochentage und Kanaele als Liste
+        v = ch.get(k, s.get(k, d))
+        if not isinstance(v, (list, tuple)):
+            raise ApiError(400, core.i18n.t("{0}: Liste erwartet.", k))
+        pre = {"quiet_days": "quiet_day_", "report_days": "report_day_", "report_channels": "report_ch_"}[k]
+        for x in v:
+            form[f"{pre}{x}"] = True
+    form["ext_present"] = "1"
     if test:
         form["test"] = test
     return done(gui("POST", "/settings", form=form))
@@ -1863,6 +1877,199 @@ def a_fdeltask(a):
         "Alle fertigen Aufträge aus der Liste entfernen (laufende bleiben).")
 def a_fcleartasks(a):
     return _fop("remove_tasks", {"finished": True})
+
+# ================================================================= Pruefen, Loeschwarnung, Papierkorb, Platzbedarf (ab 1.52.0)
+JSON_H = {"Accept": "application/json"}
+
+
+def _body(r):
+    """JSON-Antwort eines GUI-Aufrufs; Fehler als ApiError."""
+    body = r["resp"].get_json(silent=True)
+    if r["status"] in (403, 404) or not isinstance(body, dict):
+        done(r)
+        return body if isinstance(body, dict) else {}
+    if r["status"] >= 400 or body.get("ok") is False:
+        raise ApiError(r["status"] if r["status"] >= 400 else 400, _t(body.get("error") or "Fehler"))
+    return body
+
+
+@action("verify_job", "POST", "/jobs/{job_id}/verify", "jobs.run", "Aufgaben",
+        "Nur prüfen, ob Quelle und Ziel 1:1 gleich sind (rclone check, ohne zu spiegeln). Läuft im Hintergrund; das "
+        "Ergebnis steht danach in get_job (last_verify) und job_history (verify: ok/diff/error, Anzahl Abweichungen).",
+        {"job_id": S(STR)}, ["job_id"])
+def a_verify_job(a):
+    b = _body(gui("POST", f"/job/{a['job_id']}/verify", headers=JSON_H))
+    return {"ok": True, "message": _t(b.get("message") or "")}
+
+
+@action("approve_job", "POST", "/jobs/{job_id}/approve", "jobs.approve", "Aufgaben",
+        "Offene Löschwarnung freigeben: Der Lauf startet jetzt einmalig mit allen Löschungen. Die Warnung steht in "
+        "get_job unter delete_hold (deleted, total, pct, at).", {"job_id": S(STR)}, ["job_id"])
+def a_approve_job(a):
+    b = _body(gui("POST", f"/job/{a['job_id']}/approve", headers=JSON_H))
+    return {"ok": True, "message": _t(b.get("message") or "")}
+
+
+@action("dismiss_delete_warning", "POST", "/jobs/{job_id}/hold/dismiss", "jobs.approve", "Aufgaben",
+        "Offene Löschwarnung verwerfen, ohne zu laufen. Der nächste Lauf prüft wieder.", {"job_id": S(STR)}, ["job_id"])
+def a_dismiss_hold(a):
+    b = _body(gui("POST", f"/job/{a['job_id']}/hold/dismiss", headers=JSON_H))
+    return {"ok": True, "message": _t(b.get("message") or "")}
+
+
+@action("list_versions", "GET", "/jobs/{job_id}/versions", "jobs.restore", "Papierkorb",
+        "Papierkorb/Versionierung einer Aufgabe: Stände (stamps, Ordner <ziel>.versions/JJJJ-MM-TT_HHMMSS) und, mit q "
+        "(Teil von Dateiname oder Pfad) oder stamp, die Dateien darin (höchstens 500, truncated). side=a: Versionen der "
+        "Seite A beim Zwei-Wege-Sync.",
+        {"job_id": S(STR), "q": S(STR, "Suchtext im Pfad"), "stamp": S(STR, "nur dieser Stand"),
+         "side": S(STR, "a oder b (Standard)", enum=["a", "b"])}, ["job_id"], ro=True)
+def a_list_versions(a):
+    from urllib.parse import urlencode
+    qs = urlencode({"q": a.get("q") or "", "stamp": a.get("stamp") or "", "side": a.get("side") or "b", "any": "1"})
+    b = _body(gui("GET", f"/job/{a['job_id']}/versions?{qs}", headers=JSON_H))
+    b.pop("ok", None)
+    return b
+
+
+@action("restore_versions", "POST", "/jobs/{job_id}/versions/restore", "jobs.restore", "Papierkorb",
+        "Dateien aus dem Papierkorb wiederherstellen. items: [{stamp, path}] aus list_versions. target: source "
+        "(empfohlen, der nächste Lauf spiegelt sie wieder ins Ziel) oder dest. Vorhandene Dateien werden nur mit "
+        "overwrite=true ersetzt.",
+        {"job_id": S(STR), "items": {"type": "array", "items": {"type": "object", "properties": {"stamp": S(STR), "path": S(STR)}}},
+         "target": S(STR, "source oder dest", enum=["source", "dest"]), "overwrite": S(BOOL), "side": S(STR, enum=["a", "b"])},
+        ["job_id", "items"])
+def a_restore_versions(a):
+    r = gui("POST", f"/job/{a['job_id']}/versions/restore", headers=JSON_H,
+            js={"items": a.get("items") or [], "target": a.get("target") or "source", "overwrite": _bool(a.get("overwrite", False)),
+                "side": a.get("side") or "b"})
+    body = r["resp"].get_json(silent=True)
+    if r["status"] == 409 and isinstance(body, dict):
+        raise ApiError(409, _t(body.get("error") or "") + " (overwrite=true)")
+    b = _body(r)
+    return b
+
+
+@action("download_version", "GET", "/jobs/{job_id}/versions/download", "jobs.restore", "Papierkorb",
+        "Eine Datei aus dem Papierkorb herunterladen (REST: Datei, MCP: data_base64 bis 25 MB).",
+        {"job_id": S(STR), "stamp": S(STR), "path": S(STR), "side": S(STR, enum=["a", "b"])}, ["job_id", "stamp", "path"], ro=True)
+def a_download_version(a):
+    from urllib.parse import quote, urlencode
+    r = gui("GET", f"/job/{a['job_id']}/versions/download?" + urlencode({"stamp": a.get("stamp", ""), "path": a.get("path", ""),
+                                                                         "side": a.get("side") or "b"}))
+    if r["status"] >= 400:
+        done(r)
+        raise ApiError(r["status"], _t("Nicht gefunden."))
+    blob = r["resp"].get_data()
+    name = (a.get("path") or "datei").rsplit("/", 1)[-1]
+    if not a.get("_mcp"):
+        return Response(blob, mimetype="application/octet-stream",
+                        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(name)}"})
+    if len(blob) > 25 * 1024 * 1024:
+        raise ApiError(413, _t("Die Datei ist für MCP zu groß, bitte über die REST-API herunterladen."))
+    return {"filename": name, "size": len(blob), "data_base64": base64.b64encode(blob).decode()}
+
+
+@action("scan_usage", "POST", "/jobs/{job_id}/usage", "jobs.preview", "Aufgaben",
+        "Größte Ordner und Dateien ermitteln (Quelle oder Ziel, mit den Filtern der Aufgabe). Läuft im Hintergrund, "
+        "Ergebnis mit get_usage.", {"job_id": S(STR), "side": S(STR, "source (Standard) oder dest", enum=["source", "dest"])}, ["job_id"])
+def a_scan_usage(a):
+    b = _body(gui("POST", f"/job/{a['job_id']}/usage", form={"side": a.get("side") or "source"}, headers=JSON_H))
+    return {"ok": True, "started": b.get("started")}
+
+
+@action("get_usage", "GET", "/jobs/{job_id}/usage", "jobs.preview", "Aufgaben",
+        "Ergebnis von scan_usage: state (läuft/ok/fehler), files, bytes, at; children = Unterordner von path nach Größe, "
+        "top_files = größte Dateien. Mit hotspots=true zusätzlich, welche Ordner/Dateien laut Logs der letzten 30 Tage "
+        "am häufigsten übertragen wurden.",
+        {"job_id": S(STR), "side": S(STR, enum=["source", "dest"]), "path": S(STR, "Unterordner (relativ)"), "hotspots": S(BOOL)},
+        ["job_id"], ro=True)
+def a_get_usage(a):
+    from urllib.parse import urlencode
+    qs = {"side": a.get("side") or "source", "path": a.get("path") or ""}
+    if _bool(a.get("hotspots", False)):
+        qs["hotspots"] = "1"
+    b = _body(gui("GET", f"/job/{a['job_id']}/usage?" + urlencode(qs), headers=JSON_H))
+    b.pop("ok", None)
+    return b
+
+
+# ================================================================= Ueberwachung, Statistik, Versionshinweise
+@action("get_health", "GET", "/health-status", None, "Überwachung",
+        "Gesundheitszustand wie /health/jobs: status (ok/fehler), summary (z. B. „letzter Sync ok, vor 5 Minuten“) und je "
+        "Aufgabe letzter Lauf, Alter in Minuten, überfällig, offene Löschwarnung. Mit job nur eine Aufgabe (ID oder Name).",
+        {"job": S(STR)}, ro=True)
+def a_get_health(a):
+    if not (g.access.has("jobs.view") or g.access.has("system.monitor")):
+        raise ApiError(403, _t("Keine Berechtigung") + " (system.monitor)")
+    return core.monitor.health(lambda jid, j: g.access.job_ok(jid, j), a.get("job") or None)
+
+
+@action("get_stats", "GET", "/stats", "jobs.view", "Überwachung",
+        "Übertragungsstatistik pro Monat (neueste zuerst): totals und jobs mit runs, ok, fail, bytes, copied, deleted, "
+        "duration (s), verify_ok/verify_fail. volume: Datenvolumen dieses Monats gegen das Limit (null ohne Limit).",
+        {"months": S(INT, "Anzahl Monate (Standard 12, höchstens 60)")}, ro=True)
+def a_get_stats(a):
+    try:
+        n = max(1, min(60, int(a.get("months") or 12)))
+    except ValueError:
+        n = 12
+    jobs = core.load_jobs()
+    vis = lambda jid: g.access.job_ok(jid, jobs[jid]) if jid in jobs else g.access.admin
+    return {"months": core.monitor.months(n, vis), "volume": core.monitor.volume_state()}
+
+
+@action("update_monitoring", "PATCH", "/settings/monitoring", "system.settings", "Einstellungen",
+        "Überwachung und Datenvolumen: monitor_public (/health/jobs und /metrics ohne Anmeldung erreichbar), "
+        "volume_limit_gb (Monatslimit in GB, leer/0 = keins), volume_warn_pct (warnen ab Prozent, Standard 80), "
+        "volume_notify (Benachrichtigung bei Warnung/Limit), volume_stop (automatische Läufe bei erreichtem Limit anhalten).",
+        {"monitor_public": S(BOOL), "volume_limit_gb": S(NUM), "volume_warn_pct": S(INT), "volume_notify": S(BOOL), "volume_stop": S(BOOL)})
+def a_update_monitoring(a):
+    keys = ("monitor_public", "volume_limit_gb", "volume_warn_pct", "volume_notify", "volume_stop")
+    _check_keys(a, keys + ("job_id",))
+    s = core.load_settings()
+    form = {"section": "monitor"}
+    for k in ("monitor_public", "volume_notify", "volume_stop"):
+        form[k] = _bool(a[k]) if k in a else bool(s.get(k))
+    lim = a.get("volume_limit_gb", s.get("volume_limit_gb") or "")
+    form["volume_limit_gb"] = "" if lim in (None, 0, "0") else str(lim)
+    form["volume_warn_pct"] = str(a.get("volume_warn_pct", s.get("volume_warn_pct") or 80))
+    msg = done(gui("POST", "/settings/general", form=form))
+    s = core.load_settings()
+    return {"ok": True, "message": msg, "monitoring": {k: s.get(k) for k in keys}, "volume": core.monitor.volume_state(s)}
+
+
+@action("get_changelog", "GET", "/changelog", None, "System",
+        "Versionshinweise von MirrorSync (neueste zuerst). Mit since nur die Versionen nach dieser (z. B. since=1.50.0).",
+        {"since": S(STR, "z. B. 1.50.0")}, ro=True)
+def a_get_changelog(a):
+    lang = "de" if core.i18n.current() == "de" else "en"
+    since = a.get("since") or ""
+    rows = core.changelog.between(lang, since, core.VERSION) if since else core.changelog.entries(lang)
+    return {"version": core.VERSION, "entries": [{"version": e["version"], "date": e["date"], "text": e["md"]} for e in rows]}
+
+
+@action("send_report", "POST", "/settings/report/send", "notify.edit", "Benachrichtigungen",
+        "Wochenbericht jetzt senden (Läufe, übertragene Daten, Fehler im eingestellten Zeitraum) über die eingestellten Kanäle.")
+def a_send_report(a):
+    r = gui("POST", "/settings/report/send", headers=JSON_H)
+    body = r["resp"].get_json(silent=True)
+    if not isinstance(body, dict):
+        done(r)
+        body = {}
+    return {"ok": bool(body.get("ok")), "results": {k: (None if v is None else _t(v)) for k, v in (body.get("results") or {}).items()},
+            "message": _t(body.get("error") or "")}
+
+
+@action("test_notify_all", "POST", "/settings/notifications/test-all", "notify.edit", "Benachrichtigungen",
+        "Probe-Nachricht an alle eingeschalteten Kanäle senden (auch während der Ruhezeit). results: je Kanal null = ok, sonst Fehler.")
+def a_test_notify_all(a):
+    r = gui("POST", "/settings/notify/test-all", headers=JSON_H)
+    body = r["resp"].get_json(silent=True)
+    if not isinstance(body, dict):
+        done(r)
+        body = {}
+    return {"ok": bool(body.get("ok")), "results": {k: (None if v is None else _t(v)) for k, v in (body.get("results") or {}).items()},
+            "message": _t(body.get("error") or "")}
 
 
 def register(app, core_module):

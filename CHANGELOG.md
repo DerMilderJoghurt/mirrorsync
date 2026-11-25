@@ -3,6 +3,55 @@
 Version numbers follow [SemVer](https://semver.org/): MAJOR.MINOR.PATCH
 (MAJOR = incompatible change, MINOR = new feature, PATCH = bug fix).
 
+## 1.52.0 – 2026-11-25
+**Safe mirroring**
+- **Verification after the sync** (per job: off, after every run, daily or weekly): `rclone check` compares source and
+  destination and shows in black and white whether both are 1:1 identical (size, checksum or automatic). Differences
+  turn the run into an error, with a list in the log. The "🔎 Verify now" button in the log checks without mirroring.
+- **Deletion warning:** if a run would delete more than X % of the files in the destination (e.g. 20 %, from a minimum
+  count), it pauses and asks first ("Approval needed"). Protects against ransomware or an accidentally empty source.
+  Approve or dismiss in the overview and the log, via API/MCP, with a notification.
+- **Browse and restore the recycle bin:** search deleted and overwritten files from versioning by name or version,
+  download them and restore them to source or destination with one click.
+- **Check destination storage** before the run: is there enough free space (amount needed according to a dry run or a
+  fixed minimum); warn or do not start at all, instead of failing halfway.
+- **Retry automatically:** if a run fails (only on network problems or on any error), MirrorSync tries again after
+  e.g. 5, 15 and 60 minutes and only notifies after that. Survives a restart.
+- **Skip folders containing `.nosync`** (on for new jobs): the folder stays untouched in the destination instead of
+  being deleted.
+- **Snapshot at the destination** after every successful run: ZFS, Btrfs or a custom command, with "keep only the
+  last N".
+- **Scripts before and after the run** (e.g. stop a database), in the container or via SSH on an SFTP storage
+  location, with time limit and environment variables. New permission "Scripts, snapshots and Wake-on-LAN".
+- **Wake-on-LAN:** wake server B before the run, wait until it is reachable, and put it back to sleep via SSH
+  afterwards.
+
+**Monitoring**
+- **Health check** `/health/jobs` (and `/health/jobs/<job>`) for Uptime Kuma or Home Assistant: HTTP 200 or 503,
+  e.g. "1 jobs ok, last sync 5 minutes ago". Reports errors, overdue jobs, open deletion warnings and differences
+  found by a verification. Plain text with `?format=text`.
+- **Prometheus metrics** `/metrics`: runs, data volumes, duration, status, age of the last run, verifications,
+  volume. Access with an API key (permission "monitoring") or allow access without login in the settings.
+- **Statistics per month** (new menu item): runs, transferred data, errors, run time per month and job.
+  **Monthly data cap** with a warning from X % and optionally pausing automatic runs.
+- **Largest folders and files** of a job (source or destination) to click through, plus the folders and files
+  transferred most often according to the logs.
+
+**Notifications**
+- **Weekly report** by email, webhook, Telegram or Apprise: runs, transferred data, errors. Days and time adjustable,
+  "Send report now".
+- **Quiet hours:** e.g. at night report only errors or nothing at all, with weekdays.
+- **Test all channels** with one click.
+- New events: deletion warning, low storage, data volume; verification result in the messages (`{pruefung}`).
+
+**Interface**
+- **Installable as an app (PWA)** on phone and PC, with an offline page.
+- **"New in this version":** the changes are shown on the first login after an update.
+- The **version number** at the bottom left leads to all release notes directly in MirrorSync.
+- The **API page** (Swagger) follows light/dark mode and has its own switch.
+- Everything also via REST API and MCP (e.g. `verify_job`, `approve_job`, `list_versions`, `restore_versions`,
+  `get_health`, `get_stats`, `get_changelog`, `send_report`, `test_notify_all`), new permissions, all languages.
+
 ## 1.51.0 – 2026-11-24
 **Dashboard**
 - **Dashboard** at the top of the sidebar, refreshes every 5 seconds. **Tabs** like in a browser (add, rename, move,

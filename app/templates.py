@@ -2,7 +2,7 @@ TEMPLATES = {
 "base.html": r"""<!doctype html>
 <html lang="{{ lang_code() }}"{% if side_mini %} data-side="mini"{% endif %}><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{% block title %}MirrorSync{% endblock %} · MirrorSync</title><link rel="icon" href="/static/favicon.svg" type="image/svg+xml"><link rel="icon" href="/favicon.ico" sizes="any"><link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
+<title>{% block title %}MirrorSync{% endblock %} · MirrorSync</title><link rel="icon" href="/static/favicon.svg" type="image/svg+xml"><link rel="icon" href="/favicon.ico" sizes="any"><link rel="apple-touch-icon" href="/static/apple-touch-icon.png"><link rel="manifest" href="/manifest.webmanifest"><meta name="theme-color" content="#4f46e5" media="(prefers-color-scheme: light)"><meta name="theme-color" content="#09090b" media="(prefers-color-scheme: dark)"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes">
 {% if auto_refresh %}<script>/* Seite alle 3 s neu laden, aber nicht, solange das Aufträge-Fenster, ein Menü oder ein Dialog offen ist oder Text markiert wird */
 setInterval(()=>{const tp=document.getElementById('taskpop');if((tp&&!tp.hidden)||document.querySelector('details[open].pausemenu,dialog[open],.fmmenu[open]')||String(window.getSelection&&getSelection())!==''||document.hidden)return;location.reload()},3000);</script>{% endif %}
 <script>try{const t=localStorage.getItem('ms-theme');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
@@ -62,7 +62,7 @@ form.inline{display:inline}
 .tag{white-space:nowrap;display:inline-flex;align-items:center;gap:5px;padding:2px 9px;border-radius:99px;font-size:12px;font-weight:550;background:var(--card2);color:var(--mut)}
 .tag::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
 .tag.ok{background:var(--ok-soft);color:var(--ok)}.tag.fehler,.tag.abgebrochen{background:var(--err-soft);color:var(--err)}
-.tag.laeuft{background:var(--run-soft);color:var(--run)}.tag.gestoppt{background:var(--warn-soft);color:var(--warn)}
+.tag.laeuft{background:var(--run-soft);color:var(--run)}.tag.gestoppt,.tag.freigabe{background:var(--warn-soft);color:var(--warn)}
 .ok{color:var(--ok)}.fehler,.abgebrochen{color:var(--err)}.laeuft{color:var(--run)}.gestoppt{color:var(--warn)}
 label{display:block;margin:14px 0 5px;font-weight:550;font-size:13.5px}
 input[type=text],input[type=number],input[type=date],input[type=password],input[type=email],input[type=time],input[type=datetime-local],select,textarea{width:100%;height:36px;padding:0 11px;border:1px solid var(--bd2);border-radius:8px;background:var(--card2);color:var(--fg);font:inherit;outline:none;transition:border-color .12s,box-shadow .12s}
@@ -156,7 +156,7 @@ table,tbody,tr,td{display:block;width:100%}tr:first-child:has(th){display:none}t
 </style></head><body>
 {% set p = request.path %}
 
-<nav class="mobile-nav"><a href="/dashboard" class="{{ 'active' if p.startswith('/dashboard') }}">Dashboard</a><a href="/" class="{{ 'active' if p == '/' or p.startswith('/job') }}">Aufgaben</a><a href="/schedules" class="{{ 'active' if p.startswith('/schedules') }}">Zeitpläne</a><a href="/remotes" class="{{ 'active' if p.startswith('/remotes') }}">Speicherorte</a>{% if can('files.view') %}<a href="/files" class="{{ 'active' if p.startswith('/files') }}">Dateien</a>{% endif %}{% if can('system.audit') %}<a href="/audit" class="{{ 'active' if p.startswith('/audit') }}">Audit-Log</a>{% endif %}<a href="{{ '/users' if can('users.view') else ('/settings' if can('notify.view') else ('/settings/general' if can('system.settings') else ('/settings/access' if can('system.access') else '/account'))) }}" class="{{ 'active' if p.startswith(('/settings','/users','/account','/roles')) }}">Einstellungen{% if fail_badge %} <span class="badge">{{ fail_badge }}</span>{% endif %}</a>{% if g.user %}<a href="/logout">Abmelden</a>{% endif %}</nav>
+<nav class="mobile-nav"><a href="/dashboard" class="{{ 'active' if p.startswith('/dashboard') }}">Dashboard</a><a href="/" class="{{ 'active' if p == '/' or p.startswith('/job') }}">Aufgaben</a><a href="/schedules" class="{{ 'active' if p.startswith('/schedules') }}">Zeitpläne</a><a href="/remotes" class="{{ 'active' if p.startswith('/remotes') }}">Speicherorte</a>{% if can('files.view') %}<a href="/files" class="{{ 'active' if p.startswith('/files') }}">Dateien</a>{% endif %}{% if can('jobs.view') %}<a href="/stats" class="{{ 'active' if p.startswith('/stats') }}">Statistik</a>{% endif %}{% if can('system.audit') %}<a href="/audit" class="{{ 'active' if p.startswith('/audit') }}">Audit-Log</a>{% endif %}<a href="{{ '/users' if can('users.view') else ('/settings' if can('notify.view') else ('/settings/general' if can('system.settings') else ('/settings/access' if can('system.access') else '/account'))) }}" class="{{ 'active' if p.startswith(('/settings','/users','/account','/roles')) }}">Einstellungen{% if fail_badge %} <span class="badge">{{ fail_badge }}</span>{% endif %}</a>{% if g.user %}<a href="/logout">Abmelden</a>{% endif %}</nav>
 <div class="app">
 <aside>
 <div class="brand"><div class="logo">{{ ICON.jobs }}</div><span class="lbl">MirrorSync</span><button type="button" class="sidetog" id="sidetog" onclick="toggleSide()" title="{{ _('Seitenleiste ausklappen') if side_mini else _('Seitenleiste einklappen') }}" aria-label="{{ _('Seitenleiste ausklappen') if side_mini else _('Seitenleiste einklappen') }}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button></div>
@@ -166,6 +166,7 @@ table,tbody,tr,td{display:block;width:100%}tr:first-child:has(th){display:none}t
 <a href="/schedules" class="{{ 'active' if p.startswith('/schedules') }}" title="Zeitpläne">{{ ICON.clock }}<span class="lbl">Zeitpläne</span></a>
 <a href="/remotes" class="{{ 'active' if p.startswith('/remotes') }}" title="Speicherorte">{{ ICON.storage }}<span class="lbl">Speicherorte</span></a>
 {% if can('files.view') %}<a href="/files" class="{{ 'active' if p.startswith('/files') }}" title="Dateien">{{ ICON.folder }}<span class="lbl">Dateien</span></a>{% endif %}
+{% if can('jobs.view') %}<a href="/stats" class="{{ 'active' if p.startswith('/stats') }}" title="Statistik">{{ ICON.chart }}<span class="lbl">Statistik</span></a>{% endif %}
 {% if can('system.audit') %}<a href="/audit" class="{{ 'active' if p.startswith('/audit') }}" title="Audit-Log">{{ ICON.audit }}<span class="lbl">Audit-Log</span></a>{% endif %}
 <a href="{{ '/users' if can('users.view') else ('/settings' if can('notify.view') else ('/settings/general' if can('system.settings') else ('/settings/access' if can('system.access') else '/account'))) }}" class="{{ 'active' if p.startswith(('/settings','/users','/account','/roles')) }}" title="Einstellungen">{{ ICON.gear }}<span class="lbl">Einstellungen</span>{% if fail_badge %}<span class="badge" title="unbestätigte Fehlversuche">{{ fail_badge }}</span>{% endif %}</a>
 </nav>
@@ -173,7 +174,7 @@ table,tbody,tr,td{display:block;width:100%}tr:first-child:has(th){display:none}t
 <button type="button" onclick="toggleTheme()" title="Design wechseln">{{ ICON.theme }}<span id="themeLabel" class="lbl">Design wechseln</span></button>
 {% if g.user %}<a href="/account" class="userchip" title="{{ g.user }}"><span class="avatar">{{ g.user[:1]|upper }}</span><span class="lbl"><b>{{ g.user }}</b><br><small>{{ role_name(g.role) }}</small></span></a>
 <a href="/logout" title="Abmelden">{{ ICON.logout }}<span class="lbl">Abmelden</span></a>{% endif %}
-<div class="ver"><a class="vlink" href="{{ RELEASE_URL }}" target="_blank" rel="noopener" title="Versionshinweise auf GitHub">MirrorSync v{{ VERSION }}</a>{% set upd_s = UPDATE() %}{% if upd_s and upd_s.update_available %}<br><a class="upd" href="{{ upd_s.url }}" target="_blank" rel="noopener" title="Neue Version verfügbar">⬆ v{{ upd_s.latest }} verfügbar</a>{% if can("system.update") and SELFUPD_OK() %}<form method="post" action="/update/apply" style="margin:4px 0 0" onsubmit="return confirm('MirrorSync jetzt aktualisieren? Der Container wird dabei neu gestartet, die Oberfläche ist etwa eine Minute nicht erreichbar.')"><input type="hidden" name="back" value="{{ request.path }}"><button class="btn sm">Jetzt aktualisieren</button></form>{% endif %}{% endif %}</div>
+<div class="ver"><a class="vlink" href="/changelog" title="Versionshinweise: was sich in jeder Version geändert hat">MirrorSync v{{ VERSION }}</a>{% set upd_s = UPDATE() %}{% if upd_s and upd_s.update_available %}<br><a class="upd" href="{{ upd_s.url }}" target="_blank" rel="noopener" title="Neue Version verfügbar">⬆ v{{ upd_s.latest }} verfügbar</a>{% if can("system.update") and SELFUPD_OK() %}<form method="post" action="/update/apply" style="margin:4px 0 0" onsubmit="return confirm('MirrorSync jetzt aktualisieren? Der Container wird dabei neu gestartet, die Oberfläche ist etwa eine Minute nicht erreichbar.')"><input type="hidden" name="back" value="{{ request.path }}"><button class="btn sm">Jetzt aktualisieren</button></form>{% endif %}{% endif %}</div>
 </div>
 </aside>
 <div class="content">
@@ -243,7 +244,14 @@ const f=new FormData();f.append('state',mini?'mini':'full');fetch('/account/side
 window.dispatchEvent(new Event('resize'))}
 function toggleTheme(){const r=document.documentElement;const dark=r.dataset.theme?r.dataset.theme==='dark':matchMedia('(prefers-color-scheme: dark)').matches;
 r.dataset.theme=dark?'light':'dark';try{localStorage.setItem('ms-theme',r.dataset.theme)}catch(e){}}
+if('serviceWorker' in navigator&&location.protocol!=='file:'){window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(()=>{}))}
 </script>
+{% set wn = WHATS_NEW() %}{% if wn %}<dialog id="whatsnew" class="wndlg"><div style="display:flex;align-items:center;gap:10px"><h3 style="margin:0;flex:1">🎉 {{ _("Neu in MirrorSync v{0}", VERSION) }}</h3><button type="button" class="btn sm" onclick="msSeen()">Schließen</button></div>
+<div class="clbody" style="overflow:auto;max-height:62vh;margin-top:8px">{% for e in wn %}{% if wn|length > 1 %}<h3 style="margin:14px 0 2px">v{{ e.version }} <small class="mut">{{ e.date }}</small></h3>{% endif %}{{ e.html }}{% endfor %}</div>
+<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><a class="btn" href="/changelog" onclick="msSeen(true)">Alle Versionshinweise</a><button type="button" class="btn pri" onclick="msSeen()">Verstanden</button></div></dialog>
+<style>.wndlg{width:min(720px,94vw);max-height:88vh;border:1px solid var(--bd);border-radius:12px;background:var(--card);color:var(--fg);padding:18px 20px}.wndlg::backdrop{background:rgba(0,0,0,.35)}.clbody ul{margin:6px 0 10px;padding-left:20px}.clbody li{margin:3px 0}.clbody p{margin:8px 0}.clbody h4{margin:12px 0 4px}</style>
+<script>function msSeen(nav){fetch('/changelog/seen',{method:'POST',headers:{'Accept':'application/json'},keepalive:true}).catch(()=>{});if(!nav)document.getElementById('whatsnew').close()}
+(function(){const d=document.getElementById('whatsnew');if(d&&d.showModal){d.addEventListener('cancel',()=>msSeen(true));d.showModal()}})()</script>{% endif %}
 </body></html>
 """,
 
@@ -268,7 +276,10 @@ r.dataset.theme=dark?'light':'dark';try{localStorage.setItem('ms-theme',r.datase
 <div class="path">{% if j.direction == "bisync" %}<span title="Zwei-Wege-Sync">{{ j.source }} ⇄ {{ j.eff_dest }}</span>{% else %}{{ j.source }} → {{ j.eff_dest }}{% endif %}</div>
 {% if j.direction == "bisync" and j.bisync_need_resync %}<small class="fehler">Zwei-Wege-Sync abgebrochen, bitte neu zusammenführen.</small>
 {% if can("jobs.run") and not j.running %}<form class="inline" method="post" action="/job/{{ j.id }}/resync" onsubmit="return confirm('Beide Seiten neu zusammenführen? Was nur auf einer Seite liegt, wird auf die andere kopiert. Gelöscht wird nichts.')"><button class="btn sm">Neu zusammenführen</button></form>{% endif %}<br>{% endif %}
-<small>{% if j.direction == "bisync" %}⇄ Zwei-Wege · {% endif %}{% if j.n_select %}☑ nur {{ j.n_select }} {{ "Eintrag" if j.n_select == 1 else "Einträge" }} · {% endif %}{% if j.n_excludes %}{{ j.n_excludes }} Ausschlüsse · {% endif %}{% if j.no_delete and j.direction != "bisync" %}ohne Löschen · {% endif %}{% if j.versioning %}Versionierung · {% endif %}{% if j.window_text %}🕘 {{ j.window_text }} · {% endif %}{% if j.notify_summary %}🔔 {{ j.notify_summary }}{% endif %}{% if j.dry_run %} · nur Testlauf{% endif %}</small></td>
+{% if j.delete_hold %}{% set h = j.delete_hold %}<div class="msg err" style="margin:6px 0;padding:8px 10px"><b>🛑 Angehalten: Löschwarnung</b><br><small>{{ _("{0} von {1} Dateien im Ziel würden gelöscht ({2} %, Grenze {3} %).", h.deleted, h.total, h.pct, h.threshold) }}</small>
+{% if can("jobs.approve") and not j.running %}<div style="margin-top:6px"><form class="inline" method="post" action="/job/{{ j.id }}/approve" data-q="{{ _('Wirklich freigeben? Der Lauf startet jetzt und löscht {0} Dateien im Ziel.', h.deleted) }}" onsubmit="return confirm(this.dataset.q)"><button class="btn sm del">Freigeben und spiegeln</button></form> <form class="inline" method="post" action="/job/{{ j.id }}/hold/dismiss"><button class="btn sm">Warnung verwerfen</button></form> <a class="btn sm" href="/job/{{ j.id }}/log">Details</a></div>{% endif %}</div>{% endif %}
+{% if j.retry_pending and not j.running %}<small class="mut" title="Nach einem Fehler">↻ {{ _("neuer Versuch {0} von {1} um {2}", j.retry_pending.attempt, j.retry_pending.of, j.retry_pending.at[11:16]) }}</small><br>{% endif %}
+<small>{% if j.direction == "bisync" %}⇄ Zwei-Wege · {% endif %}{% if j.n_select %}☑ nur {{ j.n_select }} {{ "Eintrag" if j.n_select == 1 else "Einträge" }} · {% endif %}{% if j.n_excludes %}{{ j.n_excludes }} Ausschlüsse · {% endif %}{% if j.no_delete and j.direction != "bisync" %}ohne Löschen · {% endif %}{% if j.versioning %}Versionierung · {% endif %}{% if j.verify and j.verify != "off" %}🔎 Prüflauf · {% endif %}{% if j.delete_guard and j.direction != "bisync" %}🛡 Löschwarnung ab {{ j.delete_guard }} % · {% endif %}{% if j.retry %}↻ Wiederholen · {% endif %}{% if j.wol_mac %}⏰ Wake-on-LAN · {% endif %}{% if j.snapshot and j.snapshot != "off" %}📸 Snapshot · {% endif %}{% if j.window_text %}🕘 {{ j.window_text }} · {% endif %}{% if j.notify_summary %}🔔 {{ j.notify_summary }}{% endif %}{% if j.dry_run %} · nur Testlauf{% endif %}</small></td>
 <td class="hide-sm">{% if j.trig == "after" %}{% if j.parent_name %}<span title="startet nach einer anderen Aufgabe">⛓ nach „{{ j.parent_name }}“</span><br><small>{{ "immer" if j.after_when == "always" else "nur bei Erfolg" }}{% if not j.enabled %} · <span class="fehler">aus</span>{% endif %}</small>{% else %}<span class="fehler">Vorgänger fehlt</span>{% endif %}
 {% elif j.trig == "time" and j.enabled and j.next_run %}{% if j.schedule_text %}{{ j.schedule_text }}{% else %}<code>{{ j.schedule }}</code>{% endif %}
 {% elif j.trig == "live" and j.enabled %}<span title="gleicht laufend Quelle und Ziel ab">⚡ {{ j.live_text }}</span><br><small>{{ j.live_full_text }}{% if j.next_run %}, nächster {{ j.next_run }}{% endif %}</small>{% if j.live_fail_count %}<br><small class="fehler">{{ j.live_fail_count }} Live-Läufe in Folge fehlgeschlagen</small>{% elif j.live_checked %}<br><small class="mut">zuletzt geprüft {{ j.live_checked[11:16] }}</small>{% endif %}
@@ -663,7 +674,7 @@ const TZN='{{ tz }}';
 <script>function winShow(){document.getElementById('winbox').style.display=document.getElementById('win_on').checked?'':'none'}</script>
 
 <div class="card"><h2>Optionen</h2>
-<label class="check"><input type="checkbox" name="versioning" id="vers" {{ "checked" if job.versioning }} onchange="document.getElementById('versbox').style.display=this.checked?'':'none'"> Versionierung: gelöschte und überschriebene Dateien nach <code>&lt;ziel&gt;.versions/&lt;datum&gt;</code> verschieben statt löschen</label>
+<label class="check"><input type="checkbox" name="versioning" id="vers" {{ "checked" if job.versioning }} onchange="document.getElementById('versbox').style.display=this.checked?'':'none'"> Papierkorb/Versionierung: gelöschte und überschriebene Dateien nach <code>&lt;ziel&gt;.versions/&lt;datum&gt;</code> verschieben statt löschen{% if job_id and job.versioning and can("jobs.restore") %} · <a href="/job/{{ job_id }}/versions">Dateien suchen und wiederherstellen</a>{% endif %}</label>
 <div id="versbox" class="row" style="margin:0 0 8px 26px;{{ '' if job.versioning else 'display:none' }}">
 <div style="flex:0 0 220px"><label>Versionen behalten</label><input type="text" name="versions_keep" inputmode="numeric" value="{{ job.versions_keep or '' }}" placeholder="alle"><div class="hint">Anzahl Stände, z. B. 10. Leer = alle.</div></div>
 <div style="flex:0 0 220px"><label>Höchstens so alt (Tage)</label><input type="text" name="versions_days" inputmode="numeric" value="{{ job.versions_days or '' }}" placeholder="unbegrenzt"><div class="hint">z. B. 30. Leer = unbegrenzt.</div></div>
@@ -697,6 +708,79 @@ document.getElementById('spdhint').textContent={gentle:'Schont Server, Platten u
 <div class="hint">Schutz, falls die Quelle plötzlich leer ist. Leer = kein Limit.</div></div>
 <div><label>Zusätzliche rclone-Optionen</label><input type="text" name="extra_flags" value="{{ job.extra_flags }}" {{ "disabled" if not can("jobs.advanced") }} placeholder='--transfers 8'>
 <div class="hint">z. B. parallele Übertragungen. Ein eigenes <code>--bwlimit</code> hier ersetzt die Einstellung „Bandbreite“.</div></div></div>
+</div>
+
+<div class="card" id="protect"><h2>Prüfen und schützen</h2>
+<div class="row"><div style="flex:1 1 300px"><label for="verify">Prüflauf nach dem Sync</label><select name="verify" id="verify">
+<option value="off" {{ "selected" if (job.verify or "off") == "off" }}>aus</option>
+<option value="always" {{ "selected" if job.verify == "always" }}>nach jedem Lauf</option>
+<option value="daily" {{ "selected" if job.verify == "daily" }}>höchstens einmal am Tag</option>
+<option value="weekly" {{ "selected" if job.verify == "weekly" }}>höchstens einmal in der Woche</option></select></div>
+<div style="flex:1 1 300px"><label for="verify_method">Vergleich</label><select name="verify_method" id="verify_method">
+<option value="auto" {{ "selected" if (job.verify_method or "auto") == "auto" }}>Prüfsumme, wenn beide Seiten eine haben, sonst Größe</option>
+<option value="size" {{ "selected" if job.verify_method == "size" }}>Nur Größe (schnell)</option>
+<option value="download" {{ "selected" if job.verify_method == "download" }}>Inhalt Byte für Byte (liest alles, sicher bei jedem Speicher)</option></select></div></div>
+<div class="hint">Vergleicht nach einem erfolgreichen Lauf Quelle und Ziel Datei für Datei (<code>rclone check</code>). Im Verlauf steht dann schwarz auf weiß „1:1 gleich“ oder welche Dateien abweichen; Abweichungen machen den Lauf zum Fehler und lösen die Benachrichtigung aus. „Jetzt prüfen“ im Log startet die Prüfung jederzeit von Hand.</div>
+<div class="row ow-only" style="margin-top:6px"><div style="flex:0 0 220px"><label for="delete_guard">Löschwarnung ab (% der Dateien)</label><input type="text" inputmode="numeric" name="delete_guard" id="delete_guard" value="{{ job.delete_guard or '' }}" placeholder="aus, z. B. 20"></div>
+<div style="flex:0 0 220px"><label for="delete_guard_min">und mindestens (Dateien)</label><input type="text" inputmode="numeric" name="delete_guard_min" id="delete_guard_min" value="{{ job.delete_guard_min or '10' }}"></div>
+<div><div class="hint" style="margin-top:28px">Vor jedem echten Lauf spielt MirrorSync den Abgleich als Test durch. Würden so viele Dateien im Ziel gelöscht, hält der Lauf an, nichts wird verändert, und du bekommst eine Nachricht. Erst nach deiner Freigabe läuft er. Schützt vor Ransomware und einer versehentlich leeren Quelle. Kostet pro Lauf einen zusätzlichen Testlauf.</div></div></div>
+<div class="row" style="margin-top:6px"><div style="flex:0 0 280px"><label for="space_check">Speicher am Ziel prüfen</label><select name="space_check" id="space_check">
+<option value="off" {{ "selected" if (job.space_check or "off") == "off" }}>aus</option>
+<option value="warn" {{ "selected" if job.space_check == "warn" }}>warnen, Lauf startet trotzdem</option>
+<option value="stop" {{ "selected" if job.space_check == "stop" }}>Lauf nicht starten</option></select></div>
+<div style="flex:0 0 220px"><label for="space_min_gb">Mindestens frei bleiben (GB)</label><input type="text" inputmode="decimal" name="space_min_gb" id="space_min_gb" value="{{ job.space_min_gb or '' }}" placeholder="nur benötigter Platz"></div>
+<div><div class="hint" style="margin-top:28px">Vor dem Lauf wird ermittelt, wie viel kopiert wird, und mit dem freien Platz am Ziel verglichen, damit der Sync nicht mittendrin abbricht. Geht nur, wenn der Speicherort den freien Platz meldet (lokal, SMB, SFTP mit df, viele Clouds).</div></div></div>
+<div class="row" style="margin-top:6px"><div style="flex:0 0 280px"><label for="retry">Bei Fehler neu versuchen nach (Minuten)</label><input type="text" name="retry" id="retry" value="{{ job.retry or '' }}" placeholder="aus, z. B. 5, 15, 60"></div>
+<div style="flex:0 0 280px"><label for="retry_on">Neu versuchen bei</label><select name="retry_on" id="retry_on">
+<option value="network" {{ "selected" if job.retry_on != "any" }}>Netzwerkproblemen</option>
+<option value="any" {{ "selected" if job.retry_on == "any" }}>jedem Fehler</option></select></div>
+<div><div class="hint" style="margin-top:28px">Scheitert ein Lauf, startet er nach den angegebenen Minuten erneut. Gemeldet wird erst, wenn auch der letzte Versuch scheitert. Gilt nicht für Testläufe und Live-Runden.</div></div></div>
+<label class="check" style="margin-top:12px"><input type="checkbox" name="nosync" {{ "checked" if job.nosync }}> Ordner mit einer Datei <code>.nosync</code> überspringen</label>
+<div class="hint" style="margin:-4px 0 0 26px">Liegt in einem Ordner der Quelle eine Datei namens <code>.nosync</code>, wird er samt Unterordnern ausgelassen; was davon schon im Ziel liegt, bleibt dort unberührt. Die Quelle wird dafür bei jedem vollen Lauf einmal nach <code>.nosync</code> durchsucht.</div>
+<div class="row" style="margin-top:6px"><div style="flex:0 0 280px"><label for="health_max_age">Überfällig nach (Stunden)</label><input type="text" inputmode="decimal" name="health_max_age" id="health_max_age" value="{{ job.health_max_age or '' }}" placeholder="automatisch"></div>
+<div><div class="hint" style="margin-top:28px">Für den Health-Status (<code>/health/jobs</code>, Uptime Kuma, Home Assistant): Ist der letzte Lauf älter, gilt die Aufgabe als überfällig. Leer = aus dem Zeitplan berechnet (doppelter Abstand plus eine Stunde).</div></div></div>
+</div>
+
+{% set sc_ok = can("jobs.scripts") %}<div class="card" id="scripts"><h2>Skripte, Snapshot und Wake-on-LAN</h2>
+{% if not sc_ok %}<div class="msg info">Zum Ändern fehlt dir das Recht „Skripte, Snapshots und Wake-on-LAN einrichten“.</div>{% endif %}
+<fieldset {{ "disabled" if not sc_ok }}>
+<h3>Wake-on-LAN</h3>
+<div class="row"><div style="flex:1 1 220px"><label for="wol_mac">MAC-Adresse des Zielservers</label><input type="text" name="wol_mac" id="wol_mac" value="{{ job.wol_mac or '' }}" placeholder="aus, z. B. AA:BB:CC:DD:EE:FF"></div>
+<div style="flex:1 1 200px"><label for="wol_broadcast">Broadcast-Adresse</label><input type="text" name="wol_broadcast" id="wol_broadcast" value="{{ job.wol_broadcast or '' }}" placeholder="255.255.255.255"></div>
+<div style="flex:0 0 110px"><label for="wol_port">Port</label><input type="text" inputmode="numeric" name="wol_port" id="wol_port" value="{{ job.wol_port or '' }}" placeholder="9"></div>
+<div style="flex:0 0 160px"><label for="wol_wait">Warten bis (s)</label><input type="text" inputmode="numeric" name="wol_wait" id="wol_wait" value="{{ job.wol_wait or '' }}" placeholder="300"></div></div>
+<div class="row"><div style="flex:1 1 260px"><label for="wol_check">Wach, wenn erreichbar (Host:Port)</label><input type="text" name="wol_check" id="wol_check" value="{{ job.wol_check or '' }}" placeholder="automatisch: Host des Ziels"></div>
+<div style="flex:1 1 260px"><label for="wol_sleep_host">Schlafen legen über</label><select name="wol_sleep_host" id="wol_sleep_host"><option value="">Ziel (wenn SFTP)</option>{% for r in ssh_remotes %}<option value="{{ r }}" {{ "selected" if job.wol_sleep_host == r }}>{{ r }} (SSH)</option>{% endfor %}</select></div>
+<div style="flex:1 1 260px"><label for="wol_sleep_cmd">Befehl zum Schlafenlegen</label><input type="text" name="wol_sleep_cmd" id="wol_sleep_cmd" value="{{ job.wol_sleep_cmd or '' }}" placeholder="systemctl suspend"></div></div>
+<label class="check"><input type="checkbox" name="wol_sleep" {{ "checked" if job.wol_sleep }}> Nach dem Lauf wieder schlafen legen (nur, wenn MirrorSync ihn geweckt hat und keine andere Aufgabe ihn noch braucht)</label>
+<div class="hint">Vor dem Lauf prüft MirrorSync, ob das Ziel erreichbar ist, sonst schickt es ein Magic Packet und wartet. Das Paket muss den Server im LAN erreichen: mit macvlan oder <code>network_mode: host</code> klappt das direkt, im Bridge-Netz die Broadcast-Adresse des LANs eintragen (z. B. 192.168.1.255) oder einen WoL-Proxy nutzen. Schlafenlegen läuft per SSH über einen SFTP-Speicherort; der Benutzer braucht dafür das Recht (z. B. <code>sudo</code> ohne Passwort für <code>systemctl suspend</code>).</div>
+
+<h3 style="margin-top:18px">Skripte vor und nach dem Lauf</h3>
+<div class="row"><div style="flex:1 1 260px"><label for="script_host">Ausführen</label><select name="script_host" id="script_host"><option value="">im MirrorSync-Container</option>{% for r in ssh_remotes %}<option value="{{ r }}" {{ "selected" if job.script_host == r }}>auf {{ r }} (SSH)</option>{% endfor %}</select></div>
+<div style="flex:0 0 200px"><label for="script_timeout">Zeitlimit je Skript (s)</label><input type="text" inputmode="numeric" name="script_timeout" id="script_timeout" value="{{ job.script_timeout or '' }}" placeholder="600"></div></div>
+<label for="script_pre">Vor dem Lauf</label><textarea name="script_pre" id="script_pre" rows="3" spellcheck="false" placeholder="z. B. docker stop nextcloud-db">{{ job.script_pre or '' }}</textarea>
+<div class="row"><div style="flex:0 0 360px"><label for="script_pre_fail">Wenn das Skript fehlschlägt</label><select name="script_pre_fail" id="script_pre_fail"><option value="abort" {{ "selected" if job.script_pre_fail != "continue" }}>Lauf abbrechen</option><option value="continue" {{ "selected" if job.script_pre_fail == "continue" }}>trotzdem spiegeln</option></select></div></div>
+<label for="script_post">Nach dem Lauf</label><textarea name="script_post" id="script_post" rows="3" spellcheck="false" placeholder="z. B. docker start nextcloud-db">{{ job.script_post or '' }}</textarea>
+<div class="row"><div style="flex:0 0 360px"><label for="script_post_when">Ausführen</label><select name="script_post_when" id="script_post_when"><option value="always" {{ "selected" if (job.script_post_when or "always") == "always" }}>immer (auch nach Fehler)</option><option value="ok" {{ "selected" if job.script_post_when == "ok" }}>nur nach Erfolg</option><option value="fail" {{ "selected" if job.script_post_when == "fail" }}>nur nach Fehler</option></select></div></div>
+<div class="hint">Shell-Befehle (<code>sh</code>), eine oder mehrere Zeilen. Verfügbar sind <code>$MS_JOB_NAME</code>, <code>$MS_SOURCE</code>, <code>$MS_DEST</code>, <code>$MS_RUN_ID</code> und nach dem Lauf <code>$MS_STATUS</code> (ok oder fehler). Ausgabe und Exit-Code stehen im Log. Per SSH gelten Host, Benutzer und Passwort bzw. Schlüssel des SFTP-Speicherorts. Die Skripte laufen nur bei echten Läufen, nicht bei Testläufen und Live-Runden. Das Skript danach läuft nach Prüflauf und Snapshot.</div>
+
+<h3 style="margin-top:18px">Snapshot am Ziel nach jedem Lauf</h3>
+<div class="row"><div style="flex:0 0 260px"><label for="snapshot">Art</label><select name="snapshot" id="snapshot" onchange="snapShow()">
+<option value="off" {{ "selected" if (job.snapshot or "off") == "off" }}>aus</option><option value="zfs" {{ "selected" if job.snapshot == "zfs" }}>ZFS</option>
+<option value="btrfs" {{ "selected" if job.snapshot == "btrfs" }}>Btrfs</option><option value="command" {{ "selected" if job.snapshot == "command" }}>eigener Befehl</option></select></div>
+<div style="flex:1 1 260px" class="snap-on"><label for="snapshot_host">Ausführen</label><select name="snapshot_host" id="snapshot_host"><option value="">im MirrorSync-Container</option>{% for r in ssh_remotes %}<option value="{{ r }}" {{ "selected" if job.snapshot_host == r }}>auf {{ r }} (SSH)</option>{% endfor %}</select></div>
+<div style="flex:0 0 200px" class="snap-on"><label for="snapshot_keep">Snapshots behalten</label><input type="text" inputmode="numeric" name="snapshot_keep" id="snapshot_keep" value="{{ job.snapshot_keep or '' }}" placeholder="alle"></div></div>
+<div class="row snap-fs"><div><label for="snapshot_target" id="snaplbl">ZFS-Dataset bzw. Btrfs-Subvolume</label><input type="text" name="snapshot_target" id="snapshot_target" value="{{ job.snapshot_target or '' }}" placeholder="tank/backup  bzw.  /mnt/backup"></div>
+<div class="snap-btrfs"><label for="snapshot_dir">Ordner für die Snapshots (Btrfs)</label><input type="text" name="snapshot_dir" id="snapshot_dir" value="{{ job.snapshot_dir or '' }}" placeholder="/mnt/snapshots"></div></div>
+<div class="snap-cmd"><label for="snapshot_cmd">Befehl</label><input type="text" name="snapshot_cmd" id="snapshot_cmd" value="{{ job.snapshot_cmd or '' }}" placeholder="z. B. /usr/local/bin/snap.sh {name}"></div>
+<label class="check snap-fs"><input type="checkbox" name="snapshot_sudo" {{ "checked" if job.snapshot_sudo }}> Mit <code>sudo -n</code> ausführen</label>
+<div class="hint snap-on">Nach jedem erfolgreichen echten Lauf entsteht ein Snapshot <code>mirrorsync-&lt;Aufgabe&gt;-&lt;Datum&gt;</code>, so kommst du jederzeit auf den Stand von gestern zurück. „Behalten“ räumt nur Snapshots von MirrorSync auf. Btrfs-Snapshots müssen außerhalb des Ziels liegen, sonst würden sie beim nächsten Lauf als fremde Dateien gelöscht. Im eigenen Befehl stehen <code>{name}</code>, <code>{date}</code>, <code>{job}</code> und <code>{dest}</code> zur Verfügung. Schlägt der Snapshot fehl, gilt der Lauf als Fehler.</div>
+</fieldset>
+<script>function snapShow(){const v=document.getElementById('snapshot').value;
+document.querySelectorAll('.snap-on').forEach(e=>e.style.display=v==='off'?'none':'');
+document.querySelectorAll('.snap-fs').forEach(e=>e.style.display=(v==='zfs'||v==='btrfs')?'':'none');
+document.querySelectorAll('.snap-btrfs').forEach(e=>e.style.display=v==='btrfs'?'':'none');
+document.querySelectorAll('.snap-cmd').forEach(e=>e.style.display=v==='command'?'':'none')}snapShow()</script>
 </div>
 
 </fieldset>{% if editable %}<div style="display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap">
@@ -840,13 +924,23 @@ document.addEventListener('DOMContentLoaded',()=>{
 </script>
 {% endblock %}""",
 
-"log.html": r"""{% extends "base.html" %}{% block title %}{{ job.name }}{% endblock %}{% block subtitle %}<p class="path">{{ job.source }} {{ "⇄" if job.direction == "bisync" else "→" }} {{ job.dest }}</p>{% endblock %}{% block body %}
+"log.html": r"""{% extends "base.html" %}{% block title %}{{ job.name }}{% endblock %}{% block subtitle %}<p class="path">{{ job.source }} {{ "⇄" if job.direction == "bisync" else "→" }} {{ job.dest }}</p>{% endblock %}
+{% block actions %}{% if can("jobs.restore") and job.versioning %}<a class="btn" href="/job/{{ job_id }}/versions">🗑 Papierkorb</a>{% endif %}{% if can("jobs.preview") %}<a class="btn" href="/job/{{ job_id }}/usage">📊 Platzbedarf</a>{% endif %}{% endblock %}
+{% block body %}{% if msg %}<div class="msg ok">{{ msg }}</div>{% endif %}
+{% if job.delete_hold %}{% set h = job.delete_hold %}<div class="card" style="border-color:var(--err)"><h2>🛑 Angehalten: Löschwarnung</h2>
+<p>{{ _("{0} von {1} Dateien im Ziel würden gelöscht ({2} %, Grenze {3} %).", h.deleted, h.total, h.pct, h.threshold) }} {{ _("Festgestellt am {0}.", h.at|dt) }} Nichts wurde verändert. Das kann auf eine versehentlich leere Quelle, ein nicht eingehängtes Laufwerk oder Ransomware hindeuten.</p>
+{% if h.examples %}<details><summary>Betroffene Dateien (Auszug)</summary><pre style="max-height:240px">{{ h.examples|join("\n") }}</pre></details>{% endif %}
+{% if can("jobs.approve") and not running %}<p style="margin-bottom:0"><form class="inline" method="post" action="/job/{{ job_id }}/approve" data-q="{{ _('Wirklich freigeben? Der Lauf startet jetzt und löscht {0} Dateien im Ziel.', h.deleted) }}" onsubmit="return confirm(this.dataset.q)"><button class="btn del">Freigeben und jetzt spiegeln</button></form>
+<form class="inline" method="post" action="/job/{{ job_id }}/hold/dismiss"><button class="btn">Warnung verwerfen (nächster Lauf prüft wieder)</button></form>
+{% if can("jobs.preview") %}<a class="btn" href="/job/{{ job_id }}">Aufgabe öffnen (Vorschau)</a>{% endif %}</p>{% endif %}</div>{% endif %}
+{% if job.retry_pending and not running %}<div class="msg info">↻ {{ _("Neuer Versuch {0} von {1} um {2}. Gemeldet wird erst, wenn auch der letzte scheitert.", job.retry_pending.attempt, job.retry_pending.of, job.retry_pending.at[11:16]) }}</div>{% endif %}
 <div class="card">
 <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
 <h2 style="margin:0">{{ "Aktueller Lauf" if running else "Letzter Lauf" }} {% if running %}<span class="tag laeuft">läuft</span>{% endif %}</h2>
 <div>{% if running %}{% if can("jobs.run") %}<form class="inline" method="post" action="/job/{{ job_id }}/stop"><button class="btn del">Stopp</button></form>{% endif %}
 {% else %}{% if can("jobs.run") %}<form class="inline" method="post" action="/job/{{ job_id }}/run"><button class="btn pri">Jetzt spiegeln</button></form>{% endif %}
-{% if can("jobs.dryrun") %}<form class="inline" method="post" action="/job/{{ job_id }}/run"><input type="hidden" name="dry" value="1"><button class="btn">Testlauf</button></form>{% endif %}{% endif %}
+{% if can("jobs.dryrun") %}<form class="inline" method="post" action="/job/{{ job_id }}/run"><input type="hidden" name="dry" value="1"><button class="btn">Testlauf</button></form>{% endif %}
+{% if can("jobs.run") %}<form class="inline" method="post" action="/job/{{ job_id }}/verify"><button class="btn" title="Quelle und Ziel vergleichen, ohne etwas zu ändern">🔎 Jetzt prüfen</button></form>{% endif %}{% endif %}
 {% if current %}<a class="btn" href="/job/{{ job_id }}/run/{{ current }}">Ganzes Log mit Filter</a>{% endif %}
 <a class="btn" href="/">Zurück</a></div></div>
 <pre id="log">{{ log }}</pre>
@@ -858,7 +952,9 @@ document.addEventListener('DOMContentLoaded',()=>{
 {% if running and current %}<tr class="click" onclick="location='/job/{{ job_id }}/run/{{ current }}'"><td>jetzt</td><td class="hide-sm">–</td><td><span class="tag laeuft">läuft</span></td><td>–</td><td>–</td><td>–</td><td class="hide-sm">–</td><td><a class="btn sm" href="/job/{{ job_id }}/run/{{ current }}">Log</a></td></tr>{% endif %}
 {% for h in job.history %}{% set ok = has_file.get(h.run) %}<tr {% if ok %}class="click" onclick="location='/job/{{ job_id }}/run/{{ h.run }}'"{% endif %}>
 <td>{{ h.start }}</td><td class="hide-sm">{{ h.duration }} s</td>
-<td><span class="tag {{ h.status }}">{{ STATUS.get(h.status, h.status) }}</span>{% if h.dry_run %} <small>Testlauf</small>{% endif %}{% if h.window %}<br><small class="mut" title="{{ 'Geht im nächsten Zeitfenster weiter' if h.window == 'resume' else 'Am Ende des Zeitfensters angehalten' }}">🕘 Zeitfenster zu Ende</small>{% endif %}</td>
+<td><span class="tag {{ h.status }}">{{ STATUS.get(h.status, h.status) }}</span>{% if h.dry_run %} <small>Testlauf</small>{% endif %}{% if h.mode == "verify" %} <small>nur Prüflauf</small>{% endif %}{% if h.retry %} <small class="mut">↻ Versuch {{ h.retry }}</small>{% endif %}
+{% if h.verify %}<br><small class="{{ 'ok' if h.verify.result == 'ok' else 'fehler' }}" title="{{ _('{0} gleich, {1} fehlen im Ziel, {2} nur im Ziel, {3} unterschiedlich', h.verify.matched, h.verify.missing, h.verify.extra, h.verify.differ) }}">{% if h.verify.result == "ok" %}✔ {{ _("1:1 gleich ({0} Dateien)", h.verify.matched) }}{% elif h.verify.result == "diff" %}✖ {{ _("{0} Abweichungen", h.verify.missing + h.verify.extra + h.verify.differ + h.verify.errors) }}{% else %}✖ Prüflauf fehlgeschlagen{% endif %}</small>{% endif %}
+{% if h.hold %}<br><small class="fehler">🛑 {{ _("{0} % würden gelöscht", h.hold.pct) }}</small>{% endif %}{% if h.snapshot %}<br><small class="mut" title="{{ h.snapshot }}">📸 Snapshot</small>{% elif h.snapshot is defined %}<br><small class="fehler">📸 Snapshot fehlgeschlagen</small>{% endif %}{% if h.retry_next %}<br><small class="mut">↻ {{ _("nächster Versuch {0}", h.retry_next[11:16]) }}</small>{% endif %}{% if h.space_low %}<br><small class="fehler">💽 wenig Speicher</small>{% endif %}{% if h.window %}<br><small class="mut" title="{{ 'Geht im nächsten Zeitfenster weiter' if h.window == 'resume' else 'Am Ende des Zeitfensters angehalten' }}">🕘 Zeitfenster zu Ende</small>{% endif %}</td>
 <td class="num" data-l="Kopiert">{{ h.copied if h.copied is defined else "–" }}</td><td class="num" data-l="Gelöscht">{{ h.deleted if h.deleted is defined else "–" }}</td>
 <td class="num {{ 'err' if h.errors }}" data-l="Fehler">{{ h.errors if h.errors is defined else "–" }}</td>
 <td class="hide-sm"><small>{{ h.by or "–" }}</small></td>
@@ -1368,6 +1464,32 @@ document.querySelectorAll('details.tpl[data-prefix="{{ prefix }}"]').forEach(box
 <div class="hint">Gilt für alle Aufgaben mit „Standard verwenden“. In jeder Aufgabe kannst du eigene Kanäle, Empfänger und Zeitpunkte festlegen. Die Nachricht enthält Status, Dauer, Anzahl kopierter und gelöschter Dateien und die letzten Fehler.</div>
 </div>
 
+<div class="card" id="quiet"><h2>Ruhezeiten</h2>
+<input type="hidden" name="ext_present" value="1">
+<label class="check"><input type="checkbox" name="quiet_enabled" id="q_on" {{ "checked" if s.quiet_enabled }} onchange="document.getElementById('qbox').style.display=this.checked?'':'none'"> Ruhezeit für Benachrichtigungen{% if quiet_active %} <span class="tag gestoppt">gerade aktiv</span>{% endif %}</label>
+<div id="qbox" style="{{ '' if s.quiet_enabled else 'display:none' }}">
+<div class="row" style="margin-top:6px"><div style="flex:0 0 150px"><label>Von</label><input type="time" name="quiet_start" value="{{ s.quiet_start or '22:00' }}"></div>
+<div style="flex:0 0 150px"><label>Bis</label><input type="time" name="quiet_end" value="{{ s.quiet_end or '07:00' }}"></div>
+<div style="flex:1 1 280px"><label>An diesen Tagen (Beginn)</label><div class="chips" style="margin:4px 0 0">{% for d in range(7) %}<label class="check" style="margin:0 10px 0 0"><input type="checkbox" name="quiet_day_{{ d }}" {{ "checked" if not s.quiet_days or d in s.quiet_days }}> {{ ["Mo","Di","Mi","Do","Fr","Sa","So"][d] }}</label>{% endfor %}</div></div></div>
+<label>In der Ruhezeit</label><select name="quiet_mode" style="max-width:520px">
+<option value="errors" {{ "selected" if s.quiet_mode != "none" }}>nur Fehler und Warnungen melden, keine Erfolge</option>
+<option value="none" {{ "selected" if s.quiet_mode == "none" }}>gar nichts melden</option></select>
+<div class="hint">Unterdrückt werden Erfolgsmeldungen, Sicherungen und Update-Hinweise. Fehler, Löschwarnungen, wenig Speicher und gesperrte Anmeldungen kommen im ersten Fall trotzdem. Geht die Zeit über Mitternacht (z. B. 22:00 bis 07:00), zählt der Wochentag des Beginns. Testnachrichten und der Wochenbericht kommen immer.</div>
+</div></div>
+
+<div class="card" id="report"><h2>Wochenbericht</h2>
+<label class="check"><input type="checkbox" name="report_enabled" id="r_on" {{ "checked" if s.report_enabled }} onchange="document.getElementById('rbox').style.display=this.checked?'':'none'"> Regelmäßig einen Bericht senden</label>
+<div id="rbox" style="{{ '' if s.report_enabled else 'display:none' }}">
+<div class="row" style="margin-top:6px"><div style="flex:1 1 280px"><label>An diesen Tagen</label><div class="chips" style="margin:4px 0 0">{% for d in range(7) %}<label class="check" style="margin:0 10px 0 0"><input type="checkbox" name="report_day_{{ d }}" {{ "checked" if d in (s.report_days or [0]) }}> {{ ["Mo","Di","Mi","Do","Fr","Sa","So"][d] }}</label>{% endfor %}</div></div>
+<div style="flex:0 0 150px"><label>Uhrzeit</label><input type="time" name="report_time" value="{{ s.report_time or '08:00' }}"></div>
+<div style="flex:0 0 200px"><label>Zeitraum (Tage)</label><input type="text" inputmode="numeric" name="report_period" value="{{ s.report_period or '7' }}"></div></div>
+<label>Über diese Kanäle</label><div class="chips" style="margin:4px 0 0">{% for c, n in [("webhook","Webhook"),("smtp","E-Mail"),("telegram","Telegram"),("apprise","Apprise")] %}<label class="check" style="margin:0 12px 0 0"><input type="checkbox" name="report_ch_{{ c }}" {{ "checked" if c in (s.report_channels or []) }}> {{ n }}</label>{% endfor %}</div>
+<div class="hint">Keiner ausgewählt = alle aktiven Kanäle. Der Bericht nennt je Aufgabe Läufe, Erfolge, Fehler und übertragene Daten, dazu die Fehler im Zeitraum, offene Löschwarnungen, Prüfläufe, knappen Speicher und das Datenvolumen. Den Text passt du oben unter „Wochenbericht“ an, ein Webhook bekommt die Zahlen zusätzlich als <code>report</code>.{% if next_report %} Nächster Bericht: {{ next_report }}.{% endif %}</div>
+</div>
+{% if report_last %}<p class="hint">Zuletzt gesendet: {{ report_last.at|dt }}{% if report_last.results %} ({% for k, v in report_last.results.items() %}{{ k }} {{ "✓" if v is none else "✗" }}{{ ", " if not loop.last }}{% endfor %}){% endif %}</p>{% endif %}
+{% if can("notify.edit") %}<p><button class="btn sm" type="submit" form="reportform">{{ ICON.bell }} Bericht jetzt senden</button></p>{% endif %}
+</div>
+
 <div class="card"><h2>Texte der Benachrichtigungen</h2>
 <p class="mut" style="margin-top:-4px">Betreff und Text je Ereignis mit Variablen anpassen. Gilt für alle Kanäle (E-Mail-Betreff, Telegram, Apprise, Webhook). Ohne Änderung wird der Standardtext verwendet. Jede Aufgabe kann für ihre Läufe eigene Texte haben.</p>
 <input type="hidden" name="tpl_present" value="1">
@@ -1447,14 +1569,16 @@ document.querySelectorAll('#whbox [data-ex]').forEach(c=>c.onclick=()=>{ta.value
 <p><button class="btn sm" name="test" value="apprise">Speichern und testen</button></p></div>
 <script>function apShow(){const api=document.querySelector('[name=apprise_mode]:checked').value==='api';document.querySelector('.ap-api').style.display=api?'':'none'}apShow()</script>
 
-<p><button class="btn pri">Speichern</button></p>
-<p class="hint">Zugangsdaten werden in <code>config/settings.json</code> gespeichert (nur für den Container lesbar).</p>
+<p><button class="btn pri">Speichern</button> {% if can("notify.edit") %}<button class="btn" type="submit" form="testallform" title="Schickt eine Probe-Nachricht an alle aktiven Kanäle (gespeicherte Einstellungen)">{{ ICON.bell }} Probe an alle Kanäle</button>{% endif %}</p>
+<p class="hint">Zugangsdaten werden in <code>config/settings.json</code> gespeichert (nur für den Container lesbar). „Probe an alle Kanäle“ nutzt die gespeicherten Einstellungen, vorher also speichern.</p>
 </fieldset></form>
+<form id="testallform" method="post" action="/settings/notify/test-all"></form>
+<form id="reportform" method="post" action="/settings/report/send"></form>
 {% endblock %}""",
 "login.html": r"""<!doctype html>
 <html lang="{{ lang_code() }}"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Anmelden · MirrorSync</title><link rel="icon" href="/static/favicon.svg" type="image/svg+xml"><link rel="icon" href="/favicon.ico" sizes="any"><link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
+<title>Anmelden · MirrorSync</title><link rel="icon" href="/static/favicon.svg" type="image/svg+xml"><link rel="icon" href="/favicon.ico" sizes="any"><link rel="apple-touch-icon" href="/static/apple-touch-icon.png"><link rel="manifest" href="/manifest.webmanifest"><meta name="theme-color" content="#4f46e5">
 <script>try{const t=localStorage.getItem('ms-theme');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
 <style>
 :root{--bg:#f6f7f9;--card:#fff;--card2:#f9fafb;--fg:#0f172a;--mut:#64748b;--bd:#e5e7eb;--bd2:#d1d5db;--acc:#4f46e5;--acc-fg:#fff;--acc-soft:rgba(79,70,229,.12);--err:#dc2626;--err-soft:rgba(220,38,38,.1)}
@@ -1692,14 +1816,50 @@ document.querySelectorAll('.rv_pw,.rv_code').forEach(i=>i.addEventListener('keyd
 {% endblock %}
 """,
 "api_docs.html": r"""<!doctype html><html lang="{{ lang_code() }}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>MirrorSync API</title><link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+<title>MirrorSync API</title><link rel="icon" href="/static/favicon.svg" type="image/svg+xml"><link rel="manifest" href="/manifest.webmanifest">
+<script>(function(){let t=null;try{t=localStorage.getItem('ms-theme')}catch(e){}if(t!=='light'&&t!=='dark')t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';document.documentElement.dataset.theme=t})()</script>
 <link rel="stylesheet" href="{{ sw }}/swagger-ui.css">
-<style>body{margin:0;background:#fff}.top{display:flex;gap:12px;align-items:center;padding:10px 18px;border-bottom:1px solid #e5e7eb;font:14px system-ui,sans-serif}
-.top a{color:#4f46e5;text-decoration:none}</style></head><body>
-<div class="top"><b>MirrorSync API {{ VERSION }}</b><span style="flex:1"></span><a href="/settings/api">API-Keys</a><a href="/">Zurück zur GUI</a></div>
+<style>:root{--bg:#fff;--fg:#0f172a;--mut:#64748b;--bd:#e5e7eb;--acc:#4f46e5;color-scheme:light}
+html[data-theme=dark]{--bg:#09090b;--fg:#ececf1;--mut:#a1a1aa;--bd:#27272a;--acc:#818cf8;color-scheme:dark}
+body{margin:0;background:var(--bg);color:var(--fg)}.top{display:flex;gap:12px;align-items:center;padding:10px 18px;border-bottom:1px solid var(--bd);font:14px system-ui,sans-serif;flex-wrap:wrap}
+.top a,.top button{color:var(--acc);text-decoration:none;background:none;border:1px solid var(--bd);border-radius:8px;padding:5px 10px;font:inherit;cursor:pointer}.top a{border:0;padding:0}
+/* Swagger UI im Dunkelmodus */
+html[data-theme=dark] .swagger-ui,html[data-theme=dark] .swagger-ui .info .title,html[data-theme=dark] .swagger-ui .info p,html[data-theme=dark] .swagger-ui .info li,html[data-theme=dark] .swagger-ui .info table,
+html[data-theme=dark] .swagger-ui .opblock-tag,html[data-theme=dark] .swagger-ui .opblock .opblock-summary-description,html[data-theme=dark] .swagger-ui .opblock .opblock-summary-operation-id,
+html[data-theme=dark] .swagger-ui .opblock .opblock-summary-path,html[data-theme=dark] .swagger-ui .opblock .opblock-summary-path__deprecated,html[data-theme=dark] .swagger-ui .opblock-description-wrapper p,
+html[data-theme=dark] .swagger-ui .opblock-external-docs-wrapper p,html[data-theme=dark] .swagger-ui .opblock-title_normal p,html[data-theme=dark] .swagger-ui .opblock .opblock-section-header h4,
+html[data-theme=dark] .swagger-ui .opblock .opblock-section-header>label,html[data-theme=dark] .swagger-ui .tab li,html[data-theme=dark] .swagger-ui table thead tr th,html[data-theme=dark] .swagger-ui table thead tr td,
+html[data-theme=dark] .swagger-ui .parameter__name,html[data-theme=dark] .swagger-ui .parameter__type,html[data-theme=dark] .swagger-ui .parameter__in,html[data-theme=dark] .swagger-ui .parameter__extension,
+html[data-theme=dark] .swagger-ui .response-col_status,html[data-theme=dark] .swagger-ui .response-col_links,html[data-theme=dark] .swagger-ui .responses-inner h4,html[data-theme=dark] .swagger-ui .responses-inner h5,
+html[data-theme=dark] .swagger-ui .model-title,html[data-theme=dark] .swagger-ui .model,html[data-theme=dark] .swagger-ui section.models h4,html[data-theme=dark] .swagger-ui .scheme-container .schemes>label,
+html[data-theme=dark] .swagger-ui .btn,html[data-theme=dark] .swagger-ui label,html[data-theme=dark] .swagger-ui .markdown p,html[data-theme=dark] .swagger-ui .markdown li,html[data-theme=dark] .swagger-ui .renderedMarkdown p,
+html[data-theme=dark] .swagger-ui .dialog-ux .modal-ux-header h3,html[data-theme=dark] .swagger-ui .dialog-ux .modal-ux-content p,html[data-theme=dark] .swagger-ui .dialog-ux .modal-ux-content h4,
+html[data-theme=dark] .swagger-ui .prop-type,html[data-theme=dark] .swagger-ui .prop-format,html[data-theme=dark] .swagger-ui .model-toggle:after,html[data-theme=dark] .swagger-ui .response-control-media-type__title,
+html[data-theme=dark] .swagger-ui .responses-table .response-col_description,html[data-theme=dark] .swagger-ui .info .base-url,html[data-theme=dark] .swagger-ui .opblock-tag small{color:var(--fg)}
+html[data-theme=dark] .swagger-ui .scheme-container,html[data-theme=dark] .swagger-ui .opblock .opblock-section-header,html[data-theme=dark] .swagger-ui .dialog-ux .modal-ux,
+html[data-theme=dark] .swagger-ui .dialog-ux .modal-ux-header,html[data-theme=dark] .swagger-ui section.models .model-container,html[data-theme=dark] .swagger-ui .model-box{background:#18181b;box-shadow:none}
+html[data-theme=dark] .swagger-ui section.models,html[data-theme=dark] .swagger-ui .opblock-tag,html[data-theme=dark] .swagger-ui .dialog-ux .modal-ux,html[data-theme=dark] .swagger-ui .dialog-ux .modal-ux-header,
+html[data-theme=dark] .swagger-ui table thead tr td,html[data-theme=dark] .swagger-ui table thead tr th{border-color:var(--bd)}
+html[data-theme=dark] .swagger-ui input[type=text],html[data-theme=dark] .swagger-ui input[type=password],html[data-theme=dark] .swagger-ui input[type=email],html[data-theme=dark] .swagger-ui input[type=file],
+html[data-theme=dark] .swagger-ui textarea,html[data-theme=dark] .swagger-ui select{background:#111113;color:var(--fg);border-color:#3f3f46}
+html[data-theme=dark] .swagger-ui .btn{border-color:#52525b}html[data-theme=dark] .swagger-ui .btn.authorize,html[data-theme=dark] .swagger-ui .btn.authorize svg{color:#4ade80;fill:#4ade80;border-color:#4ade80}
+html[data-theme=dark] .swagger-ui svg:not(:root){fill:var(--fg)}html[data-theme=dark] .swagger-ui .opblock .opblock-summary-method svg,html[data-theme=dark] .swagger-ui .opblock-summary-control svg{fill:var(--fg)}
+html[data-theme=dark] .swagger-ui .info a,html[data-theme=dark] .swagger-ui a.nostyle,html[data-theme=dark] .swagger-ui .info .title small pre{color:var(--acc)}
+html[data-theme=dark] .swagger-ui .info .title small{background:#3f3f46}html[data-theme=dark] .swagger-ui .opblock-body pre.microlight,html[data-theme=dark] .swagger-ui .highlight-code>.microlight{background:#111113!important}
+html[data-theme=dark] .swagger-ui .markdown code,html[data-theme=dark] .swagger-ui .renderedMarkdown code{background:#27272a;color:#f0abfc}
+html[data-theme=dark] .swagger-ui .opblock.opblock-get{background:rgba(97,175,254,.08)}html[data-theme=dark] .swagger-ui .opblock.opblock-post{background:rgba(73,204,144,.08)}
+html[data-theme=dark] .swagger-ui .opblock.opblock-put{background:rgba(252,161,48,.08)}html[data-theme=dark] .swagger-ui .opblock.opblock-delete{background:rgba(249,62,62,.08)}
+html[data-theme=dark] .swagger-ui .opblock.opblock-patch{background:rgba(80,227,194,.08)}html[data-theme=dark] .swagger-ui .opblock .tab-header .tab-item.active h4 span:after{background:var(--mut)}
+html[data-theme=dark] .swagger-ui .parameter__name.required:after,html[data-theme=dark] .swagger-ui .parameter__name.required span{color:#f87171}
+html[data-theme=dark] .swagger-ui .model .property.primitive,html[data-theme=dark] .swagger-ui .model-hint{color:var(--mut)}html[data-theme=dark] .swagger-ui .loading-container .loading:after{color:var(--fg)}
+html[data-theme=dark] .swagger-ui .response-col_description__inner p,html[data-theme=dark] .swagger-ui .errors-wrapper{color:var(--fg)}html[data-theme=dark] .swagger-ui .copy-to-clipboard{background:#3f3f46}
+</style></head><body>
+<div class="top"><b>MirrorSync API {{ VERSION }}</b><span style="flex:1"></span><button type="button" id="thb" onclick="msTheme()"></button><a href="/settings/api">API-Keys</a><a href="/">Zurück zur GUI</a></div>
 <div id="ui"></div>
 <script src="{{ sw }}/swagger-ui-bundle.js"></script>
-<script>window.ui=SwaggerUIBundle({url:'/api/v1/openapi.json',dom_id:'#ui',deepLinking:true,persistAuthorization:true,tryItOutEnabled:false});</script>
+<script>const TL={dark:'☀ {{ _("Hell") }}',light:'☾ {{ _("Dunkel") }}'};function msThl(){document.getElementById('thb').textContent=TL[document.documentElement.dataset.theme]}
+function msTheme(){const r=document.documentElement;r.dataset.theme=r.dataset.theme==='dark'?'light':'dark';try{localStorage.setItem('ms-theme',r.dataset.theme)}catch(e){}msThl()}msThl();
+window.ui=SwaggerUIBundle({url:'/api/v1/openapi.json',dom_id:'#ui',deepLinking:true,persistAuthorization:true,tryItOutEnabled:false,syntaxHighlight:{theme:document.documentElement.dataset.theme==='dark'?'monokai':'agate'}});</script>
 </body></html>
 """,
 "denied.html": r"""{% extends "base.html" %}{% block title %}Keine Berechtigung{% endblock %}{% block body %}
@@ -1708,6 +1868,104 @@ document.querySelectorAll('.rv_pw,.rv_code').forEach(i=>i.addEventListener('keyd
 <p><a class="btn" href="/">Zur Übersicht</a></p></div></div>
 {% endblock %}
 """,
+"versions.html": r"""{% extends "base.html" %}{% block title %}Papierkorb: {{ job.name }}{% endblock %}
+{% block subtitle %}<p class="path">{{ data.base }}</p>{% endblock %}
+{% block actions %}<a class="btn" href="/job/{{ job_id }}/log">Log</a><a class="btn" href="/job/{{ job_id }}">Aufgabe</a>{% endblock %}
+{% block body %}
+{% if msg %}<div class="msg ok">{{ msg }}</div>{% endif %}{% if err %}<div class="msg err">{{ err }}</div>{% endif %}
+{% if not job.versioning %}<div class="msg info">Papierkorb/Versionierung ist bei dieser Aufgabe aus. Gelöschte und überschriebene Dateien werden dann direkt entfernt. Einschalten unter <a href="/job/{{ job_id }}">Aufgabe → Optionen</a>.{% if data.stamps %} Ältere Stände sind noch da.{% endif %}</div>{% endif %}
+<div class="card">
+<form method="get" class="row" style="align-items:flex-end;flex-wrap:wrap">
+{% if bisync %}<div style="flex:0 0 180px"><label>Seite</label><select name="side"><option value="b" {{ "selected" if side == "b" }}>Seite B (Ziel)</option><option value="a" {{ "selected" if side == "a" }}>Seite A (Quelle)</option></select></div>{% endif %}
+<div style="flex:2 1 260px"><label for="q">Dateiname oder Pfad enthält</label><input type="text" name="q" id="q" value="{{ q }}" placeholder="z. B. rechnung oder Fotos/2024" autofocus></div>
+<div style="flex:1 1 220px"><label for="stamp">Stand</label><select name="stamp" id="stamp"><option value="">alle Stände</option>{% for st in data.stamps %}<option value="{{ st }}" {{ "selected" if st == stamp }}>{{ st|stamp }}</option>{% endfor %}</select></div>
+<div style="flex:0 0 auto"><input type="hidden" name="any" value="1"><button class="btn pri">Suchen</button></div></form>
+<p class="hint">{{ _("{0} Stände vorhanden.", data.stamps|length) }} Jeder Stand enthält die Dateien, die bei einem Lauf zu diesem Zeitpunkt gelöscht oder überschrieben wurden, in ihrer alten Fassung. Suche ohne Stand durchsucht alle (kann bei vielen Ständen dauern).</p>
+</div>
+{% if data.files %}<form method="post" action="/job/{{ job_id }}/versions/restore" class="card">
+<input type="hidden" name="q" value="{{ q }}"><input type="hidden" name="stamp" value="{{ stamp }}"><input type="hidden" name="side" value="{{ side }}">
+<div class="card-head"><h2>{{ _("{0} Dateien", data.files|length) }}{% if data.truncated %} <small class="mut">(gekürzt, bitte genauer suchen)</small>{% endif %}</h2>
+<label class="check" style="margin:0"><input type="checkbox" onclick="document.querySelectorAll('.vsel').forEach(c=>c.checked=this.checked)"> alle auswählen</label></div>
+<table><tr><th></th><th>Datei</th><th>Stand (gelöscht/ersetzt am)</th><th class="hide-sm">Größe</th><th class="hide-sm">Geändert</th><th></th></tr>
+{% for f in data.files %}<tr><td style="width:28px"><input type="checkbox" class="vsel" name="item" value="{{ f.stamp }}|{{ f.path }}"></td>
+<td><span class="path" style="color:var(--fg)">{{ f.path }}</span></td><td><small>{{ f.stamp|stamp }}</small></td>
+<td class="hide-sm num">{{ f.size|hbytes if f.size is not none else "–" }}</td><td class="hide-sm"><small>{{ f.mod }}</small></td>
+<td style="white-space:nowrap"><a class="btn sm" href="/job/{{ job_id }}/versions/download?stamp={{ f.stamp|urlencode }}&path={{ f.path|urlencode }}&side={{ side }}" title="Herunterladen">↓</a></td></tr>{% endfor %}</table>
+<div class="row" style="align-items:flex-end;margin-top:12px;flex-wrap:wrap">
+<div style="flex:1 1 320px"><label>Wiederherstellen nach</label><select name="target">
+<option value="source">{{ "Seite A" if bisync else "Quelle" }}: {{ job.source }} (empfohlen)</option>
+<option value="dest">{{ "Seite B" if bisync else "Ziel" }}: {{ job.dest }}</option></select></div>
+<div style="flex:0 0 auto"><label class="check"><input type="checkbox" name="overwrite"> Vorhandene überschreiben</label></div>
+<div style="flex:0 0 auto"><button class="btn pri">Ausgewählte wiederherstellen</button></div></div>
+<p class="hint">In die {{ "Seiten" if bisync else "Quelle" }} zurückgeholt, wird die Datei beim nächsten Lauf wieder ins Ziel gespiegelt.{% if not bisync %} Nur ins Ziel zurückgelegt, löscht oder überschreibt der nächste Lauf sie wieder, wenn sie in der Quelle fehlt oder anders ist.{% endif %} Die Datei bleibt zusätzlich im Papierkorb.</p>
+</form>{% elif q or stamp %}<div class="card"><div class="empty">Nichts gefunden.</div></div>{% endif %}
+{% endblock %}""",
+
+"usage.html": r"""{% extends "base.html" %}{% block title %}Platzbedarf: {{ job.name }}{% endblock %}
+{% block subtitle %}<p class="path">{{ u.path or (job.source if side == "source" else job.dest) }}</p>{% endblock %}
+{% block actions %}<a class="btn" href="/job/{{ job_id }}/log">Log</a><a class="btn" href="/job/{{ job_id }}">Aufgabe</a>{% endblock %}
+{% block body %}
+<div class="tabs"><a href="?side=source" class="{{ 'active' if side == 'source' }}">{{ "Seite A" if job.direction == "bisync" else "Quelle" }}</a><a href="?side=dest" class="{{ 'active' if side == 'dest' }}">{{ "Seite B" if job.direction == "bisync" else "Ziel" }}</a></div>
+<div class="card"><div class="card-head"><div><h2>Größte Ordner und Dateien</h2>
+<p class="mut" style="margin:0">{% if u.state == "läuft" %}{{ _("Wird gezählt … {0} Dateien, {1} bisher.", u.files, u.bytes|hbytes) }}{% elif u.at %}{{ _("Stand {0}: {1} Dateien, {2}.", u.at|dt, u.files, u.bytes|hbytes) }}{% else %}Noch nicht ermittelt. Die Analyse liest einmal alle Ordner (mit den Filtern der Aufgabe).{% endif %}</p></div>
+{% if u.state != "läuft" %}<form method="post"><input type="hidden" name="side" value="{{ side }}"><button class="btn pri">{{ "Neu ermitteln" if u.at else "Jetzt ermitteln" }}</button></form>{% endif %}</div>
+{% if u.state == "fehler" %}<div class="msg err">{{ u.error }}</div>{% endif %}
+{% if u.children is defined %}
+<p class="fbcrumbs"><a href="?side={{ side }}">{{ "Seite A" if side == "source" and job.direction == "bisync" else ("Quelle" if side == "source" else ("Seite B" if job.direction == "bisync" else "Ziel")) }}</a>{% set acc = namespace(p="") %}{% for part in (u.sub or "").strip("/").split("/") if part %}{% set acc.p = (acc.p ~ "/" ~ part).lstrip("/") %}<span class="sep">/</span><a href="?side={{ side }}&path={{ acc.p|urlencode }}">{{ part }}</a>{% endfor %}
+ <small class="mut">· {{ u.dir_bytes|hbytes }}, {{ u.dir_files }} Dateien</small></p>
+{% if u.children %}<table><tr><th>Ordner</th><th style="width:40%">Anteil</th><th class="num">Größe</th><th class="num hide-sm">Dateien</th></tr>
+{% for c in u.children %}{% set pct = (c.bytes * 100 / u.dir_bytes) if u.dir_bytes else 0 %}<tr class="click" onclick="location='?side={{ side }}&path={{ c.path|urlencode }}'"><td><a href="?side={{ side }}&path={{ c.path|urlencode }}">📁 {{ c.name }}</a></td>
+<td><div class="fm-bar" style="width:100%"><i style="width:{{ pct|round(1) }}%;background:var(--acc)"></i></div><small class="mut">{{ pct|round(1) }} %</small></td>
+<td class="num">{{ c.bytes|hbytes }}</td><td class="num hide-sm">{{ c.files }}</td></tr>{% endfor %}</table>{% else %}<p class="mut">Keine Unterordner.</p>{% endif %}
+{% if u.top_files %}<h3 style="margin-top:18px">Größte Dateien{% if u.sub %} in diesem Ordner{% endif %}</h3><table><tr><th>Datei</th><th class="num">Größe</th></tr>
+{% for f in u.top_files %}<tr><td><span class="path" style="color:var(--fg)">{{ f.path }}</span></td><td class="num">{{ f.bytes|hbytes }}</td></tr>{% endfor %}</table>{% endif %}
+{% endif %}</div>
+<div class="card"><h2>Am häufigsten übertragen</h2>
+<p class="mut" style="margin-top:-4px">{{ _("Aus den Logs der letzten {0} Tage ({1} Läufe): welche Ordner und Dateien immer wieder kopiert werden und damit Übertragungszeit kosten.", hot.days, hot.runs) }}</p>
+{% if hot.folders %}<div class="row" style="flex-wrap:wrap"><div style="flex:1 1 300px"><table><tr><th>Ordner (oberste Ebene)</th><th class="num">Übertragungen</th></tr>{% for x in hot.folders %}<tr><td>📁 {{ x.name }}</td><td class="num">{{ x.count }}</td></tr>{% endfor %}</table></div>
+<div style="flex:1 1 300px">{% if hot.files %}<table><tr><th>Datei (mehrfach übertragen)</th><th class="num">Mal</th></tr>{% for x in hot.files %}<tr><td><span class="path" style="color:var(--fg)">{{ x.path }}</span></td><td class="num">{{ x.count }}</td></tr>{% endfor %}</table>{% endif %}</div></div>
+{% else %}<p class="mut">In den aufbewahrten Logs wurde nichts übertragen.</p>{% endif %}</div>
+{% endblock %}""",
+
+"stats.html": r"""{% extends "base.html" %}{% block title %}Statistik{% endblock %}
+{% block subtitle %}<p>Übertragungen pro Monat, z. B. für Verbindungen mit Datenvolumen-Limit.</p>{% endblock %}
+{% block body %}
+{% if vol %}<div class="card"><h2>Datenvolumen {{ vol.month[5:] }}/{{ vol.month[:4] }}</h2>
+<div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><span><b>{{ vol.used|hbytes }}</b> von {{ vol.limit|hbytes }}</span><span class="{{ 'fehler' if vol.exceeded else ('gestoppt' if vol.warn else 'ok') }}">{{ vol.pct }} %</span></div>
+<div class="fm-bar" style="width:100%;height:10px;margin-top:6px"><i style="width:{{ [vol.pct,100]|min }}%;background:{{ 'var(--err)' if vol.exceeded else ('var(--warn)' if vol.warn else 'var(--ok)') }}"></i></div>
+{% if vol.exceeded and vol.stop %}<p class="fehler" style="margin-bottom:0">Limit erreicht: Automatische Läufe sind bis zum Monatsende angehalten.</p>{% endif %}
+{% if can("system.settings") %}<p class="hint"><a href="/settings/general#monitor">Limit ändern</a></p>{% endif %}</div>{% endif %}
+{% if not months %}<div class="card"><div class="empty">Noch keine Läufe gezählt.</div></div>{% else %}
+{% set mx = months|map(attribute="totals")|map(attribute="bytes")|max %}
+<div class="card"><h2>Verlauf</h2><table><tr><th>Monat</th><th style="width:38%">Übertragen</th><th class="num">Läufe</th><th class="num">ok</th><th class="num">Fehler</th><th class="num hide-sm">Kopiert</th><th class="num hide-sm">Gelöscht</th><th class="num hide-sm">Laufzeit</th></tr>
+{% for m in months %}{% set t = m.totals %}<tr class="click" onclick="document.getElementById('m{{ m.month }}').open=true;location.hash='m{{ m.month }}'">
+<td><b>{{ m.month[5:] }}/{{ m.month[:4] }}</b></td><td><div class="fm-bar" style="width:100%"><i style="width:{{ (t.bytes * 100 / mx)|round(1) if mx else 0 }}%;background:var(--acc)"></i></div><small>{{ t.bytes|hbytes }}</small></td>
+<td class="num">{{ t.runs }}</td><td class="num ok">{{ t.ok }}</td><td class="num {{ 'err' if t.fail }}">{{ t.fail }}</td><td class="num hide-sm">{{ t.copied }}</td><td class="num hide-sm">{{ t.deleted }}</td>
+<td class="num hide-sm">{{ (t.duration // 3600) }} h {{ (t.duration % 3600) // 60 }} min</td></tr>{% endfor %}</table></div>
+{% for m in months %}<details class="tpl card" id="m{{ m.month }}" {{ "open" if loop.first }} style="padding:0"><summary><b>{{ m.month[5:] }}/{{ m.month[:4] }}</b> <span class="mut">· {{ m.totals.bytes|hbytes }} · {{ m.totals.runs }} Läufe</span></summary><div class="tplbody">
+<table><tr><th>Aufgabe</th><th class="num">Übertragen</th><th class="num">Läufe</th><th class="num">ok</th><th class="num">Fehler</th><th class="num hide-sm">Testläufe</th><th class="num hide-sm">Prüfläufe ok</th><th class="num hide-sm">Laufzeit</th></tr>
+{% for j in m.jobs %}<tr><td>{{ j.name }}</td><td class="num">{{ j.bytes|hbytes }}</td><td class="num">{{ j.runs }}</td><td class="num">{{ j.ok }}</td><td class="num {{ 'err' if j.fail }}">{{ j.fail }}</td>
+<td class="num hide-sm">{{ j.dry }}</td><td class="num hide-sm">{{ j.verify_ok }}{% if j.verify_fail %} / <span class="fehler">{{ j.verify_fail }} ✖</span>{% endif %}</td><td class="num hide-sm">{{ (j.duration // 3600) }} h {{ (j.duration % 3600) // 60 }} min</td></tr>{% endfor %}</table></div></details>{% endfor %}
+{% endif %}
+<p class="hint">Gezählt werden echte Läufe (Testläufe nur in der Spalte „Testläufe“, ohne Datenmenge). Live-Runden ohne Änderung zählen nicht. Die Zahlen bleiben erhalten, auch wenn alte Logs gelöscht werden. Als Kennzahlen für Grafana: <code>/metrics</code>.</p>
+{% endblock %}""",
+
+"changelog.html": r"""{% extends "base.html" %}{% block title %}Versionshinweise{% endblock %}
+{% block subtitle %}<p>Was sich in jeder Version von MirrorSync geändert hat. Installiert ist v{{ VERSION }}.</p>{% endblock %}
+{% block actions %}<a class="btn" href="{{ release_url }}" target="_blank" rel="noopener">Auf GitHub</a>{% endblock %}
+{% block body %}
+<div class="card" style="padding:10px 16px"><div class="chips" style="margin:0">{% for e in items[:40] %}<a class="chip {{ 'active' if e.version == VERSION }}" href="#v{{ e.version }}">v{{ e.version }}</a>{% endfor %}</div></div>
+{% for e in items %}<div class="card cl" id="v{{ e.version }}"><div class="card-head" style="margin-bottom:4px"><h2>v{{ e.version }}{% if e.version == VERSION %} <span class="tag ok">installiert</span>{% endif %}</h2><small class="mut">{{ e.date }}</small></div>
+<div class="clbody">{{ e.html }}</div></div>{% else %}<div class="card"><div class="empty">Keine Versionshinweise gefunden (CHANGELOG.md fehlt im Image).</div></div>{% endfor %}
+<style>.clbody ul{margin:6px 0 10px;padding-left:20px}.clbody li{margin:3px 0}.clbody p{margin:8px 0}.clbody h4{margin:12px 0 4px}</style>
+{% endblock %}""",
+
+"offline.html": r"""<!doctype html><html lang="{{ lang_code() }}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MirrorSync · offline</title><meta name="theme-color" content="#4f46e5"><link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+<style>body{margin:0;min-height:100vh;display:grid;place-items:center;font:15px/1.5 system-ui,sans-serif;background:#f6f7f9;color:#0f172a;text-align:center;padding:20px}
+@media (prefers-color-scheme:dark){body{background:#09090b;color:#ececf1}}img{width:72px;height:72px}button{margin-top:14px;padding:9px 16px;border-radius:8px;border:0;background:#4f46e5;color:#fff;font:inherit;cursor:pointer}</style></head>
+<body><div><img src="/static/favicon.svg" alt=""><h1 style="font-size:20px">MirrorSync ist gerade nicht erreichbar</h1><p>Keine Verbindung zum Server. Prüfe das Netzwerk oder ob der Container läuft.</p><button onclick="location.reload()">Neu laden</button></div></body></html>""",
+
 "users.html": r"""{% extends "base.html" %}{% block title %}Einstellungen{% endblock %}
 {% block actions %}{% if can("users.manage") %}<a class="btn pri" href="/users/new">{{ ICON.plus }} Neuer Benutzer</a>{% endif %}{% endblock %}
 {% block body %}{% include "tabs.html" %}
@@ -2106,6 +2364,22 @@ scope();
 <div><label>Wochentage</label><div style="display:flex;gap:10px;flex-wrap:wrap">{% for d in range(7) %}<label class="check" style="margin:0"><input type="checkbox" name="restart_day_{{ d }}" {{ "checked" if d in rs.days }}> {{ day_names[d] }}</label>{% endfor %}</div></div></div>
 <div class="hint">Läuft gerade eine Aufgabe, wartet der Neustart, bis sie fertig ist (höchstens bis Mitternacht). Zeitzone des Containers.</div>
 <p><button class="btn pri">Speichern</button></p></form></div>{% endif %}
+<form method="post" class="card" id="monitor"><input type="hidden" name="section" value="monitor"><h2>Überwachung und Datenvolumen</h2>
+<p class="mut" style="margin-top:-4px">Für Uptime Kuma, Home Assistant, Grafana und andere: Zustand der Aufgaben und Kennzahlen abrufen.</p>
+<table class="chg" style="margin:6px 0 8px"><tr><td><b>Health</b></td><td><code>{{ base_url }}/health/jobs</code></td></tr>
+<tr><td></td><td><small class="mut">HTTP 200 = alles in Ordnung, 503 = Fehler, überfällig oder Löschwarnung. Eine Aufgabe: <code>/health/jobs/&lt;ID oder Name&gt;</code>, als Text: <code>?format=text</code> („OK: 3 Aufgaben ok, letzter Sync vor 5 Minuten“).</small></td></tr>
+<tr><td><b>Prometheus</b></td><td><code>{{ base_url }}/metrics</code></td></tr>
+<tr><td></td><td><small class="mut">Läufe, Datenmengen, Dauer, Zustand und freier Speicher je Aufgabe, für Grafana.</small></td></tr></table>
+<div class="hint">Zugriff mit einem API-Key mit dem Recht <code>system.monitor</code> (oder <code>jobs.view</code>): Header <code>Authorization: Bearer msk_…</code> oder <code>?key=msk_…</code> in der Adresse. Es erscheinen nur die Aufgaben, die der Key sehen darf.</div>
+<label class="check"><input type="checkbox" name="monitor_public" {{ "checked" if s.monitor_public }}> Ohne Anmeldung abrufbar (zeigt Namen und Zustand aller Aufgaben, keine Pfade oder Zugangsdaten)</label>
+<div class="section"><h3>Datenvolumen pro Monat</h3>
+<div class="row"><div style="flex:0 0 220px"><label>Limit (GB pro Monat)</label><input type="text" inputmode="decimal" name="volume_limit_gb" value="{{ s.volume_limit_gb or '' }}" placeholder="kein Limit"></div>
+<div style="flex:0 0 200px"><label>Warnen ab (%)</label><input type="text" inputmode="numeric" name="volume_warn_pct" value="{{ s.volume_warn_pct or '80' }}"></div>
+<div>{% if vol %}<label>Dieser Monat</label><div style="margin-top:8px"><b>{{ vol.used|hbytes }}</b> von {{ vol.limit|hbytes }} ({{ vol.pct }} %)</div><div class="fm-bar" style="width:100%;margin-top:6px"><i style="width:{{ [vol.pct,100]|min }}%;background:{{ 'var(--err)' if vol.exceeded else ('var(--warn)' if vol.warn else 'var(--ok)') }}"></i></div>{% endif %}</div></div>
+<label class="check"><input type="checkbox" name="volume_notify" {{ "checked" if s.volume_notify is not false }}> Benachrichtigen, wenn die Warnschwelle und wenn das Limit erreicht ist</label>
+<label class="check"><input type="checkbox" name="volume_stop" {{ "checked" if s.volume_stop }}> Bei erreichtem Limit automatische Läufe bis zum Monatsende anhalten (von Hand gestartete laufen weiter)</label>
+<div class="hint">Gezählt wird, was MirrorSync in echten Läufen überträgt. Den Verlauf je Monat und Aufgabe zeigt die Seite <a href="/stats">Statistik</a>.</div></div>
+<p><button class="btn pri">Speichern</button></p></form>
 <form method="post"><div class="card"><h2>Logs aufbewahren</h2>
 <p class="mut" style="margin-top:-4px">Jeder Lauf bekommt ein eigenes Log. Ältere Läufe werden nach jedem Lauf automatisch gelöscht.</p>
 <div class="row"><div><label>Läufe pro Aufgabe behalten</label><input type="text" inputmode="numeric" name="log_keep_runs" value="{{ s.log_keep_runs }}"><div class="hint">0 bis 1000, 0 = unbegrenzt</div></div>
@@ -2649,4 +2923,4 @@ function tog(el,c){const i=document.getElementById('cc');let l=i.value.split(/[,
 {% endblock %}""",
 }
 
-ICONS = {'dash': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>', 'folder': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>', 'audit': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/><path d="M8 13h8M8 17h5"/></svg>', 'clock': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>', 'jobs': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 1-15.5 6.2L3 16"/><path d="M3 12a9 9 0 0 1 15.5-6.2L21 8"/><path d="M21 3v5h-5"/><path d="M3 21v-5h5"/></svg>', 'storage': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="7" rx="2"/><rect x="3" y="13" width="18" height="7" rx="2"/><path d="M7 7.5h.01M7 16.5h.01"/></svg>', 'bell': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/></svg>', 'theme': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 3v18" /><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor"/></svg>', 'logout': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>', 'play': '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l12.5-7.5z"/></svg>', 'plus': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>', 'gear': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>', 'lock': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>'}
+ICONS = {'chart': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6" rx="1"/><rect x="12" y="8" width="3" height="10" rx="1"/><rect x="17" y="5" width="3" height="13" rx="1"/></svg>', 'dash': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>', 'folder': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>', 'audit': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/><path d="M8 13h8M8 17h5"/></svg>', 'clock': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>', 'jobs': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 1-15.5 6.2L3 16"/><path d="M3 12a9 9 0 0 1 15.5-6.2L21 8"/><path d="M21 3v5h-5"/><path d="M3 21v-5h5"/></svg>', 'storage': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="7" rx="2"/><rect x="3" y="13" width="18" height="7" rx="2"/><path d="M7 7.5h.01M7 16.5h.01"/></svg>', 'bell': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/></svg>', 'theme': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 3v18" /><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor"/></svg>', 'logout': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>', 'play': '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l12.5-7.5z"/></svg>', 'plus': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>', 'gear': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>', 'lock': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>'}

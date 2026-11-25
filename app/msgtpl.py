@@ -17,6 +17,9 @@ RUN_VARS = [
     ("fehler", "Anzahl Fehler", "0"), ("fehler_liste", "letzte Fehler, je Zeile „• …“", ""),
     ("fehler_block", "„Letzte Fehler:“ + Liste, oder leer", ""), ("gestartet_von", "Zeitplan, Live, Benutzername …", "Zeitplan"),
     ("art", "„Live“ bei Live-Läufen, sonst „Spiegel“", "Spiegel"),
+    ("pruefung", "Ergebnis des Prüflaufs oder leer", "1:1 gleich (1234 Dateien geprüft)"),
+    ("pruefung_block", "„Prüflauf: …“ als eigene Zeile, oder leer", "\nPrüflauf: 1:1 gleich (1234 Dateien geprüft)"),
+    ("versuch", "Wiederholung, z. B. „2 von 3“, oder leer", ""),
 ]
 RUN_FAIL_SAMPLE = {"status": "FEHLER", "status_icon": "❌", "fehler": "2", "kopiert": "15",
                    "fehler_liste": "• Daten/bild.jpg: permission denied\n• Daten/x.tmp: file changed",
@@ -25,12 +28,48 @@ EVENTS = {
     "run_ok": {
         "label": "Lauf erfolgreich", "vars": RUN_VARS,
         "title": "{status_icon} MirrorSync: {job} – {status}{testlauf}",
-        "body": "{titel}\n{quelle} → {ziel}\nDauer: {dauer_s} s, kopiert/aktualisiert: {kopiert}, gelöscht: {geloescht}, Fehler: {fehler}{fehler_block}",
+        "body": "{titel}\n{quelle} → {ziel}\nDauer: {dauer_s} s, kopiert/aktualisiert: {kopiert}, gelöscht: {geloescht}, Fehler: {fehler}{fehler_block}{pruefung_block}",
     },
     "run_fail": {
         "label": "Lauf fehlgeschlagen oder gestoppt", "vars": RUN_VARS, "sample": RUN_FAIL_SAMPLE,
         "title": "{status_icon} MirrorSync: {job} – {status}{testlauf}",
-        "body": "{titel}\n{quelle} → {ziel}\nDauer: {dauer_s} s, kopiert/aktualisiert: {kopiert}, gelöscht: {geloescht}, Fehler: {fehler}{fehler_block}",
+        "body": "{titel}\n{quelle} → {ziel}\nDauer: {dauer_s} s, kopiert/aktualisiert: {kopiert}, gelöscht: {geloescht}, Fehler: {fehler}{fehler_block}{pruefung_block}",
+    },
+    "delete_hold": {
+        "label": "Löschwarnung: Lauf angehalten",
+        "vars": [("job", "Name der Aufgabe", "NAS → Docker"), ("quelle", "Quelle", "NAS:Daten"),
+                 ("ziel", "Ziel", "Server:/backup/Daten"), ("loeschungen", "Anzahl Dateien, die gelöscht würden", "4210"),
+                 ("dateien", "Dateien im Ziel", "5000"), ("prozent", "Anteil in Prozent", "84"), ("grenze", "eingestellte Grenze in Prozent", "20"),
+                 ("beispiele", "einige betroffene Dateien, je Zeile", "• Fotos/2024/IMG_0001.jpg\n• Fotos/2024/IMG_0002.jpg"),
+                 ("link", "Adresse der Aufgabe in MirrorSync (wenn die öffentliche Adresse eingestellt ist)", "")],
+        "title": "🛑 MirrorSync: {job} angehalten – {prozent} % würden gelöscht",
+        "body": "{titel}\n{quelle} → {ziel}\n{loeschungen} von {dateien} Dateien im Ziel würden gelöscht (Grenze {grenze} %). "
+                "Das kann auf eine leere Quelle oder Ransomware hindeuten. Bitte prüfen und in MirrorSync freigeben.\n{beispiele}\n{link}",
+    },
+    "space_low": {
+        "label": "Wenig Speicher am Ziel",
+        "vars": [("job", "Name der Aufgabe", "NAS → Docker"), ("ziel", "Ziel", "Server:/backup/Daten"),
+                 ("frei", "freier Speicher am Ziel", "12,4 GB"), ("benoetigt", "voraussichtlich zu übertragen", "18,2 GB"),
+                 ("mindestens", "eingestellter Mindestplatz", "10 GB"), ("aktion", "„Lauf abgebrochen“ oder „Lauf läuft trotzdem“", "Lauf abgebrochen")],
+        "title": "💽 MirrorSync: {job} – wenig Speicher am Ziel",
+        "body": "{titel}\nZiel: {ziel}\nFrei: {frei}, benötigt: {benoetigt}, Mindestplatz: {mindestens}.\n{aktion}.",
+    },
+    "volume_limit": {
+        "label": "Datenvolumen des Monats",
+        "vars": [("monat", "Monat", "11/2026"), ("verbraucht", "übertragen in diesem Monat", "84,2 GB"),
+                 ("limit", "eingestelltes Limit", "100 GB"), ("prozent", "Anteil in Prozent", "84"),
+                 ("hinweis", "Zusatz, z. B. dass automatische Läufe angehalten sind", "")],
+        "title": "📶 MirrorSync: {prozent} % des Datenvolumens verbraucht",
+        "body": "{titel}\nIm Monat {monat} wurden {verbraucht} von {limit} übertragen.{hinweis}",
+    },
+    "report": {
+        "label": "Wochenbericht",
+        "vars": [("zeitraum", "Zeitraum", "18.11.–25.11.2026"), ("laeufe", "Anzahl Läufe", "42"), ("ok_anzahl", "davon erfolgreich", "40"),
+                 ("fehler_anzahl", "davon fehlgeschlagen", "2"), ("daten", "übertragene Datenmenge", "12,3 GB"),
+                 ("dauer", "gesamte Laufzeit", "3 h 12 min"), ("liste", "eine Zeile je Aufgabe", "• NAS → Docker: 7 Läufe, 7 ok, 1,2 GB"),
+                 ("fehler_liste", "Fehler im Zeitraum, je Zeile", ""), ("hinweise", "offene Löschwarnungen, Prüfläufe, Speicher", "")],
+        "title": "📊 MirrorSync: Wochenbericht {zeitraum}",
+        "body": "{titel}\nLäufe: {laeufe} ({ok_anzahl} ok, {fehler_anzahl} mit Fehler) · übertragen: {daten} · Laufzeit: {dauer}\n\n{liste}{fehler_liste}{hinweise}",
     },
     "login_fail": {
         "label": "Fehlgeschlagene Anmeldungen",
@@ -145,7 +184,7 @@ def make(settings, event, values, job=None):
     return title, render(t["body"], vals).strip()
 
 
-NUMERIC = {"kopiert", "geloescht", "fehler", "dauer_s", "anzahl", "versuche", "pause"}
+NUMERIC = {"kopiert", "geloescht", "fehler", "dauer_s", "anzahl", "versuche", "pause", "loeschungen", "dateien", "prozent", "grenze", "laeufe", "ok_anzahl", "fehler_anzahl"}
 
 
 def all_blank():
