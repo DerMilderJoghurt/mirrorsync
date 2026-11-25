@@ -25,7 +25,11 @@ DEFAULTS = {
     # Apprise: "lib" = URLs direkt im Container senden, "api" = an einen Apprise-API-Server
     "apprise_enabled": False, "apprise_mode": "lib", "apprise_urls": "", "apprise_api_url": "",
     "apprise_api_key": "", "apprise_tag": "",
+    # Ruhezeiten und Wochenbericht (Listen quiet_days, report_days, report_channels stehen in LIST_DEFAULTS)
+    "quiet_enabled": False, "quiet_start": "22:00", "quiet_end": "07:00", "quiet_mode": "errors",
+    "report_enabled": False, "report_time": "08:00", "report_period": "7",
 }
+LIST_DEFAULTS = {"quiet_days": [], "report_days": [0], "report_channels": []}
 
 
 JOB_FIELDS = ("notify_mode", "notify_when", "notify_webhook", "notify_webhook_url", "notify_smtp",
@@ -153,7 +157,7 @@ def event(settings, kind, values, job_cfg=None, **fields):
     return ev
 
 
-def build_event(job, status, duration, dry, log_path, settings=None, by="", mode="full"):
+def build_event(job, status, duration, dry, log_path, settings=None, by="", mode="full", extra=None):
     copied, deleted, errors = summarize_log(log_path)
     ok = status == "ok"
     end = time.time()
@@ -165,8 +169,9 @@ def build_event(job, status, duration, dry, log_path, settings=None, by="", mode
         "ende": time.strftime("%d.%m.%Y %H:%M:%S", time.localtime(end)), "dauer": _dur(duration), "dauer_s": str(duration),
         "kopiert": str(copied), "geloescht": str(deleted), "fehler": str(len(errors)), "fehler_liste": "\n".join(err5),
         "fehler_block": ("\nLetzte Fehler:\n" + "\n".join(err5)) if errors else "", "gestartet_von": by,
-        "art": "Live" if mode == "delta" else "Spiegel",
+        "art": "Live" if mode == "delta" else "Spiegel", "pruefung": "", "pruefung_block": "", "versuch": "",
     }
+    values.update(extra or {})
     return event(settings or {}, "run_ok" if ok else "run_fail", values, job,
                  job=job["name"], status=status, ok=ok, dry_run=dry, duration=duration, source=job["source"],
                  dest=job["dest"], copied=copied, deleted=deleted, errors=errors[-5:])
@@ -297,9 +302,49 @@ def send_apprise(s, ev):
 CHANNELS = {"webhook": send_webhook, "smtp": send_mail, "telegram": send_telegram, "apprise": send_apprise}
 
 
-def send(settings, ev, only=None):
-    """Schickt an alle aktiven Kanaele (oder nur einen). Liefert {kanal: None | Fehlertext}."""
+# Ruhezeiten: Hinweise (Erfolg, Sicherung, Update) werden unterdrueckt, Fehler je nach Einstellung auch
+INFO_EVENTS = {"run_ok", "backup_ok", "backup_skip", "update_available"}
+NEVER_QUIET = {"test", "report"}
+
+
+def _hm(v, default):
+    v = (v or "").strip()
+    return v if len(v) == 5 and v[2] == ":" and v[:2].isdigit() and v[3:].isdigit() else default
+
+
+def quiet_now(settings, now=None):
+    """True, wenn gerade Ruhezeit ist (Beginn bis Ende, auch ueber Mitternacht; Tage = Wochentag des Beginns)."""
+    if not settings.get("quiet_enabled"):
+        return False
+    now = now or time.localtime()
+    t = f"{now.tm_hour:02d}:{now.tm_min:02d}"
+    a, b = _hm(settings.get("quiet_start"), "22:00"), _hm(settings.get("quiet_end"), "07:00")
+    days = settings.get("quiet_days")
+    days = list(range(7)) if days in (None, "", []) else [int(d) for d in days]
+    wd = now.tm_wday
+    if a == b:
+        return wd in days
+    if a < b:
+        return wd in days and a <= t < b
+    return (wd in days and t >= a) or (((wd - 1) % 7) in days and t < b)
+
+
+def quiet_blocks(settings, ev):
+    """Soll dieses Ereignis wegen der Ruhezeit nicht gesendet werden?"""
+    kind = ev.get("event") or ""
+    if kind in NEVER_QUIET or not quiet_now(settings):
+        return False
+    if kind in INFO_EVENTS or (kind in ("run_ok", "run_fail") and ev.get("ok")):
+        return True
+    return settings.get("quiet_mode") == "none"
+
+
+def send(settings, ev, only=None, force=False):
+    """Schickt an alle aktiven Kanaele (oder nur einen). Liefert {kanal: None | Fehlertext}.
+    In der Ruhezeit bleibt das Ergebnis leer, ausser force=True (Tests)."""
     results = {}
+    if not only and not force and quiet_blocks(settings, ev):
+        return results
     for name, fn in CHANNELS.items():
         if only and name != only:
             continue

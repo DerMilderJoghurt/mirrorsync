@@ -20,6 +20,7 @@ import uuid
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
+from apscheduler.triggers.date import DateTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 import flask
 from flask import Flask, abort, g, has_request_context, redirect, request, send_file, session, url_for
@@ -33,8 +34,12 @@ import bwlimit
 import configparser
 import db as dbmod
 import files as filemgr
+import changelog
 import geoip
 import i18n
+import monitor
+import remote_exec
+import wol
 import update
 import selfupdate
 import preview
@@ -128,9 +133,10 @@ app.jinja_env.globals["SELFUPD_OK"] = lambda: os.path.exists(selfupdate.SOCK)
 app.jinja_env.globals["RELEASE_URL"] = f"https://github.com/{update.REPO}/releases/tag/v{VERSION}"
 app.jinja_env.globals["UPDATE"] = lambda: update_status() if g.get("user") else None
 notify.VERSION = VERSION
+users.CURRENT_VERSION = VERSION
 app.jinja_env.globals["ICON"] = {k: Markup(v) for k, v in ICONS.items()}
 app.jinja_env.globals["STATUS"] = {"ok": "OK", "fehler": "Fehler", "laeuft": "läuft",
-                                    "gestoppt": "gestoppt", "abgebrochen": "abgebrochen"}
+                                    "gestoppt": "gestoppt", "abgebrochen": "abgebrochen", "freigabe": "Freigabe nötig"}
 
 _lock = threading.RLock()
 _running = {}  # job_id -> subprocess.Popen
@@ -150,6 +156,9 @@ except Exception as _e:   # nichts uebernommen, JSON-Dateien unveraendert -> lie
           "Es wurde nichts verändert. Bitte die genannte Datei in config/ prüfen oder reparieren und neu starten.",
           flush=True)
     raise SystemExit(1)
+
+
+remote_exec.RCLONE_CONF = RCLONE_CONF
 
 
 def load_jobs():
@@ -334,12 +343,7 @@ def build_bisync_cmd(job, job_id, dry_run, resync=False):
         cmd += ["--backup-dir1", job["source"].rstrip("/") + ".versions/" + stamp,
                 "--backup-dir2", side_b.rstrip("/") + ".versions/" + stamp]
     cmd += compare_flags(job, bisync=True)
-    if selection_list(job):   # nur die Auswahl wird abgeglichen, auf beiden Seiten bleibt alles andere unberuehrt
-        for rule in selection_filters(job):
-            cmd += ["--filter", rule]
-    else:
-        for pattern in exclude_list(job):
-            cmd += ["--exclude", pattern]
+    cmd += filter_args(job)   # mit Auswahl wird nur sie abgeglichen, auf beiden Seiten bleibt alles andere unberuehrt
     return _cmd_tail(job, cmd)
 
 
@@ -383,6 +387,55 @@ def compare_flags(job, bisync=False):
     return []
 
 
+NOSYNC_FILE = ".nosync"
+
+
+def nosync_on(job):
+    """Ordner mit einer Datei .nosync ueberspringen (neue Aufgaben: an; Aufgaben aus aelteren Versionen: aus,
+    weil das Suchen nach .nosync die Quelle einmal mehr durchlaeuft)."""
+    return bool((job or {}).get("nosync"))
+
+
+def nosync_patterns(job):
+    """Ordner mit .nosync (beim letzten vollen Lauf gefunden) als Ausschlussmuster '/Ordner/**'."""
+    if not nosync_on(job):
+        return []
+    out = []
+    for d in job.get("nosync_dirs") or []:
+        d = d.strip("/")
+        out.append("/" + GLOB_SPECIAL.sub(r"\\\1", d) + "/**" if d else "/**")
+    return out
+
+
+def nosync_scan(job):
+    """Quelle nach .nosync-Dateien durchsuchen. Liefert (Liste der Ordner relativ zur Quelle, Fehlertext)."""
+    rc, out = rclone("lsf", "-R", "--files-only", "--include", NOSYNC_FILE, job["source"], timeout=3600)
+    if rc != 0:
+        return None, out[-300:]
+    dirs = []
+    for line in out.splitlines():
+        line = line.strip()
+        if line == NOSYNC_FILE or line.endswith("/" + NOSYNC_FILE):
+            dirs.append(line[:-len(NOSYNC_FILE)].strip("/"))
+    return sorted(set(dirs)), None
+
+
+def filter_args(job):
+    """Filter einer Aufgabe fuer rclone (Sync, Vorabpruefung, Pruefung, Groesse): Auswahl bzw. Ausschluesse, .nosync.
+    .nosync wird als Ausschluss uebergeben (nicht --exclude-if-present): so bleibt der Ordner im Ziel unberuehrt."""
+    out = []
+    ns = nosync_patterns(job)
+    if selection_list(job):
+        for p in ns:
+            out += ["--filter", "- " + p]
+        for rule in selection_filters(job):
+            out += ["--filter", rule]
+    else:
+        for pattern in exclude_list(job) + ns:
+            out += ["--exclude", pattern]
+    return out
+
+
 def _cmd_tail(job, cmd):
     cmd = cmd + SPEED_FLAGS[speed_of(job)]   # eigene Optionen stehen danach und haben damit Vorrang
     extra = shlex.split(job.get("extra_flags", "") or "")
@@ -415,12 +468,7 @@ def build_sync_cmd(job, dry_run, mode="full", max_age=None):
     if job.get("versioning"):
         cmd += ["--backup-dir", effective_dest(job).rstrip("/") + ".versions/" + stamp]
     cmd += compare_flags(job)
-    if selection_list(job):   # nur ausgewaehlte Dateien/Ordner; im Ziel bleibt alles andere unberuehrt
-        for rule in selection_filters(job):
-            cmd += ["--filter", rule]
-    else:
-        for pattern in exclude_list(job):
-            cmd += ["--exclude", pattern]
+    cmd += filter_args(job)   # mit Auswahl nur die ausgewaehlten Dateien/Ordner; im Ziel bleibt alles andere unberuehrt
     if job.get("delete_excluded") and not delta and not selection_list(job):
         cmd.append("--delete-excluded")
     return _cmd_tail(job, cmd)
@@ -434,12 +482,14 @@ LOG_DEFAULTS = {"log_keep_runs": "50", "log_keep_days": "30", "log_keep_unit": "
                 "lock_attempts": "5", "lock_minutes": "15", "lock_notify": True, "require_2fa_mode": "off",
                 "fail_notify": "", "fail_notify_minutes": "15", "audit_keep_days": "365", "update_check": True, "update_interval": "60", "update_notify": False, "update_notify_channels": [],
                 "selfupdate_auto": False, "selfupdate_time": "04:00", "selfupdate_prune": True,
-                "restart_auto": False, "restart_time": "04:30", "restart_days": [6]}
+                "restart_auto": False, "restart_time": "04:30", "restart_days": [6],
+                "monitor_public": False, "volume_limit_gb": "", "volume_warn_pct": "80", "volume_notify": True, "volume_stop": False}
 RUN_ID_RE = re.compile(r"^[A-Za-z0-9_.-]{1,64}$")
 
 
 def load_settings():
     data = dict(notify.DEFAULTS, **LOG_DEFAULTS)
+    data.update(json.loads(json.dumps(notify.LIST_DEFAULTS)))
     data.update(json.loads(json.dumps(backup.AUTO_DEFAULTS)))
     data.update(DB.get_map("settings"))
     return data
@@ -800,12 +850,12 @@ def migrate_logs():
         save_jobs(jobs)
 
 
-def send_notifications(job_id, job, status, duration, dry, log_path, by="", mode="full"):
+def send_notifications(job_id, job, status, duration, dry, log_path, by="", mode="full", extra=None):
     settings = load_settings()
     when, eff = notify.effective(settings, job)
     if not notify.should_send(when, status == "ok"):
         return
-    ev = notify.build_event(dict(job, dest=effective_dest(job)), status, duration, dry, log_path, settings, by, mode)
+    ev = notify.build_event(dict(job, dest=effective_dest(job)), status, duration, dry, log_path, settings, by, mode, extra)
     results = notify.send(eff, ev)
     if results:
         with open(log_path, "a", encoding="utf-8") as f:
@@ -846,14 +896,578 @@ def prune_versions(job):
     return lines
 
 
-def _watch(job_id, job, proc, logf, started, dry, by, run_id, log_path, mode="full"):
-    rc = proc.wait()
-    if rc == 0 and not dry and not job.get("dry_run"):
+# ---------------------------------------------------------------- Lauf: Ablauf in Schritten
+class RunHandle:
+    """Ein laufender Auftrag. Er kann aus mehreren Schritten bestehen (Wake-on-LAN, Skript, Vorabpruefung, rclone,
+    Pruefung, Snapshot); terminate() bricht den gerade laufenden rclone-Schritt ab und verhindert alle weiteren."""
+
+    def __init__(self):
+        self.proc = None
+        self.stopped = False
+        self._l = threading.Lock()
+
+    def set(self, proc):
+        with self._l:
+            self.proc = proc
+            if self.stopped:
+                try:
+                    proc.terminate()
+                except Exception:  # noqa: BLE001
+                    pass
+
+    def terminate(self):
+        with self._l:
+            self.stopped = True
+            if self.proc is not None and self.proc.poll() is None:
+                self.proc.terminate()
+
+    def run(self, cmd, out):
+        """rclone-Schritt starten und warten. out = offene Datei fuer stdout/stderr."""
+        if self.stopped:
+            return -15
+        proc = subprocess.Popen(cmd, stdout=out, stderr=subprocess.STDOUT)
+        self.set(proc)
+        return proc.wait()
+
+
+VERIFY_WHEN = ("off", "always", "daily", "weekly")
+VERIFY_METHODS = ("auto", "size", "download")
+SNAPSHOT_TYPES = ("off", "zfs", "btrfs", "command")
+SPACE_MODES = ("off", "warn", "stop")
+NET_ERRORS = re.compile(r"connection refused|connection reset|connection timed out|i/o timeout|no route to host|network is unreachable|"
+                        r"host is down|broken pipe|unexpected eof|\bEOF\b|dial tcp|failed to dial|couldn't connect|could not connect|"
+                        r"no such host|temporary failure in name resolution|tls handshake timeout|context deadline exceeded|"
+                        r"STATUS_NETWORK|STATUS_CONNECTION|connection lost|ssh: handshake failed|operation timed out|"
+                        r"503 Service Unavailable|502 Bad Gateway|504 Gateway Time", re.I)
+
+
+def _int(v, default=0, lo=None, hi=None):
+    try:
+        n = int(float(str(v).strip().replace(",", ".")))
+    except (TypeError, ValueError):
+        return default
+    if lo is not None:
+        n = max(lo, n)
+    if hi is not None:
+        n = min(hi, n)
+    return n
+
+
+def _num(v):
+    try:
+        return float(str(v).strip().replace(",", "."))
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def human_bytes(n):
+    n = float(n or 0)
+    for u in ("B", "KB", "MB", "GB", "TB"):
+        if abs(n) < 1024 or u == "TB":
+            return (f"{n:.0f} {u}" if u == "B" or n >= 100 else f"{n:.1f} {u}").replace(".", ",")
+        n /= 1024
+    return f"{n:.1f} PB"
+
+
+def retry_delays(job):
+    """'5, 15, 60' -> [5, 15, 60] (Minuten, hoechstens 10 Versuche)."""
+    out = []
+    for p in re.split(r"[\s,;]+", str(job.get("retry") or "")):
+        if p.strip().isdigit() and 0 < int(p) <= 10080:
+            out.append(int(p))
+    return out[:10]
+
+
+def verify_of(job):
+    v = (job or {}).get("verify")
+    return v if v in VERIFY_WHEN else "off"
+
+
+def verify_due(job):
+    when = verify_of(job)
+    if when == "always":
+        return True
+    if when == "off":
+        return False
+    last = monitor._ts((job.get("last_verify") or {}).get("at") or "")
+    return not last or time.time() - last > (20 * 3600 if when == "daily" else int(6.5 * 86400))
+
+
+def _dest_root(job):
+    d = effective_dest(job).strip()
+    return d.split(":", 1)[0] + ":" if ":" in d and not d.startswith("/") else d
+
+
+def _wol_probe(job):
+    """Pruefung, ob das Ziel erreichbar ist: eigener Host:Port, sonst Host/Port des Speicherorts, sonst rclone."""
+    chk = (job.get("wol_check") or "").strip()
+    host = port = None
+    if chk:
+        host, _, port = chk.rpartition(":") if ":" in chk else (chk, "", "22")
+    else:
+        info = remote_exec.remote_info(remote_exec.remote_of(job.get("dest")))
+        if info and info.get("host") and info.get("port"):
+            host, port = info["host"], info["port"]
+    if host and str(port).isdigit():
+        return lambda: wol.tcp_ok(host, int(port)), f"{host}:{port}"
+    root = _dest_root(job)
+    return (lambda: rclone("lsjson", "--stat", "--max-depth", "0", root, timeout=15)[0] == 0), root
+
+
+def _wol_wake(job, w, handle):
+    """True = von MirrorSync geweckt, False = war schon wach."""
+    probe, what = _wol_probe(job)
+    if probe():
+        w(i18n.t("=== Wake-on-LAN: Ziel {0} ist schon erreichbar. ===", what))
+        return False
+    mac = wol.clean_mac(job.get("wol_mac"))
+    try:
+        wol.send(mac, job.get("wol_broadcast") or "255.255.255.255", _int(job.get("wol_port"), 9, 1, 65535))
+    except OSError as e:
+        w(i18n.t("=== Wake-on-LAN: Senden fehlgeschlagen: {0} ===", e))
+        return False
+    wait_s = _int(job.get("wol_wait"), 300, 10, 1800)
+    w(i18n.t("=== Wake-on-LAN: {0} geweckt, warte bis zu {1} s auf {2} … ===", mac, wait_s, what))
+    secs = wol.wait(probe, wait_s, stop=lambda: handle.stopped)
+    if secs is None:
+        w(i18n.t("=== Wake-on-LAN: {0} nach {1} s nicht erreichbar, der Lauf wird trotzdem versucht. ===", what, wait_s))
+    else:
+        w(i18n.t("=== Wake-on-LAN: Ziel nach {0} s erreichbar. ===", secs))
+        time.sleep(5)   # Dienste (SMB, SSH) kurz hochkommen lassen
+    return True
+
+
+def _wol_sleep(job_id, job, w):
+    host = job.get("wol_sleep_host") or (remote_exec.remote_of(job.get("dest"))
+                                         if remote_exec.remote_of(job.get("dest")) in remote_exec.ssh_remotes() else "")
+    mac = wol.clean_mac(job.get("wol_mac"))
+    others = [j.get("name") for jid, j in load_jobs().items() if jid != job_id and jid in _running and wol.clean_mac(j.get("wol_mac")) == mac]
+    if others:
+        w(i18n.t("=== Wake-on-LAN: Ziel bleibt wach, weil noch {0} läuft. ===", ", ".join(others)))
+        return
+    if not host:
+        w(i18n.t("=== Wake-on-LAN: Schlafenlegen geht nur über einen SFTP-Speicherort (SSH). Bitte unter „Schlafen legen über“ wählen. ==="))
+        return
+    cmd = (job.get("wol_sleep_cmd") or "systemctl suspend").strip()
+    w(i18n.t("=== Wake-on-LAN: Ziel wird schlafen gelegt ({0} auf {1}) ===", cmd, host))
+    rc, out = remote_exec.run(host, "nohup sh -c " + shlex.quote("sleep 5; " + cmd) + " >/dev/null 2>&1 &", timeout=60)
+    if rc != 0:
+        w(i18n.t("=== Wake-on-LAN: Schlafenlegen fehlgeschlagen (Code {0}): {1} ===", rc, out.strip()[-300:]))
+
+
+def _script(job, job_id, which, w, run_id, status=""):
+    cmd = (job.get(f"script_{which}") or "").strip()
+    host = job.get("script_host") or ""
+    where = i18n.t("auf {0} (SSH)", host) if host else i18n.t("im Container")
+    w(i18n.t("=== Skript vor dem Lauf ({0}) ===", where) if which == "pre" else i18n.t("=== Skript nach dem Lauf ({0}) ===", where))
+    env = {"MS_JOB_ID": job_id, "MS_JOB_NAME": job.get("name", ""), "MS_SOURCE": job.get("source", ""),
+           "MS_DEST": effective_dest(job), "MS_RUN_ID": run_id, "MS_STATUS": status}
+    rc, out = remote_exec.run(host, cmd, timeout=_int(job.get("script_timeout"), 600, 5, 86400), env=env)
+    for line in out.splitlines()[-200:]:
+        w("  " + line)
+    w(i18n.t("=== Skript beendet, Code {0} ===", rc))
+    return rc == 0
+
+
+def snapshot_name(job_id):
+    return f"mirrorsync-{job_id}-{datetime.datetime.now():%Y%m%d-%H%M%S}"
+
+
+def _snapshot(job, job_id, w):
+    """Snapshot am Ziel (ZFS, Btrfs oder eigener Befehl), danach alte MirrorSync-Snapshots aufraeumen. Liefert Name oder None."""
+    typ = job.get("snapshot")
+    host = job.get("snapshot_host") or ""
+    target = (job.get("snapshot_target") or "").strip()
+    sudo = "sudo -n " if job.get("snapshot_sudo") else ""
+    name = snapshot_name(job_id)
+    q = shlex.quote
+    if typ == "zfs":
+        cmd = f"{sudo}zfs snapshot {q(target + '@' + name)}"
+    elif typ == "btrfs":
+        sdir = (job.get("snapshot_dir") or "").rstrip("/")
+        cmd = f"{sudo}btrfs subvolume snapshot -r {q(target)} {q(sdir + '/' + name)}"
+    else:
+        cmd = msgtpl.render(job.get("snapshot_cmd") or "", {"name": name, "job": job.get("name", ""), "job_id": job_id,
+                                                           "date": time.strftime("%Y-%m-%d_%H%M%S"), "dest": effective_dest(job)})
+    w(i18n.t("=== Snapshot am Ziel: {0} ===", name))
+    rc, out = remote_exec.run(host, cmd, timeout=600)
+    for line in out.strip().splitlines()[-20:]:
+        w("  " + line)
+    if rc != 0:
+        w(i18n.t("=== Snapshot fehlgeschlagen (Code {0}) ===", rc))
+        return None
+    keep = _int(job.get("snapshot_keep"), 0, 0, 10000)
+    if keep and typ in ("zfs", "btrfs"):
+        prefix = f"mirrorsync-{job_id}-"
+        if typ == "zfs":
+            rc, out = remote_exec.run(host, f"{sudo}zfs list -H -t snapshot -o name -s creation -d 1 {q(target)}", timeout=120)
+            snaps = [x.split("@", 1)[1] for x in out.split() if "@" in x and x.split("@", 1)[1].startswith(prefix)] if rc == 0 else []
+        else:
+            rc, out = remote_exec.run(host, f"ls -1 {q(sdir)}", timeout=60)
+            snaps = sorted(x for x in out.split() if x.startswith(prefix)) if rc == 0 else []
+        for old in snaps[:-keep] if len(snaps) > keep else []:
+            dcmd = (f"{sudo}zfs destroy {q(target + '@' + old)}" if typ == "zfs"
+                    else f"{sudo}btrfs subvolume delete {q(sdir + '/' + old)}")
+            drc, dout = remote_exec.run(host, dcmd, timeout=600)
+            w(i18n.t("Alter Snapshot entfernt: {0}", old) if drc == 0 else i18n.t("Snapshot {0} konnte nicht entfernt werden: {1}", old, dout.strip()[-200:]))
+    return name
+
+
+def _parse_dry(path):
+    """Ausgabe eines Testlaufs: (geloescht, ersetzt, Bytes zu kopieren, Beispiele geloescht)."""
+    deleted = replaced = nbytes = 0
+    examples = []
+    rx = re.compile(r"(?:NOTICE|INFO)\s*: (.+?): Skipped (copy|delete|move into backup dir|move) as --dry-run is set(?: \(size ([\d.]+)([KMGTPE]?i?)\))?")
+    mult = {"": 1, "K": 1024, "Ki": 1024, "M": 1024 ** 2, "Mi": 1024 ** 2, "G": 1024 ** 3, "Gi": 1024 ** 3, "T": 1024 ** 4, "Ti": 1024 ** 4}
+    try:
+        with open(path, encoding="utf-8", errors="replace") as f:
+            for line in f:
+                m = rx.search(line)
+                if not m:
+                    continue
+                kind = m.group(2)
+                if kind == "copy":
+                    if m.group(3):
+                        nbytes += int(float(m.group(3)) * mult.get(m.group(4) or "", 1))
+                elif kind == "move":
+                    replaced += 1
+                else:
+                    deleted += 1
+                    if len(examples) < 20:
+                        examples.append(m.group(1))
+    except OSError:
+        pass
+    return deleted, replaced, nbytes, examples
+
+
+def _dest_count(job):
+    rc, out = rclone("size", "--json", *filter_args(job), effective_dest(job), timeout=3600)
+    try:
+        return int(json.loads(out).get("count") or 0) if rc == 0 else None
+    except ValueError:
+        return None
+
+
+def dest_space(job):
+    """Freier Speicher am Ziel (rclone about). None, wenn der Speicherort das nicht meldet."""
+    for path in (effective_dest(job), _dest_root(job)):
+        rc, out = rclone("about", "--json", path, timeout=60)
+        if rc == 0:
+            try:
+                d = json.loads(out)
+            except ValueError:
+                continue
+            if d.get("free") is not None:
+                return {"free": int(d["free"]), "total": int(d.get("total") or 0) or None,
+                        "at": time.strftime("%Y-%m-%d %H:%M:%S")}
+    return None
+
+
+def _precheck(job, job_id, w, handle, mode, max_age, info):
+    """Testlauf vor dem echten Lauf: Loeschwarnung und Speicherplatz. Liefert Code zum Abbrechen oder None."""
+    guard = _int(job.get("delete_guard"), 0, 0, 100)
+    space = job.get("space_check") if job.get("space_check") in SPACE_MODES and mode == "full" else "off"
+    if not guard and space == "off":
+        return None
+    w(i18n.t("=== Vorabprüfung: Testlauf, um Löschungen und Platzbedarf zu ermitteln … ==="))
+    tmp = os.path.join(LOG_DIR, job_id, f".precheck-{uuid.uuid4().hex[:8]}.log")
+    try:
+        with open(tmp, "w", encoding="utf-8") as out:
+            rc = handle.run(build_sync_cmd(job, True, mode, max_age), out)
+        if handle.stopped:
+            return -15
+        if rc != 0:
+            w(i18n.t("=== Vorabprüfung nicht möglich (Code {0}), der Lauf startet ohne sie. ===", rc))
+            return None
+        deleted, replaced, nbytes, examples = _parse_dry(tmp)
+    finally:
         try:
-            for line in prune_versions(job):
-                logf.write(line + "\n")
-        except Exception as e:   # Aufraeumen darf den Lauf nicht scheitern lassen
-            logf.write(f"Versionen aufräumen: {e}\n")
+            os.remove(tmp)
+        except OSError:
+            pass
+    w(i18n.t("Vorabprüfung: {0} zu kopieren ({1}), {2} zu löschen, {3} würden ersetzt.", "", human_bytes(nbytes), deleted, replaced).replace(" ()", "").replace(":  ", ": "))
+    min_n = _int(job.get("delete_guard_min"), 10, 1, 10 ** 9)
+    if guard and deleted >= min_n and not job.get("no_delete"):
+        total = _dest_count(job)
+        pct = deleted * 100.0 / total if total else 0.0
+        w(i18n.t("Löschwarnung: {0} von {1} Dateien im Ziel würden gelöscht ({2} %), Grenze {3} %.", deleted, total if total is not None else "?",
+                 f"{pct:.1f}".replace(".", ","), guard))
+        if total and pct >= guard:
+            info["hold"] = {"at": time.strftime("%Y-%m-%d %H:%M:%S"), "deleted": deleted, "replaced": replaced, "total": total,
+                            "pct": round(pct, 1), "threshold": guard, "examples": examples, "by": info.get("by", "")}
+            w(i18n.t("=== Lauf angehalten: Zu viele Löschungen. Nichts wurde verändert. Bitte prüfen und die Aufgabe freigeben. ==="))
+            return 3
+    elif guard:
+        w(i18n.t("Löschwarnung: {0} Löschungen, keine Warnung (ab {1} Dateien und {2} %).", deleted, min_n, guard))
+    if space != "off":
+        sp = dest_space(job)
+        if sp is None:
+            w(i18n.t("Speicherplatz am Ziel lässt sich nicht ermitteln (der Speicherort meldet ihn nicht), Prüfung entfällt."))
+        else:
+            info["space"] = sp
+            min_b = int(_num(job.get("space_min_gb")) * 1024 ** 3)
+            need = nbytes
+            low = need > sp["free"] or (min_b and sp["free"] - need < min_b)
+            w(i18n.t("Speicher am Ziel: {0} frei, benötigt etwa {1}, Mindestplatz {2}.", human_bytes(sp["free"]), human_bytes(need),
+                     human_bytes(min_b) if min_b else "–"))
+            if low:
+                info["space_low"] = {"free": sp["free"], "need": need, "min": min_b, "stop": space == "stop"}
+                if space == "stop":
+                    w(i18n.t("=== Abgebrochen: Am Ziel ist nicht genug Platz. Nichts wurde verändert. ==="))
+                    return 4
+                w(i18n.t("=== Warnung: Am Ziel wird der Platz knapp. Der Lauf startet trotzdem. ==="))
+    return None
+
+
+def _verify(job, job_id, w, handle):
+    """Pruefung nach dem Lauf (rclone check): Sind Quelle und Ziel 1:1 gleich?"""
+    method = job.get("verify_method") if job.get("verify_method") in VERIFY_METHODS else "auto"
+    comb = os.path.join(LOG_DIR, job_id, f".verify-{uuid.uuid4().hex[:8]}.txt")
+    tmp = comb + ".log"
+    cmd = ["rclone", "check", job["source"], effective_dest(job), "--config", RCLONE_CONF, "--combined", comb,
+           "--log-level", "NOTICE"]
+    if method == "download":
+        cmd.append("--download")
+    elif method == "size":
+        cmd.append("--size-only")
+    if job.get("no_delete") and not is_bisync(job):
+        cmd.append("--one-way")   # ohne Loeschen darf das Ziel mehr enthalten
+    cmd += filter_args(job) + ["--checkers", SPEED_FLAGS[speed_of(job)][3] if len(SPEED_FLAGS[speed_of(job)]) > 3 else "8"]
+    tt = bwlimit.timetable(bwlimit.for_job(load_settings(), job))
+    if tt and method == "download":
+        cmd += ["--bwlimit", tt]
+    label = {"auto": i18n.t("Prüfsumme, sonst Größe"), "size": i18n.t("nur Größe"), "download": i18n.t("Inhalt Byte für Byte")}[method]
+    w("")
+    w(i18n.t("=== Prüflauf: Ist das Ziel 1:1 wie die Quelle? (Vergleich: {0}) ===", label))
+    w("$ " + " ".join(shlex.quote(c) for c in cmd))
+    t0 = time.time()
+    try:
+        with open(tmp, "w", encoding="utf-8") as out:
+            rc = handle.run(cmd, out)
+        counts = {"=": 0, "+": 0, "-": 0, "*": 0, "!": 0}
+        samples = []
+        try:
+            with open(comb, encoding="utf-8", errors="replace") as f:
+                for line in f:
+                    k, _, path = line.rstrip("\n").partition(" ")
+                    if k in counts:
+                        counts[k] += 1
+                        if k != "=" and len(samples) < 50:
+                            samples.append((k, path))
+        except OSError:
+            pass
+        with open(tmp, encoding="utf-8", errors="replace") as f:
+            out_txt = f.read()
+    finally:
+        for p in (comb, tmp):
+            try:
+                os.remove(p)
+            except OSError:
+                pass
+    res = {"at": time.strftime("%Y-%m-%d %H:%M:%S"), "method": method, "matched": counts["="], "missing": counts["+"],
+           "extra": counts["-"], "differ": counts["*"], "errors": counts["!"], "duration": int(time.time() - t0)}
+    res["hash"] = "No common hash" not in out_txt and method != "size"
+    if handle.stopped:
+        res["result"] = "stopped"
+        w(i18n.t("=== Prüflauf abgebrochen ==="))
+        return res
+    names = {"+": i18n.t("fehlt im Ziel"), "-": i18n.t("nur im Ziel"), "*": i18n.t("Inhalt unterschiedlich"), "!": i18n.t("nicht lesbar")}
+    for k, path in samples:
+        w(f"  {k} {path}  ({names[k]})")
+    diff = res["missing"] + res["extra"] + res["differ"] + res["errors"]
+    if not res["hash"] and method == "auto":
+        w(i18n.t("Hinweis: Quelle und Ziel haben keine gemeinsame Prüfsumme, verglichen wurden Größen. Für einen echten Inhaltsvergleich bei der Aufgabe „Inhalt Byte für Byte“ wählen."))
+    if rc != 0 and not diff:
+        res["result"] = "error"
+        tail = [x for x in out_txt.strip().splitlines() if x.strip()][-3:]
+        w(i18n.t("=== Prüflauf fehlgeschlagen (Code {0}) ===", rc))
+        for x in tail:
+            w("  " + re.sub(r"^\d{4}/\d\d/\d\d \d\d:\d\d:\d\d (ERROR|NOTICE) ?: ?", "", x))
+    elif diff:
+        res["result"] = "diff"
+        w(i18n.t("=== Prüflauf: Ziel weicht ab. {0} gleich, {1} fehlen im Ziel, {2} nur im Ziel, {3} unterschiedlich, {4} nicht lesbar. ===",
+                 res["matched"], res["missing"], res["extra"], res["differ"], res["errors"]))
+    else:
+        res["result"] = "ok"
+        w(i18n.t("=== Prüflauf: Ziel ist 1:1 gleich wie die Quelle ({0} Dateien geprüft). ===", res["matched"]))
+    return res
+
+
+def verify_text(v):
+    if not v:
+        return ""
+    r = v.get("result")
+    if r == "ok":
+        return i18n.t("1:1 gleich ({0} Dateien geprüft)", v.get("matched", 0))
+    if r == "diff":
+        return i18n.t("{0} Abweichungen", v.get("missing", 0) + v.get("extra", 0) + v.get("differ", 0) + v.get("errors", 0))
+    if r == "error":
+        return i18n.t("Prüflauf fehlgeschlagen")
+    return ""
+
+
+def _pipeline(job_id, job, handle, cmd_fn, logf, started, dry, by, run_id, log_path, mode, opts):
+    """Alle Schritte eines Laufs nacheinander (im Hintergrund)."""
+    info = {"attempt": opts.get("retry_attempt", 0), "by": by}
+    rc = None
+
+    def w(text):
+        try:
+            logf.write(text + "\n")
+        except (ValueError, OSError):
+            pass
+    woke = False
+    try:
+        full = mode == "full"
+        if job.get("wol_mac") and mode in ("full", "verify") and wol.clean_mac(job.get("wol_mac")):
+            woke = _wol_wake(job, w, handle)
+        if handle.stopped:
+            rc = -15
+        if rc is None and full and not dry and (job.get("script_pre") or "").strip():
+            if not _script(job, job_id, "pre", w, run_id) and job.get("script_pre_fail") != "continue":
+                w(i18n.t("=== Abgebrochen: Das Skript vor dem Lauf ist fehlgeschlagen. Gespiegelt wurde nichts. ==="))
+                rc, info["no_retry"] = 5, True
+        if rc is None and nosync_on(job) and mode in ("full", "verify"):
+            dirs, err = nosync_scan(job)
+            if err is None:
+                job = dict(job, nosync_dirs=dirs)
+                update_job(job_id, nosync_dirs=dirs)
+                if dirs:
+                    w(i18n.t("=== .nosync: {0} Ordner werden übersprungen: {1} ===", len(dirs), ", ".join(d or "/" for d in dirs[:10]) + (" …" if len(dirs) > 10 else "")))
+            else:
+                w(i18n.t("=== .nosync: Suche fehlgeschlagen ({0}), es gelten die Ordner vom letzten Lauf. ===", err.strip()[-200:]))
+        if rc is None and mode in ("full", "livesync") and not dry and not is_bisync(job) and not opts.get("guard_ok"):
+            rc = _precheck(job, job_id, w, handle, mode, opts.get("max_age"), info)
+        if rc is None and mode == "verify":
+            v = _verify(job, job_id, w, handle)
+            info["verify"] = v
+            rc = -15 if v["result"] == "stopped" else (0 if v["result"] == "ok" else 1)
+            info["no_retry"] = True
+        elif rc is None:
+            cmd = cmd_fn(job)
+            w("$ " + " ".join(shlex.quote(c) for c in cmd) + "\n")
+            rc = handle.run(cmd, logf)
+            if rc == 0 and not dry:
+                try:
+                    for line in prune_versions(job):
+                        w(line)
+                except Exception as e:   # Aufraeumen darf den Lauf nicht scheitern lassen
+                    w(f"Versionen aufräumen: {e}")
+            if rc == 0 and full and not dry and verify_due(job):
+                v = _verify(job, job_id, w, handle)
+                if v["result"] != "stopped":
+                    info["verify"] = v
+                if v["result"] in ("diff", "error"):
+                    info["no_retry"] = True
+            if rc == 0 and full and not dry and job.get("snapshot") in SNAPSHOT_TYPES[1:] and not handle.stopped:
+                name = _snapshot(job, job_id, w)
+                info["snapshot"] = name or False
+                if not name:
+                    info["no_retry"] = True
+    except Exception as e:   # noqa: BLE001  ein Fehler im Ablauf darf die Aufgabe nicht haengen lassen
+        w(i18n.t("=== Interner Fehler: {0} ===", f"{type(e).__name__}: {e}"))
+        rc = rc if rc not in (None, 0) else 1
+    if rc is None:
+        rc = 1
+    if mode == "full" and not dry and (job.get("script_post") or "").strip() and not (rc == 3 or rc == 4):
+        okish = rc == 0 and (info.get("verify") or {}).get("result") in (None, "ok") and info.get("snapshot") is not False
+        when = job.get("script_post_when") or "always"
+        if when == "always" or (when == "ok") == okish:
+            if not _script(job, job_id, "post", w, run_id, "ok" if okish else "fehler"):
+                info["script_post_failed"] = True
+                info["no_retry"] = True
+    info["retry"] = _retry_plan(job_id, job, rc, info, mode, dry, log_path, w)
+    if woke and job.get("wol_sleep") and not info["retry"]:
+        try:
+            _wol_sleep(job_id, job, w)
+        except Exception as e:  # noqa: BLE001
+            w(f"Wake-on-LAN: {e}")
+    _watch(job_id, job, rc, logf, started, dry, by, run_id, log_path, mode, info)
+
+
+def _retry_plan(job_id, job, rc, info, mode, dry, log_path, w):
+    """Nach einem Fehler einen neuen Versuch planen? Liefert {"attempt", "of", "at", "minutes"} oder None."""
+    delays = retry_delays(job)
+    attempt = info.get("attempt", 0)
+    if rc in (0, -15, 143, 3, 4) or dry or mode != "full" or info.get("no_retry") or not delays or attempt >= len(delays):
+        return None
+    if job.get("retry_on") != "any":
+        try:
+            with open(log_path, encoding="utf-8", errors="replace") as f:
+                text = f.read()[-200000:]
+        except OSError:
+            text = ""
+        if not NET_ERRORS.search(text):
+            w(i18n.t("=== Kein Netzwerkfehler erkannt, daher kein neuer Versuch. ==="))
+            return None
+    minutes = delays[attempt]
+    at = datetime.datetime.now() + datetime.timedelta(minutes=minutes)
+    plan = {"attempt": attempt + 1, "of": len(delays), "at": at.strftime("%Y-%m-%d %H:%M:%S"), "minutes": minutes}
+    w(i18n.t("=== Neuer Versuch in {0} Minuten ({1}, Versuch {2} von {3}). Gemeldet wird erst, wenn auch der letzte scheitert. ===",
+             minutes, at.strftime("%H:%M"), attempt + 1, len(delays)))
+    return plan
+
+
+def _schedule_retry(job_id, plan):
+    try:
+        at = datetime.datetime.strptime(plan["at"], "%Y-%m-%d %H:%M:%S")
+    except (KeyError, ValueError):
+        return
+    if at < datetime.datetime.now():
+        at = datetime.datetime.now() + datetime.timedelta(seconds=30)
+    scheduler.add_job(start_job, DateTrigger(run_date=at, timezone=TZ), args=[job_id],
+                      kwargs={"by": f"Wiederholung {plan['attempt']}/{plan['of']}", "retry_attempt": plan["attempt"]},
+                      id=job_id + ":retry", replace_existing=True, misfire_grace_time=3600)
+
+
+def cancel_retry(job_id):
+    try:
+        scheduler.remove_job(job_id + ":retry")
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def send_job_event(job, kind, values):
+    """Ereignis einer Aufgabe (Loeschwarnung, Speicher) an deren Kanaele senden, unabhaengig von „nur bei Fehler“."""
+    settings = load_settings()
+    when, eff = notify.effective(settings, job)
+    if when == "never":
+        return {}
+    base = {"job": job.get("name", ""), "quelle": job.get("source", ""), "ziel": effective_dest(job)}
+    ev = notify.event(eff, kind, dict(base, **values), job, job=job.get("name", ""), status=kind, ok=False,
+                      source=job.get("source", ""), dest=effective_dest(job))
+    return notify.send(eff, ev)
+
+
+def _public_link(path):
+    base = (load_settings().get("public_url") or os.environ.get("PUBLIC_URL") or "").strip().rstrip("/")
+    return base + path if base else ""
+
+
+def _volume_check():
+    """Nach jedem Lauf: Datenvolumen des Monats gegen das Limit pruefen und einmal je Stufe melden."""
+    s = load_settings()
+    vol = monitor.volume_state(s)
+    if not vol or not s.get("volume_notify", True):
+        return
+    level = 100 if vol["exceeded"] else (vol["warn_pct"] if vol["warn"] else 0)
+    key = f"{vol['month']}:{level}"
+    if not level or (s.get("volume_notified") or "") >= key and (s.get("volume_notified") or "")[:7] == vol["month"]:
+        return
+    s["volume_notified"] = key
+    save_settings(s)
+    hint = ""
+    if vol["exceeded"] and vol["stop"]:
+        hint = "\n" + i18n.t("Automatische Läufe sind bis zum Monatsende angehalten. Von Hand gestartete Läufe laufen weiter.", lang=i18n.default_lang)
+    ev = notify.event(s, "volume_limit", {"monat": vol["month"][5:] + "/" + vol["month"][:4], "verbraucht": human_bytes(vol["used"]),
+                                          "limit": human_bytes(vol["limit"]), "prozent": str(int(vol["pct"])), "hinweis": hint},
+                      status="volume_limit", ok=False)
+    notify.send(s, ev)
+
+
+def _watch(job_id, job, rc, logf, started, dry, by, run_id, log_path, mode="full", info=None):
+    """Lauf abschliessen: Verlauf, Statistik, Benachrichtigungen, Folgeaufgaben, neuer Versuch."""
+    info = info or {}
     if is_bisync(job) and job.get("bisync_ready") and rc not in (0, -15, 143):
         try:
             with open(log_path, encoding="utf-8", errors="replace") as lf:
@@ -890,10 +1504,22 @@ def _watch(job_id, job, proc, logf, started, dry, by, run_id, log_path, mode="fu
     delta = mode in ("delta", "livesync")   # beides sind Live-Runden
     quiet = repeat = False
     notify_now = True
+    verify = info.get("verify")
+    hold = info.get("hold")
+    retry = info.get("retry")
+    entry = None
     with _lock:
         _running.pop(job_id, None)
         _current_run.pop(job_id, None)
-        status = "ok" if rc == 0 else ("gestoppt" if rc in (-15, 143) else "fehler")
+        if hold:
+            status = "freigabe"
+        elif rc in (-15, 143):
+            status = "gestoppt"
+        elif rc == 0 and not (verify and verify.get("result") in ("diff", "error")) and info.get("snapshot") is not False \
+                and not info.get("script_post_failed"):
+            status = "ok"
+        else:
+            status = "fehler"
         jobs = load_jobs()
         if job_id in jobs:
             j = jobs[job_id]
@@ -912,6 +1538,16 @@ def _watch(job_id, job, proc, logf, started, dry, by, run_id, log_path, mode="fu
                 j["live_fail_count"] = (j.get("live_fail_count", 0) + 1) if status == "fehler" else 0
                 # nichts geaendert oder derselbe Fehler noch einmal: kein Verlauf, kein Log
                 quiet = (status == "ok" and copied == 0 and deleted == 0 and not errors) or bool(repeat)
+            if hold:
+                j["delete_hold"] = dict(hold, run=run_id)
+            if info.get("space"):
+                j["dest_space"] = info["space"]
+            if verify:
+                j["last_verify"] = verify
+            if retry:
+                j["retry_pending"] = retry
+            else:
+                j.pop("retry_pending", None)
             if not quiet:
                 entry = {
                     "start": datetime.datetime.fromtimestamp(started).strftime("%Y-%m-%d %H:%M:%S"),
@@ -921,6 +1557,22 @@ def _watch(job_id, job, proc, logf, started, dry, by, run_id, log_path, mode="fu
                 }
                 if delta:
                     entry["mode"] = "live"
+                if mode == "verify":
+                    entry.update(mode="verify", copied=0, deleted=0, bytes=0)
+                if verify:
+                    entry["verify"] = {k: verify.get(k) for k in ("result", "matched", "missing", "extra", "differ", "errors", "method", "hash")}
+                if hold:
+                    entry["hold"] = {k: hold[k] for k in ("deleted", "total", "pct", "threshold")}
+                if info.get("snapshot"):
+                    entry["snapshot"] = info["snapshot"]
+                elif info.get("snapshot") is False:
+                    entry["snapshot"] = ""
+                if info.get("attempt"):
+                    entry["retry"] = info["attempt"]
+                if retry:
+                    entry["retry_next"] = retry["at"]
+                if info.get("space_low"):
+                    entry["space_low"] = True
                 if win_stop:
                     entry["window"] = win_stop
                     if win_stop == "resume":
@@ -929,6 +1581,15 @@ def _watch(job_id, job, proc, logf, started, dry, by, run_id, log_path, mode="fu
             elif j.get("last_status") == "laeuft":
                 j["last_status"] = "fehler" if repeat else (j.get("history") or [{}])[0].get("status", "ok")
             save_jobs(jobs)
+    if entry and mode != "verify":
+        try:
+            monitor.add_run(job_id, job.get("name", job_id), entry)
+            if not dry:
+                _volume_check()
+        except Exception as e:  # noqa: BLE001
+            print(f"Statistik: {e}", flush=True)
+    if retry:
+        _schedule_retry(job_id, retry)
     if quiet:
         try:
             os.remove(log_path)
@@ -938,16 +1599,55 @@ def _watch(job_id, job, proc, logf, started, dry, by, run_id, log_path, mode="fu
     if win_stop:
         cleanup_logs(job_id)
         return   # planmaessig am Fensterende angehalten: keine Benachrichtigung, keine Folgeaufgaben
-    if not delta or notify_now and status == "fehler":
-        send_notifications(job_id, job, status, duration, dry, log_path, by, mode)
-    if not delta or mode == "livesync":    # Live wie Spiegeln: Folgeaufgaben nach jeder Runde mit Aenderungen
+    if hold:
+        ex = "\n".join("• " + x for x in hold.get("examples", [])[:10])
+        res = send_job_event(job, "delete_hold", {"loeschungen": str(hold["deleted"]), "dateien": str(hold["total"]),
+                                                  "prozent": str(int(hold["pct"])), "grenze": str(hold["threshold"]), "beispiele": ex,
+                                                  "link": _public_link(f"/job/{job_id}/log")})
+        _log_results(log_path, res)
+        cleanup_logs(job_id)
+        return   # angehalten: keine Folgeaufgaben, bis freigegeben
+    sl = info.get("space_low")
+    if sl:
+        res = send_job_event(job, "space_low", {"frei": human_bytes(sl["free"]), "benoetigt": human_bytes(sl["need"]),
+                                                "mindestens": human_bytes(sl["min"]) if sl["min"] else "–",
+                                                "aktion": i18n.t("Lauf abgebrochen" if sl["stop"] else "Lauf läuft trotzdem", lang=i18n.default_lang)})
+        _log_results(log_path, res)
+    if retry:
+        cleanup_logs(job_id)
+        return   # neuer Versuch geplant: erst melden, wenn auch der letzte scheitert
+    extra = {}
+    if verify:
+        vt = verify_text(verify)
+        extra.update(pruefung=vt, pruefung_block="\n" + i18n.t("Prüflauf: {0}", vt, lang=i18n.default_lang) if vt else "")
+    if info.get("attempt"):
+        extra["versuch"] = f"{info['attempt']}/{len(retry_delays(job)) or info['attempt']}"
+    if mode == "verify":
+        if status != "ok" or not dry:
+            send_notifications(job_id, job, status, duration, dry, log_path, by, mode, extra)
+    elif not delta or notify_now and status == "fehler":
+        send_notifications(job_id, job, status, duration, dry, log_path, by, mode, extra)
+    if (not delta or mode == "livesync") and mode != "verify":    # Live wie Spiegeln: Folgeaufgaben nach jeder Runde mit Aenderungen
         start_followers(job_id, status, dry, log_path)
     cleanup_logs(job_id)
 
 
-def start_job(job_id, dry_run=False, by="Zeitplan", mode="full", manual=False, resync=False):
+def _log_results(log_path, results):
+    if not results:
+        return
+    try:
+        with open(log_path, "a", encoding="utf-8") as f:
+            for ch, err in results.items():
+                f.write(f"Benachrichtigung {ch}: {'gesendet' if err is None else 'FEHLER ' + err}\n")
+    except OSError:
+        pass
+
+
+def start_job(job_id, dry_run=False, by="Zeitplan", mode="full", manual=False, resync=False, guard_ok=False, retry_attempt=0):
     """Startet einen Job im Hintergrund. False, wenn er schon laeuft (Laeufe ueberlappen nie).
-    mode=delta: Live-Lauf, kopiert nur seit dem letzten erfolgreichen Lauf geaenderte Dateien."""
+    mode=delta: Live-Lauf, kopiert nur seit dem letzten erfolgreichen Lauf geaenderte Dateien.
+    mode=verify: nur pruefen, ob Quelle und Ziel 1:1 gleich sind.
+    guard_ok: Loeschwarnung fuer diesen Lauf freigegeben. retry_attempt: Nummer der Wiederholung nach einem Fehler."""
     with _lock:
         if job_id in _running:
             return False
@@ -956,6 +1656,12 @@ def start_job(job_id, dry_run=False, by="Zeitplan", mode="full", manual=False, r
             return False
         if is_paused(job) and not manual:
             return False   # pausiert: kein Start per Zeitplan, Live oder Kette
+        if job.get("delete_hold") and not manual and not guard_ok:
+            return False   # wartet auf Freigabe nach einer Loeschwarnung
+        if not manual and mode != "verify":
+            vol = monitor.volume_state()
+            if vol and vol["exceeded"] and vol["stop"]:
+                return False   # Datenvolumen des Monats aufgebraucht: nur noch von Hand
         wcfg = job.get("window")
         if wcfg and not manual and not timewin.inside(wcfg):
             # ausserhalb des Zeitfensters: Live-Runden entfallen, alles andere startet, sobald das Fenster aufgeht
@@ -974,15 +1680,18 @@ def start_job(job_id, dry_run=False, by="Zeitplan", mode="full", manual=False, r
         if bisync and job.get("bisync_need_resync") and not resync:
             if mode == "livesync":
                 return False   # erst nach "Neu abgleichen" weiter, sonst kommt jede Minute derselbe Fehler
-        first = bisync and (resync or not job.get("bisync_ready"))
+        first = bisync and (resync or not job.get("bisync_ready")) and mode != "verify"
         if mode == "delta":
             last = job.get("live_last")
             if not last:
                 mode, by = "full", by + " (erster voller Abgleich)"
             else:
                 max_age = min(int(time.time() - float(last)) + 120, 30 * 86400)   # 2 Minuten Puffer
-        if bisync:
-            cmd = build_bisync_cmd(job, job_id, dry_run, resync=first)
+        bisync_missing = []
+        if mode == "verify":
+            cmd_fn = None
+        elif bisync:
+            cmd_fn = lambda jb: build_bisync_cmd(jb, job_id, dry_run, resync=first)
             os.makedirs(bisync_workdir(job_id), exist_ok=True)
             for fn in os.listdir(bisync_workdir(job_id)):   # Laeufe ueberlappen nie: alte Sperren sind verwaist
                 if fn.endswith(".lck"):
@@ -999,7 +1708,7 @@ def start_job(job_id, dry_run=False, by="Zeitplan", mode="full", manual=False, r
                 for side in bisync_missing:
                     rclone("mkdir", side, timeout=30)
         else:
-            cmd = build_sync_cmd(job, dry_run, mode, max_age)
+            cmd_fn = lambda jb: build_sync_cmd(jb, dry_run, mode, max_age)
         os.makedirs(os.path.join(LOG_DIR, job_id), exist_ok=True)
         run_id = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
         n = 2
@@ -1008,9 +1717,13 @@ def start_job(job_id, dry_run=False, by="Zeitplan", mode="full", manual=False, r
             n += 1
         log_path = run_log_path(job_id, run_id)
         logf = open(log_path, "w", encoding="utf-8", buffering=1)
-        dry = dry_run or bool(job.get("dry_run"))
+        dry = (dry_run or bool(job.get("dry_run"))) and mode != "verify"
         logf.write(f"=== Start: {datetime.datetime.now():%Y-%m-%d %H:%M:%S}, gestartet von {by}"
                    f"{'  (TESTLAUF, nichts wird verändert)' if dry else ''} ===\n")
+        if mode == "verify":
+            logf.write("=== Nur Prüflauf: Quelle und Ziel werden verglichen, verändert wird nichts. ===\n")
+        if guard_ok and job.get("delete_hold"):
+            logf.write(f"=== Löschwarnung freigegeben von {by.split(' (')[0]}: Der Lauf darf löschen. ===\n")
         for side in (bisync_missing if bisync else []):
             logf.write(f"=== Ordner fehlte und wird angelegt: {side} ===\n" if not dry
                        else f"=== Ordner fehlt und würde angelegt: {side} ===\n")
@@ -1020,20 +1733,29 @@ def start_job(job_id, dry_run=False, by="Zeitplan", mode="full", manual=False, r
         if bisync and first:
             logf.write("=== Zwei-Wege-Sync, erster Abgleich (--resync): Beide Seiten werden zusammengeführt, gelöscht wird "
                        "dabei nichts. Gibt es eine Datei auf beiden Seiten unterschiedlich, gewinnt die neuere. ===\n")
-        elif bisync:
+        elif bisync and mode != "verify":
             logf.write("=== Zwei-Wege-Sync: Änderungen und Löschungen auf beiden Seiten werden übernommen ===\n")
         elif mode == "livesync":
             logf.write("=== Live-Lauf: Abgleich wie beim Spiegeln, inklusive Löschen ===\n")
         if mode == "delta":
             logf.write(f"=== Live-Lauf: nur Dateien, die sich in den letzten {max_age // 60} Minuten geändert haben, "
                        f"ohne Löschen ===\n")
-        logf.write("$ " + " ".join(shlex.quote(c) for c in cmd) + "\n\n")
-        proc = subprocess.Popen(cmd, stdout=logf, stderr=subprocess.STDOUT)
-        _running[job_id] = proc
+        if retry_attempt:
+            logf.write(f"=== Neuer Versuch {retry_attempt} von {len(retry_delays(job))} nach einem Fehler ===\n")
+        handle = RunHandle()
+        _running[job_id] = handle
         _current_run[job_id] = run_id
         _win_started[job_id] = bool(wcfg) and timewin.inside(wcfg) and not dry
-        update_job(job_id, last_status="laeuft", window_wait="")
-    threading.Thread(target=_watch, args=(job_id, job, proc, logf, time.time(), dry, by, run_id, log_path, mode),
+        fields = dict(last_status="laeuft", window_wait="")
+        if guard_ok or (manual and job.get("delete_hold") and mode != "verify"):
+            fields["delete_hold"] = None
+        if mode != "verify":
+            fields["retry_pending"] = None
+        update_job(job_id, **fields)
+        if mode != "verify" and not retry_attempt:
+            cancel_retry(job_id)   # neuer regulaerer Lauf ersetzt einen geplanten Wiederholungsversuch
+        opts = {"guard_ok": guard_ok, "retry_attempt": retry_attempt, "max_age": max_age}
+    threading.Thread(target=_pipeline, args=(job_id, job, handle, cmd_fn, logf, time.time(), dry, by, run_id, log_path, mode, opts),
                      daemon=True).start()
     return True
 
@@ -1125,7 +1847,7 @@ def chain_problem(jobs, job_id, parent_id):
 def start_followers(job_id, status, dry, log_path, _seen=None, _notes=None):
     """Aufgaben starten, die nach dieser Aufgabe laufen sollen.
     Pausierte Folgeaufgabe: "skip" = ueberspringen, ihre Folgeaufgaben laufen weiter; "stop" = Kette endet dort."""
-    if dry or status == "gestoppt":
+    if dry or status in ("gestoppt", "freigabe"):
         return
     seen = _seen or {job_id}
     jobs = load_jobs()
@@ -1171,7 +1893,17 @@ def schedule_all():
                               id="_autobackup", misfire_grace_time=3600, coalesce=True, max_instances=1)
         except ValueError:
             pass
+    if st.get("report_enabled"):
+        try:
+            h, m = (st.get("report_time") or "08:00").split(":")
+            dows = ",".join(GEOIP_DOW[int(d)] for d in (st.get("report_days") or [0]) if str(d).isdigit() and 0 <= int(d) < 7) or "mon"
+            scheduler.add_job(send_report, CronTrigger(day_of_week=dows, hour=int(h), minute=int(m), timezone=TZ),
+                              id="_report", misfire_grace_time=3600, coalesce=True, max_instances=1)
+        except (ValueError, AttributeError):
+            pass
     for job_id, job in load_jobs().items():
+        if job.get("retry_pending") and job.get("enabled") is not False:
+            _schedule_retry(job_id, job["retry_pending"])   # geplante Wiederholung (auch nach einem Neustart)
         if is_paused(job):
             continue
         if job.get("enabled") and trigger_of(job) == "live":
@@ -1202,7 +1934,7 @@ def schedule_all():
 
 def next_run(job_id):
     j = scheduler.get_job(job_id)
-    return j.next_run_time.strftime("%d.%m.%Y %H:%M") if j and j.next_run_time else None
+    return j.next_run_time.strftime("%d.%m.%Y %H:%M") if j and getattr(j, "next_run_time", None) else None
 
 
 def _next_time(sched_id):
@@ -1353,7 +2085,8 @@ app.config.update(SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE="Lax",
                   SESSION_COOKIE_NAME="mirrorsync_session",
                   PERMANENT_SESSION_LIFETIME=datetime.timedelta(days=30))
 _failed = {}  # ip -> (anzahl, zeitpunkt) fuer Schutz gegen Passwort-Raten
-PUBLIC = {"/health", "/login", "/login/2fa", "/setup", "/login/passkey", "/login/passkey/options"}
+PUBLIC = {"/health", "/login", "/login/2fa", "/setup", "/login/passkey", "/login/passkey/options",
+          "/manifest.webmanifest", "/sw.js", "/offline"}
 store = users.Store(DB)
 role_store = roles.RoleStore(DB)
 
@@ -1510,6 +2243,10 @@ ENDPOINT_PERMS = {
     "groups_page": "groups.manage", "group_edit": "groups.manage", "group_delete": "groups.manage",
     "general_settings": "system.settings", "audit_page": "system.audit", "audit_export": "system.audit",
     "access_settings": "system.access", "access_block": "system.access", "access_unblock": "system.access",
+    "job_approve": "jobs.approve", "job_hold_dismiss": "jobs.approve", "job_verify": "jobs.run",
+    "job_versions": "jobs.restore", "job_versions_restore": "jobs.restore", "job_versions_download": "jobs.restore",
+    "job_usage": "jobs.preview", "stats_page": "jobs.view", "report_send": "notify.edit", "notify_test_all": "notify.edit",
+    "changelog_page": None, "changelog_seen": None,
 }
 
 
@@ -1634,8 +2371,8 @@ def auth():
     blocked = _ip_blocked()
     if blocked:
         return blocked
-    if request.path.startswith("/static") or request.path in ("/health", "/favicon.ico"):
-        return None
+    if request.path.startswith(("/static", "/health/")) or request.path in ("/health", "/favicon.ico", "/metrics"):
+        return None   # /health/jobs und /metrics pruefen den Zugriff selbst (API-Key, Sitzung oder freigegeben)
     if request.path.startswith(("/api/v1", "/mcp")):   # REST-API und MCP: API-Key (Bearer)
         if not store.load():
             return {"error": "MirrorSync ist noch nicht eingerichtet."}, 503
@@ -2287,7 +3024,7 @@ def _uptime_text(sec):
     return (i18n.t("{0} Tg. {1} Std.", d, h) if d else i18n.t("{0} Std. {1} Min.", h, m) if h else i18n.t("{0} Min.", m))
 
 
-_DSTATUS = {"ok": "OK", "fehler": "Fehler", "laeuft": "läuft", "gestoppt": "gestoppt", "paused": "pausiert",
+_DSTATUS = {"ok": "OK", "fehler": "Fehler", "laeuft": "läuft", "gestoppt": "gestoppt", "paused": "pausiert", "freigabe": "Freigabe nötig",
             "off": "ausgeschaltet", "never": "noch nie gelaufen", "fail": "fehlgeschlagen", "warn": "Hinweis", "info": "OK"}
 
 
@@ -2727,7 +3464,8 @@ def cron_text(expr):
     return ", ".join(parts) + f" {t}"
 
 
-EMPTY_JOB = dict(name="", source="", dest="", schedule="0 3 * * *", enabled=True,
+EMPTY_JOB = dict(name="", source="", dest="", schedule="0 3 * * *", enabled=True, nosync=True, verify="off", verify_method="auto",
+                 delete_guard="", delete_guard_min="10", space_check="off", space_min_gb="", retry="", retry_on="network",
                  dry_run=False, versioning=False, versions_keep="", versions_days="", checksum=False, compare="standard", compare_window="2", speed="normal", max_delete="500", extra_flags="",
                  excludes="", delete_excluded=False, notify_mode="global", notify_when="fail",
                  notify_webhook=False, notify_webhook_url="", notify_smtp=False, notify_smtp_to="",
@@ -2752,6 +3490,85 @@ def job_notify_from_form(f, old=None):
         notify_apprise="notify_apprise" in f, notify_apprise_urls=ap_urls,
         notify_apprise_tag=f.get("notify_apprise_tag", "").strip(),
     )
+
+
+SCRIPT_FIELDS = ("script_pre", "script_post", "script_host", "script_timeout", "script_pre_fail", "script_post_when",
+                 "snapshot", "snapshot_host", "snapshot_target", "snapshot_dir", "snapshot_cmd", "snapshot_keep", "snapshot_sudo",
+                 "wol_mac", "wol_broadcast", "wol_port", "wol_wait", "wol_check", "wol_sleep", "wol_sleep_cmd", "wol_sleep_host")
+EXTRA_TEXT = ("verify", "verify_method", "delete_guard", "delete_guard_min", "space_check", "space_min_gb", "retry", "retry_on",
+              "health_max_age") + tuple(x for x in SCRIPT_FIELDS if x not in ("snapshot_sudo", "wol_sleep"))
+EXTRA_BOOL = ("nosync", "snapshot_sudo", "wol_sleep")
+
+
+def apply_extras(f, job, old):
+    """Pruefung, Loeschwarnung, Speicher, Wiederholen, .nosync, Health, Skripte, Snapshot, Wake-on-LAN. Liefert Fehlertext oder None."""
+    val = lambda k, d="": str(f.get(k, d) or "").strip()
+    job["verify"] = val("verify") if val("verify") in VERIFY_WHEN else "off"
+    job["verify_method"] = val("verify_method") if val("verify_method") in VERIFY_METHODS else "auto"
+    job["delete_guard"] = val("delete_guard")
+    job["delete_guard_min"] = val("delete_guard_min") or "10"
+    job["space_check"] = val("space_check") if val("space_check") in SPACE_MODES else "off"
+    job["space_min_gb"] = val("space_min_gb").replace(",", ".")
+    job["retry"] = ", ".join(str(x) for x in retry_delays({"retry": val("retry")}))
+    job["retry_on"] = "any" if val("retry_on") == "any" else "network"
+    job["nosync"] = "nosync" in f
+    job["health_max_age"] = val("health_max_age").replace(",", ".")
+    if g.access.has("jobs.scripts"):
+        for k in SCRIPT_FIELDS:
+            if k in ("snapshot_sudo", "wol_sleep"):
+                job[k] = k in f
+            elif k in ("script_pre", "script_post", "snapshot_cmd"):
+                job[k] = str(f.get(k, "") or "").replace("\r\n", "\n").strip()[:8000]
+            else:
+                job[k] = val(k)[:500]
+        job["snapshot"] = job["snapshot"] if job["snapshot"] in SNAPSHOT_TYPES else "off"
+        job["script_pre_fail"] = "continue" if job["script_pre_fail"] == "continue" else "abort"
+        job["script_post_when"] = job["script_post_when"] if job["script_post_when"] in ("always", "ok", "fail") else "always"
+    else:
+        for k in SCRIPT_FIELDS:
+            if k in old:
+                job[k] = old[k]
+            else:
+                job.pop(k, None)
+    t = i18n.t
+    if job["delete_guard"] and (not job["delete_guard"].isdigit() or not 1 <= int(job["delete_guard"]) <= 100):
+        return t("Löschwarnung: bitte 1 bis 100 Prozent angeben (leer = aus).")
+    if not job["delete_guard_min"].isdigit() or int(job["delete_guard_min"]) < 1:
+        return t("Löschwarnung: Mindestanzahl als Zahl ab 1.")
+    if job["space_min_gb"] and not re.match(r"^\d+(\.\d+)?$", job["space_min_gb"]):
+        return t("Mindestplatz am Ziel: Zahl in GB (leer = nur benötigten Platz prüfen).")
+    if val("retry") and not job["retry"]:
+        return t("Neu versuchen: Minuten durch Komma getrennt, z. B. 5, 15, 60.")
+    if job["health_max_age"] and not re.match(r"^\d+(\.\d+)?$", job["health_max_age"]):
+        return t("Überfällig nach: Stunden als Zahl (leer = automatisch).")
+    if not g.access.has("jobs.scripts"):
+        return None
+    ssh = remote_exec.ssh_remotes()
+    for k in ("script_host", "snapshot_host", "wol_sleep_host"):
+        if job.get(k) and (job[k] not in ssh or not g.access.remote_ok(job[k])):
+            return t("{0}: nur SFTP-Speicherorte (SSH), die du verwenden darfst.", job[k])
+    if job.get("script_timeout") and not (job["script_timeout"].isdigit() and 5 <= int(job["script_timeout"]) <= 86400):
+        return t("Zeitlimit für Skripte: 5 bis 86400 Sekunden.")
+    if job["snapshot"] in ("zfs", "btrfs") and not job.get("snapshot_target"):
+        return t("Snapshot: bitte das ZFS-Dataset bzw. den Btrfs-Pfad angeben.")
+    if job["snapshot"] == "btrfs" and not (job.get("snapshot_dir") or "").startswith("/"):
+        return t("Snapshot (Btrfs): bitte einen Ordner für die Snapshots angeben (absoluter Pfad außerhalb des Ziels).")
+    if job["snapshot"] == "command" and not job.get("snapshot_cmd"):
+        return t("Snapshot: bitte den Befehl angeben.")
+    if job.get("snapshot_keep") and not job["snapshot_keep"].isdigit():
+        return t("Snapshots behalten: Anzahl als Zahl (leer = alle).")
+    if job.get("wol_mac"):
+        mac = wol.clean_mac(job["wol_mac"])
+        if not mac:
+            return t("Wake-on-LAN: MAC-Adresse ungültig (z. B. AA:BB:CC:DD:EE:FF).")
+        job["wol_mac"] = mac
+        if job.get("wol_port") and not (job["wol_port"].isdigit() and 1 <= int(job["wol_port"]) <= 65535):
+            return t("Wake-on-LAN: Port 1 bis 65535.")
+        if job.get("wol_wait") and not (job["wol_wait"].isdigit() and 10 <= int(job["wol_wait"]) <= 1800):
+            return t("Wake-on-LAN: Wartezeit 10 bis 1800 Sekunden.")
+        if job.get("wol_check") and not re.match(r"^[A-Za-z0-9_.\-\[\]:]+:\d{1,5}$", job["wol_check"]):
+            return t("Wake-on-LAN: Erreichbarkeit als Host:Port angeben, z. B. 192.168.1.20:22.")
+    return None
 
 
 def apply_job_form(f, job, old, job_id, jobs, api=False):
@@ -2837,6 +3654,7 @@ def apply_job_form(f, job, old, job_id, jobs, api=False):
             job["visible_to"] = vis
     if not g.access.has("jobs.advanced"):
         job["extra_flags"] = old.get("extra_flags", "")
+    ext_err = apply_extras(f, job, old)
     if not job_id:
         job["owner"] = g.user
     if job["source"] and not job["selection"] and job["source"] != old.get("source") and g.access.path_ok(job["source"]):
@@ -2863,6 +3681,8 @@ def apply_job_form(f, job, old, job_id, jobs, api=False):
         error = cw_err
     elif win_err:
         error = win_err
+    elif ext_err:
+        error = ext_err
     elif not g.access.path_ok(job["source"]) or not g.access.path_ok(job["dest"]):
         error = "Deine Rolle darf diesen Speicherort bzw. lokale Ordner nicht verwenden."
     elif any(".." in x.strip().split("/") for x in f.get("selection", "").splitlines()):
@@ -2947,7 +3767,8 @@ def edit_job(job_id=None):
     followers = [j["name"] for jid, j in jobs.items() if job_id and trigger_of(j) == "after" and j.get("after_job") == job_id]
     jtpl = msgtpl.editor_data(msgtpl.JOB_EVENTS, job.get("msg_tpl"), settings.get("msg_templates"))
     return render_template("job.html", job=job, job_id=job_id, error=error, msg=session.pop("flash", None) if request.method == "GET" else None, remotes=remotes, tz=TZ, jtpl=jtpl, vis_opts=vis_options(),
-                           glob=glob, has_token=has_token, others=others, followers=followers, bw_cfg=job.get("bw") or settings.get("bw") or bwlimit.EMPTY)
+                           glob=glob, has_token=has_token, others=others, followers=followers, bw_cfg=job.get("bw") or settings.get("bw") or bwlimit.EMPTY,
+                           ssh_remotes=[r for r in remote_exec.ssh_remotes() if g.access.remote_ok(r)])
 
 
 def parse_bw(raw):
@@ -2958,7 +3779,7 @@ def parse_bw(raw):
     return data if isinstance(data, dict) else {}
 
 
-PREVIEW_KEYS = ("source", "dest", "selection", "excludes", "include_source_dir", "direction", "delete_excluded", "no_delete", "compare", "compare_window", "checksum")
+PREVIEW_KEYS = ("source", "dest", "selection", "excludes", "include_source_dir", "direction", "delete_excluded", "no_delete", "compare", "compare_window", "checksum", "nosync", "nosync_dirs")
 
 
 def preview_job_from(f, saved=None):
@@ -2993,13 +3814,7 @@ def preview_job(job):
         fs = split_file_source(job["source"])
         if fs:   # Quelle ist eine Datei: wie beim Speichern Ordner + Auswahl
             job["source"], job["selection"] = fs[0], fs[1]
-    flt = []
-    if selection_list(job):
-        for rule in selection_filters(job):
-            flt += ["--filter", rule]
-    else:
-        for pattern in exclude_list(job):
-            flt += ["--exclude", pattern]
+    flt = filter_args(job)
     dest = effective_dest(job)
     bis = is_bisync(job)
     nodel = bool(job.get("no_delete")) and not bis
@@ -3086,7 +3901,7 @@ def job_notify_test(job_id=None):
                 testlauf=" (Test der Benachrichtigung)", gestartet_von=g.user or "")
     ev = notify.event(eff, "run_ok", vals, tj, status="test", ok=True, job=cfg["name"],
                       source=vals["quelle"], dest=vals["ziel"])
-    results = notify.send(eff, ev)
+    results = notify.send(eff, ev, force=True)
     if not results:
         return {"ok": False, "results": {}, "error": "Kein Kanal aktiv."}
     return {"ok": all(v is None for v in results.values()), "results": results}
@@ -3280,7 +4095,7 @@ def show_log(job_id):
         text = "".join(i18n.translate(ln) if ln.startswith("===") else ln for ln in text.splitlines(True))
     runs, days = keep_limits()
     job = dict(job, dest=effective_dest(job))
-    return render_template("log.html", job=job, job_id=job_id, log=text, current=current,
+    return render_template("log.html", job=job, job_id=job_id, log=text, current=current, msg=session.pop("flash", None),
                            running=running, auto_refresh=running, keep_runs=runs, keep_days=days,
                            has_file={h.get("run"): bool(h.get("run")) and os.path.exists(run_log_path(job_id, h["run"]))
                                      for h in hist})
@@ -3614,6 +4429,15 @@ def settings_page():
                 s[key] = f.get(key, "").strip()
         if s["when"] not in ("always", "fail", "never"):
             s["when"] = "fail"
+        hm = lambda v, d: v if re.fullmatch(r"([01]\d|2[0-3]):[0-5]\d", v or "") else d
+        s["quiet_start"], s["quiet_end"] = hm(s.get("quiet_start"), "22:00"), hm(s.get("quiet_end"), "07:00")
+        s["quiet_mode"] = "none" if s.get("quiet_mode") == "none" else "errors"
+        s["report_time"] = hm(s.get("report_time"), "08:00")
+        s["report_period"] = str(_int(s.get("report_period"), 7, 1, 31))
+        if "ext_present" in f:
+            s["quiet_days"] = [d for d in range(7) if f"quiet_day_{d}" in f]
+            s["report_days"] = [d for d in range(7) if f"report_day_{d}" in f] or [0]
+            s["report_channels"] = [c for c in REPORT_CHANNELS if f"report_ch_{c}" in f]
         if s.get("apprise_mode") not in ("lib", "api"):
             s["apprise_mode"] = "lib"
         if "tpl_present" in f:
@@ -3629,11 +4453,14 @@ def settings_page():
             pass
         elif test in notify.CHANNELS:
             ev = notify.event(s, "test", {"job": "Test"}, status="test", ok=True, job="Test", source="-", dest="-")
-            res = notify.send(s, ev, only=test)[test]
+            res = notify.send(s, ev, only=test, force=True)[test]
             msg, err = (f"Testnachricht über {test} gesendet.", None) if res is None else (None, f"{test}: {res}")
         else:
             msg = "Einstellungen gespeichert."
+        schedule_all()   # Wochenbericht
     view = {k: ("" if k in notify.SECRET_FIELDS else v) for k, v in s.items()}
+    for k, d in notify.LIST_DEFAULTS.items():
+        view.setdefault(k, list(d))
     has_secret = {k: bool(s.get(k)) for k in notify.SECRET_FIELDS}
     ap_saved = [notify.mask_url(u) for u in notify.apprise_list(s.get("apprise_urls"))]
     try:
@@ -3646,8 +4473,11 @@ def settings_page():
         view["webhook_body"] = request.form.get("webhook_body", "")
     wh_sample = dict(msgtpl.sample("run_fail"), titel="❌ MirrorSync: NAS → Docker – FEHLER", ereignis="run_fail", ok="false")
     wh_sample["nachricht"] = msgtpl.make({}, "run_fail", wh_sample)[1]
+    msg = msg or session.pop("flash", None)
+    err = err or session.pop("flash_err", None)
     return render_template("settings.html", s=view, has_secret=has_secret, msg=msg, err=err, ap_saved=ap_saved, ap_lib=ap_lib,
-                           tpl_data=tpl_data, wh_sample=wh_sample)
+                           tpl_data=tpl_data, wh_sample=wh_sample, quiet_active=notify.quiet_now(s), next_report=next_run("_report"),
+                           report_last=s.get("report_last"))
 
 
 @app.route("/settings/general", methods=["GET", "POST"])
@@ -3706,6 +4536,19 @@ def general_settings():
                 purge = {"before": before, "runs": n}
                 msg = (i18n.t("Vor dem {0} gestartet: {1} Läufe in {2} Aufgaben. Zum Löschen unten bestätigen.", day, n, nj)
                        if n else i18n.t("Vor dem {0} gibt es keine Läufe.", day))
+    elif request.method == "POST" and request.form.get("section") == "monitor":
+        f = request.form
+        lim = (f.get("volume_limit_gb") or "").strip().replace(",", ".")
+        warn = (f.get("volume_warn_pct") or "80").strip()
+        if lim and not re.fullmatch(r"\d+(\.\d+)?", lim):
+            err = "Datenvolumen: Limit in GB als Zahl (leer = kein Limit)."
+        elif not warn.isdigit() or not 1 <= int(warn) <= 100:
+            err = "Warnen ab: 1 bis 100 Prozent."
+        else:
+            s.update(monitor_public="monitor_public" in f, volume_limit_gb=lim, volume_warn_pct=warn,
+                     volume_notify="volume_notify" in f, volume_stop="volume_stop" in f)
+            save_settings(s)
+            msg = "Gespeichert."
     elif request.method == "POST" and request.form.get("section") == "files":
         sp = request.form.get("files_speed")
         if sp not in SPEEDS:
@@ -3822,7 +4665,7 @@ def general_settings():
                            attribution=Markup(geoip.ATTRIBUTION), my_ip=_client_ip(), my_loc=geoip.locate(_client_ip()),
                            next_geoip=next_run("_geoip"), tz=TZ, upd=update_status(), purge=purge, upd_channels=_notify_channel_list(),
                            selfupd=selfupd, old_imgs=old_imgs, restart=restart_status() if g.access.has("system.restart") or g.access.has("system.settings") else None,
-                           day_names=timewin.DAY_NAMES,
+                           day_names=timewin.DAY_NAMES, vol=monitor.volume_state(s), base_url=_public_link("") or request.host_url.rstrip("/"),
                            fwd=request.headers.get("X-Forwarded-For", ""),
                            bw_desc=bwlimit.describe(bw, s.get("bw_unit") or "MB/s"), bw_tt=bwlimit.timetable(bw))
 
@@ -5011,6 +5854,579 @@ def browse_entries(path):
     return {"ok": True, "path": path, "entries": entries, "truncated": len(items) > FILES_MAX, "total": len(items)}
 
 
+# ---------------------------------------------------------------- Loeschwarnung, Pruefen
+@app.post("/job/<job_id>/approve")
+def job_approve(job_id):
+    """Loeschwarnung freigeben: Lauf jetzt mit Loeschen starten (einmalig)."""
+    job = load_jobs().get(job_id) or abort(404)
+    if not job.get("delete_hold"):
+        return _json_or_back({"ok": False, "error": i18n.t("Für diese Aufgabe gibt es keine offene Löschwarnung.")}, 409, job_id)
+    h = job["delete_hold"]
+    ok = start_job(job_id, by=f"{g.user or 'Web'} (Freigabe)", manual=True, guard_ok=True)
+    if not ok:
+        return _json_or_back({"ok": False, "error": i18n.t("Die Aufgabe läuft schon.")}, 409, job_id)
+    audit_add("job", "Löschwarnung freigegeben", job["name"], detail=f"{h.get('deleted')} / {h.get('total')} ({h.get('pct')} %)")
+    return _json_or_back({"ok": True, "message": i18n.t("Freigegeben, der Lauf startet.")}, 200, job_id)
+
+
+@app.post("/job/<job_id>/hold/dismiss")
+def job_hold_dismiss(job_id):
+    """Loeschwarnung verwerfen, ohne zu laufen: der naechste Lauf prueft wieder."""
+    job = load_jobs().get(job_id) or abort(404)
+    if not job.get("delete_hold"):
+        return _json_or_back({"ok": False, "error": i18n.t("Für diese Aufgabe gibt es keine offene Löschwarnung.")}, 409, job_id)
+    update_job(job_id, delete_hold=None)
+    audit_add("job", "Löschwarnung verworfen", job["name"])
+    return _json_or_back({"ok": True, "message": i18n.t("Löschwarnung verworfen. Der nächste Lauf prüft wieder.")}, 200, job_id)
+
+
+@app.post("/job/<job_id>/verify")
+def job_verify(job_id):
+    """Nur pruefen, ob Quelle und Ziel 1:1 gleich sind (ohne zu spiegeln)."""
+    load_jobs().get(job_id) or abort(404)
+    if not start_job(job_id, by=g.user or "Web", mode="verify", manual=True):
+        return _json_or_back({"ok": False, "error": i18n.t("Die Aufgabe läuft schon.")}, 409, job_id)
+    return _json_or_back({"ok": True, "message": i18n.t("Prüflauf gestartet.")}, 200, job_id)
+
+
+def _json_or_back(data, status, job_id):
+    if request.headers.get("Accept", "").startswith("application/json") or g.get("bridge"):
+        return data, status
+    session["flash"] = data.get("message") or data.get("error")
+    return redirect(url_for("show_log", job_id=job_id))
+
+
+# ---------------------------------------------------------------- Papierkorb / Versionierung: suchen und wiederherstellen
+VERSIONS_MAX = 500
+
+
+def versions_base(job, side="b"):
+    """Ordner mit den Versionen: <ziel>.versions (beim Zwei-Wege-Sync side a = <quelle>.versions)."""
+    root = job["source"] if side == "a" and is_bisync(job) else effective_dest(job)
+    return root.rstrip("/") + ".versions"
+
+
+def versions_list(job, side="b", q="", stamp=""):
+    """Staende und (mit Suchtext oder Stand) Dateien darin. Liefert (daten, fehler)."""
+    base = versions_base(job, side)
+    rc, out = rclone("lsjson", "--dirs-only", base, timeout=120)
+    if rc != 0:
+        if any(x in out.lower() for x in ("not found", "doesn't exist", "no such")):
+            return {"base": base, "stamps": [], "files": [], "truncated": False}, None
+        return None, i18n.t("Versionen nicht lesbar: {0}", out[-300:])
+    try:
+        stamps = sorted((d["Name"] for d in json.loads(out or "[]") if VERSION_DIR_RE.match(d.get("Name", ""))), reverse=True)
+    except ValueError:
+        stamps = []
+    files, truncated = [], False
+    q = (q or "").strip().lower()
+    if stamp and stamp not in stamps:
+        return None, i18n.t("Stand {0} gibt es nicht.", stamp)
+    if q or stamp:
+        for st in ([stamp] if stamp else stamps):
+            rc, out = rclone("lsf", "-R", "--files-only", "--format", "pst", "--separator", "\t", f"{base}/{st}", timeout=900)
+            if rc != 0:
+                continue
+            for line in out.splitlines():
+                parts = line.split("\t")
+                if len(parts) < 3:
+                    continue
+                path, size, mod = parts[0], parts[1], parts[2]
+                if q and q not in path.lower():
+                    continue
+                if len(files) >= VERSIONS_MAX:
+                    truncated = True
+                    break
+                files.append({"stamp": st, "path": path, "size": int(size) if size.lstrip("-").isdigit() and int(size) >= 0 else None,
+                              "mod": mod[:19].replace("T", " ")})
+            if truncated:
+                break
+    return {"base": base, "stamps": stamps, "files": files, "truncated": truncated}, None
+
+
+def _stamp_text(st):
+    m = re.match(r"^(\d{4})-(\d{2})-(\d{2})_(\d{2})(\d{2})(\d{2})$", st or "")
+    return f"{m.group(3)}.{m.group(2)}.{m.group(1)} {m.group(4)}:{m.group(5)}" if m else st
+
+
+app.jinja_env.filters["stamp"] = _stamp_text
+
+
+def _clean_rel(path):
+    p = re.sub(r"/{2,}", "/", (path or "").strip()).strip("/")
+    if not p or any(x in ("..", ".") for x in p.split("/")):
+        return None
+    return p
+
+
+def versions_restore(job, items, target="source", overwrite=False, side="b"):
+    """Dateien aus Staenden zurueckholen. items = [{stamp, path}]. Liefert (ergebnis, fehler, http-status)."""
+    if target not in ("source", "dest"):
+        return None, "target: nur source oder dest.", 400
+    base = versions_base(job, side)
+    root = job["source"] if target == "source" else effective_dest(job)
+    if not g.access.path_ok(root):
+        return None, i18n.t("Keine Berechtigung für {0}.", root), 403
+    todo = []
+    for it in items or []:
+        st, rel = (it or {}).get("stamp", ""), _clean_rel((it or {}).get("path"))
+        if not VERSION_DIR_RE.match(st or "") or not rel:
+            return None, i18n.t("Ungültiger Eintrag: {0}", f"{st}/{(it or {}).get('path')}"), 400
+        todo.append((st, rel))
+    if not todo:
+        return None, "Nichts ausgewählt.", 400
+    if len(todo) > 1000:
+        return None, "Höchstens 1000 Dateien auf einmal.", 400
+    dests = [r for _, r in todo]
+    if len(set(dests)) != len(dests):
+        return None, "Dieselbe Datei ist mehrfach ausgewählt (aus verschiedenen Ständen). Bitte nur einen Stand je Datei wählen.", 400
+    if not overwrite:
+        exists = []
+        for _, rel in todo:
+            rc, _out = rclone("lsjson", "--stat", f"{root.rstrip('/')}/{rel}", timeout=30)
+            if rc == 0:
+                exists.append(rel)
+        if exists:
+            return {"exists": exists}, i18n.t("{0} Datei(en) gibt es dort schon. Zum Ersetzen „Vorhandene überschreiben“ wählen.", len(exists)), 409
+    done, failed = [], []
+    for st, rel in todo:
+        rc, out = rclone("copyto", f"{base}/{st}/{rel}", f"{root.rstrip('/')}/{rel}", timeout=3600)
+        (done if rc == 0 else failed).append(rel if rc == 0 else {"path": rel, "error": out[-300:]})
+    return {"restored": done, "failed": failed, "target": root}, None, 200
+
+
+@app.get("/job/<job_id>/versions")
+def job_versions(job_id):
+    job = load_jobs().get(job_id) or abort(404)
+    side = "a" if request.args.get("side") == "a" and is_bisync(job) else "b"
+    q, stamp = request.args.get("q", "").strip(), request.args.get("stamp", "").strip()
+    data, err = versions_list(job, side, q, stamp) if job.get("versioning") or request.args.get("any") else ({"stamps": [], "files": [], "base": versions_base(job, side)}, None)
+    if request.headers.get("Accept", "").startswith("application/json"):
+        return ({"ok": False, "error": err}, 400) if err else dict(data, ok=True)
+    return render_template("versions.html", job=dict(job, dest=effective_dest(job)), job_id=job_id, data=data or {}, err=err,
+                           q=q, stamp=stamp, side=side, bisync=is_bisync(job), msg=session.pop("flash", None))
+
+
+@app.post("/job/<job_id>/versions/restore")
+def job_versions_restore(job_id):
+    job = load_jobs().get(job_id) or abort(404)
+    body = request.get_json(silent=True)
+    if body is None:
+        f = request.form
+        body = {"items": [{"stamp": x.split("|", 1)[0], "path": x.split("|", 1)[1]} for x in f.getlist("item") if "|" in x],
+                "target": f.get("target", "source"), "overwrite": bool(f.get("overwrite")), "side": f.get("side", "b")}
+    res, err, st = versions_restore(job, body.get("items"), body.get("target", "source"), bool(body.get("overwrite")),
+                                    "a" if body.get("side") == "a" else "b")
+    if not err:
+        audit_add("job", "Dateien wiederhergestellt", job["name"],
+                  detail=i18n.t("{0} Datei(en) nach {1}", len(res["restored"]), res["target"]) + (f", {len(res['failed'])} Fehler" if res["failed"] else ""))
+    if request.headers.get("Accept", "").startswith("application/json") or g.get("bridge"):
+        return (dict(res or {}, ok=False, error=err), st) if err else (dict(res, ok=True), 200)
+    session["flash"] = err or i18n.t("{0} Datei(en) wiederhergestellt nach {1}.", len(res["restored"]), res["target"]) + \
+        (" " + i18n.t("{0} fehlgeschlagen.", len(res["failed"])) if res["failed"] else "")
+    return redirect(url_for("job_versions", job_id=job_id, q=request.form.get("q", ""), stamp=request.form.get("stamp", ""),
+                            side=body.get("side", "b")))
+
+
+@app.get("/job/<job_id>/versions/download")
+def job_versions_download(job_id):
+    job = load_jobs().get(job_id) or abort(404)
+    st, rel = request.args.get("stamp", ""), _clean_rel(request.args.get("path"))
+    side = "a" if request.args.get("side") == "a" else "b"
+    if not VERSION_DIR_RE.match(st) or not rel:
+        abort(400)
+    src = f"{versions_base(job, side)}/{st}/{rel}"
+    rc, _o = rclone("lsjson", "--stat", src, timeout=30)
+    if rc != 0:
+        abort(404)
+    proc = subprocess.Popen(["rclone", "--config", RCLONE_CONF, "cat", src], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+
+    def gen():
+        try:
+            while True:
+                chunk = proc.stdout.read(65536)
+                if not chunk:
+                    break
+                yield chunk
+        finally:
+            proc.kill()
+    from urllib.parse import quote
+    return flask.Response(gen(), mimetype="application/octet-stream",
+                          headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(rel.rsplit('/', 1)[-1])}"})
+
+
+# ---------------------------------------------------------------- Groesste Ordner und Dateien
+_usage = {}          # (job_id, seite) -> Ergebnis
+_usage_lock = threading.Lock()
+USAGE_TOP = 100
+
+
+def _usage_scan(key, path, flt):
+    import heapq
+    dirs, top, total, files = {"": [0, 0]}, [], 0, 0
+    proc = subprocess.Popen(["rclone", "--config", RCLONE_CONF, "lsf", "-R", "--files-only", "--format", "sp", "--separator", "\t",
+                             *flt, path], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, errors="replace")
+    with _usage_lock:
+        _usage[key]["proc"] = proc
+    for line in proc.stdout:
+        size, _, p = line.rstrip("\n").partition("\t")
+        try:
+            n = max(0, int(size))
+        except ValueError:
+            continue
+        total += n
+        files += 1
+        parts = p.split("/")
+        acc = ""
+        dirs[""][0] += n
+        dirs[""][1] += 1
+        for part in parts[:-1]:
+            acc = f"{acc}/{part}" if acc else part
+            d = dirs.setdefault(acc, [0, 0])
+            d[0] += n
+            d[1] += 1
+        if len(top) < USAGE_TOP:
+            heapq.heappush(top, (n, p))
+        elif n > top[0][0]:
+            heapq.heapreplace(top, (n, p))
+        if files % 5000 == 0:
+            with _usage_lock:
+                _usage[key].update(files=files, bytes=total)
+    err = proc.stderr.read()[-400:]
+    rc = proc.wait()
+    with _usage_lock:
+        _usage[key].update(state="ok" if rc == 0 else "fehler", error="" if rc == 0 else err, dirs=dirs, files=files, bytes=total,
+                           top=sorted(top, reverse=True), at=time.strftime("%Y-%m-%d %H:%M:%S"), proc=None)
+
+
+def usage_start(job_id, job, side):
+    path = job["source"] if side == "source" else effective_dest(job)
+    key = (job_id, side)
+    with _usage_lock:
+        if (_usage.get(key) or {}).get("state") == "läuft":
+            return False
+        _usage[key] = {"state": "läuft", "path": path, "files": 0, "bytes": 0, "started": time.strftime("%Y-%m-%d %H:%M:%S")}
+    threading.Thread(target=_usage_scan, args=(key, path, filter_args(job)), daemon=True).start()
+    return True
+
+
+def usage_view(job_id, side, sub=""):
+    with _usage_lock:
+        u = dict(_usage.get((job_id, side)) or {})
+    u.pop("proc", None)
+    dirs = u.pop("dirs", None)
+    top = u.pop("top", None)
+    out = dict(u, side=side, sub=sub)
+    if dirs is not None:
+        sub = sub.strip("/")
+        pre = sub + "/" if sub else ""
+        kids = []
+        for d, (b, n) in dirs.items():
+            if d and d.startswith(pre) and "/" not in d[len(pre):]:
+                kids.append({"name": d[len(pre):], "path": d, "bytes": b, "files": n})
+        kids.sort(key=lambda x: -x["bytes"])
+        own = dirs.get(sub, [0, 0])
+        out.update(children=kids[:200], dir_bytes=own[0], dir_files=own[1],
+                   top_files=[{"path": p, "bytes": b} for b, p in (top or []) if not sub or p.startswith(pre)][:50])
+    return out
+
+
+def transfer_hotspots(job_id, job, days=30):
+    """Welche Ordner werden am haeufigsten uebertragen? Aus den aufbewahrten Logs der letzten Tage."""
+    cut = (datetime.datetime.now() - datetime.timedelta(days=days)).strftime("%Y-%m-%d %H:%M:%S")
+    folders, files_, runs = {}, {}, 0
+    rx = re.compile(r"INFO\s+: (.+?): Copied \((?:new|replaced existing)\)")
+    for h in job.get("history", []):
+        if h.get("start", "") < cut or h.get("dry_run") or not h.get("run"):
+            continue
+        p = run_log_path(job_id, h["run"])
+        if not os.path.exists(p):
+            continue
+        runs += 1
+        with open(p, encoding="utf-8", errors="replace") as f:
+            for line in f:
+                m = rx.search(line)
+                if m:
+                    path = m.group(1)
+                    top = path.split("/", 1)[0] if "/" in path else "/"
+                    folders[top] = folders.get(top, 0) + 1
+                    files_[path] = files_.get(path, 0) + 1
+    return {"runs": runs, "days": days,
+            "folders": sorted(({"name": k, "count": v} for k, v in folders.items()), key=lambda x: -x["count"])[:20],
+            "files": sorted(({"path": k, "count": v} for k, v in files_.items() if v > 1), key=lambda x: -x["count"])[:20]}
+
+
+@app.route("/job/<job_id>/usage", methods=["GET", "POST"])
+def job_usage(job_id):
+    job = load_jobs().get(job_id) or abort(404)
+    side = "dest" if (request.values.get("side") == "dest") else "source"
+    if request.method == "POST":
+        started = usage_start(job_id, job, side)
+        if request.headers.get("Accept", "").startswith("application/json"):
+            return {"ok": True, "started": started}
+        return redirect(url_for("job_usage", job_id=job_id, side=side))
+    view = usage_view(job_id, side, request.args.get("path", ""))
+    if request.headers.get("Accept", "").startswith("application/json"):
+        return dict(view, ok=True, hotspots=transfer_hotspots(job_id, job) if request.args.get("hotspots") else None)
+    return render_template("usage.html", job=dict(job, dest=effective_dest(job)), job_id=job_id, u=view, side=side,
+                           hot=transfer_hotspots(job_id, job), auto_refresh=view.get("state") == "läuft")
+
+
+# ---------------------------------------------------------------- Statistik pro Monat
+@app.get("/stats")
+def stats_page():
+    jobs = load_jobs()
+    vis = lambda jid: g.access.job_ok(jid, jobs.get(jid) or {"owner": ""}) if jid in jobs else g.access.admin
+    data = monitor.months(24, vis)
+    if request.headers.get("Accept", "").startswith("application/json"):
+        return {"ok": True, "months": data, "volume": monitor.volume_state()}
+    return render_template("stats.html", months=data, vol=monitor.volume_state(), hb=human_bytes)
+
+
+app.jinja_env.filters["hbytes"] = human_bytes
+
+
+# ---------------------------------------------------------------- Health und Prometheus
+def _monitor_access():
+    """Zugriff auf /health/jobs und /metrics: angemeldet, API-Key (Header oder ?key=) oder freigegeben ohne Anmeldung.
+    Liefert (sichtbar-funktion, None) oder (None, antwort)."""
+    s = load_settings()
+    tok = request.args.get("key", "").strip()
+    hdr = request.headers.get("Authorization", "")
+    if tok and not hdr:
+        request.environ["HTTP_AUTHORIZATION"] = "Bearer " + tok
+        hdr = "Bearer " + tok
+    if hdr or request.headers.get("X-API-Key"):
+        resp = api.authenticate()
+        if resp is not None:
+            return None, resp
+        if not (g.access.has("system.monitor") or g.access.has("jobs.view")):
+            return None, ({"error": i18n.t("Dem Key fehlt das Recht „{0}“ ({1}).", roles.PERM_LABELS.get("system.monitor"), "system.monitor")}, 403)
+        return (lambda jid, j: g.access.job_ok(jid, j)), None
+    name, u = current_user()
+    if name:
+        acc = make_access(name, u["role"])
+        if acc.has("jobs.view") or acc.has("system.monitor"):
+            return (lambda jid, j: acc.job_ok(jid, j)), None
+    if s.get("monitor_public"):
+        return None, None
+    return None, ({"error": i18n.t("Anmeldung nötig: API-Key als Header Authorization: Bearer msk_… oder ?key=msk_…, "
+                                   "oder unter Einstellungen → Allgemein → Überwachung ohne Anmeldung freigeben.")}, 401)
+
+
+@app.get("/health/jobs")
+@app.get("/health/jobs/<job>")
+def health_jobs(job=None):
+    vis, deny = _monitor_access()
+    if deny:
+        return deny
+    data = monitor.health(vis, job or request.args.get("job") or None)
+    code = 200 if data["ok"] or request.args.get("always200") else 503
+    if request.args.get("format") == "text":
+        return flask.Response(("OK: " if data["ok"] else "FEHLER: ") + data["summary"] + "\n", status=code, mimetype="text/plain")
+    return data, code
+
+
+@app.get("/metrics")
+def metrics():
+    vis, deny = _monitor_access()
+    if deny:
+        return deny
+    return flask.Response(monitor.metrics(vis), mimetype="text/plain; version=0.0.4")
+
+
+# ---------------------------------------------------------------- Wochenbericht
+REPORT_CHANNELS = ("webhook", "smtp", "telegram", "apprise")
+
+
+def build_report(days=7, now=None):
+    L = i18n.default_lang
+    t = lambda x, *a: i18n.t(x, *a, lang=L)
+    now = now or datetime.datetime.now()
+    start = now - datetime.timedelta(days=days)
+    cut = start.strftime("%Y-%m-%d %H:%M:%S")
+    tot = {"runs": 0, "ok": 0, "fail": 0, "bytes": 0, "duration": 0}
+    lines, errs, hints, per_job = [], [], [], []
+    for jid, j in sorted(load_jobs().items(), key=lambda kv: kv[1].get("name", "").lower()):
+        hs = [h for h in j.get("history", []) if h.get("start", "") >= cut and not h.get("dry_run") and h.get("mode") != "verify"]
+        if not hs and not j.get("enabled"):
+            continue
+        n = len(hs)
+        ok = sum(1 for h in hs if h.get("status") == "ok")
+        fail = sum(1 for h in hs if h.get("status") in ("fehler", "abgebrochen"))
+        b = sum(int(h.get("bytes") or 0) for h in hs)
+        d = sum(int(h.get("duration") or 0) for h in hs)
+        for k, v in (("runs", n), ("ok", ok), ("fail", fail), ("bytes", b), ("duration", d)):
+            tot[k] += v
+        per_job.append({"id": jid, "name": j["name"], "runs": n, "ok": ok, "fail": fail, "bytes": b, "duration": d})
+        if not n:
+            lines.append("• " + t("{0}: keine Läufe", j["name"]))
+            continue
+        line = "• " + t("{0}: {1} Läufe, {2} ok", j["name"], n, ok)
+        if fail:
+            line += ", " + t("{0} mit Fehler", fail)
+        lines.append(line + ", " + human_bytes(b))
+        bad = next((h for h in hs if h.get("status") in ("fehler", "abgebrochen")), None)
+        if bad:
+            msg = ""
+            p = run_log_path(jid, bad.get("run") or "")
+            if bad.get("run") and os.path.exists(p):
+                e = notify.summarize_log(p)[2]
+                msg = e[-1][:200] if e else ""
+            if not msg and (bad.get("verify") or {}).get("result") in ("diff", "error"):
+                msg = t("Prüflauf: {0}", verify_text(bad["verify"]))
+            errs.append("• " + f"{j['name']} ({bad['start'][8:10]}.{bad['start'][5:7]}. {bad['start'][11:16]})" + (f": {msg}" if msg else ""))
+        if j.get("delete_hold"):
+            hints.append("🛑 " + t("{0}: wartet auf Freigabe ({1} % würden gelöscht)", j["name"], int(j["delete_hold"].get("pct") or 0)))
+        v = [h["verify"] for h in hs if h.get("verify")]
+        if v:
+            good = sum(1 for x in v if x.get("result") == "ok")
+            hints.append("🔎 " + t("{0}: {1} von {2} Prüfläufen 1:1 gleich", j["name"], good, len(v)))
+        sp = j.get("dest_space") or {}
+        if sp.get("free") is not None and sp.get("total"):
+            pct = sp["free"] * 100 / sp["total"]
+            if pct < 10:
+                hints.append("💽 " + t("{0}: am Ziel nur noch {1} frei ({2} %)", j["name"], human_bytes(sp["free"]), int(pct)))
+    vol = monitor.volume_state()
+    if vol:
+        hints.append("📶 " + t("Datenvolumen {0}: {1} von {2} ({3} %)", vol["month"], human_bytes(vol["used"]), human_bytes(vol["limit"]), int(vol["pct"])))
+    period = f"{start:%d.%m.}–{now:%d.%m.%Y}"
+    values = {"zeitraum": period, "laeufe": str(tot["runs"]), "ok_anzahl": str(tot["ok"]), "fehler_anzahl": str(tot["fail"]),
+              "daten": human_bytes(tot["bytes"]), "dauer": notify._dur(tot["duration"]), "liste": "\n".join(lines),
+              "fehler_liste": ("\n\n" + t("Fehler:") + "\n" + "\n".join(errs)) if errs else "",
+              "hinweise": ("\n\n" + "\n".join(hints)) if hints else ""}
+    return values, {"period": period, "from": start.strftime("%Y-%m-%d %H:%M"), "to": now.strftime("%Y-%m-%d %H:%M"),
+                    "totals": tot, "jobs": per_job}
+
+
+def send_report(by="Zeitplan", channels=None):
+    """Wochenbericht senden. Liefert {kanal: None | Fehlertext}."""
+    s = load_settings()
+    days = _int(s.get("report_period"), 7, 1, 31)
+    values, data = build_report(days)
+    eff = dict(s)
+    want = channels if channels is not None else [c for c in (s.get("report_channels") or []) if c in REPORT_CHANNELS]
+    if want:
+        for c in REPORT_CHANNELS:
+            eff[f"{c}_enabled"] = c in want and bool(s.get(f"{c}_enabled"))
+    ev = notify.event(eff, "report", values, status="report", ok=data["totals"]["fail"] == 0, job="", report=data)
+    res = notify.send(eff, ev)
+    s = load_settings()
+    s["report_last"] = {"at": time.strftime("%Y-%m-%d %H:%M:%S"), "by": by, "results": res}
+    save_settings(s)
+    return res
+
+
+@app.post("/settings/report/send")
+def report_send():
+    res = send_report(by=g.user or "Web")
+    audit_add("settings", "Wochenbericht gesendet", "Benachrichtigungen", detail=", ".join(res) or "–")
+    if request.headers.get("Accept", "").startswith("application/json") or g.get("bridge"):
+        return {"ok": bool(res) and all(v is None for v in res.values()), "results": res,
+                "error": None if res else i18n.t("Kein Kanal aktiv.")}
+    session["flash"] = i18n.t("Wochenbericht gesendet: {0}", ", ".join(f"{k} {'✓' if v is None else '✗ ' + v}" for k, v in res.items())) if res \
+        else i18n.t("Kein Kanal aktiv.")
+    return redirect("/settings#report")
+
+
+@app.post("/settings/notify/test-all")
+def notify_test_all():
+    """Probe-Nachricht an alle eingeschalteten Kanaele (Standard-Einstellungen)."""
+    s = load_settings()
+    ev = notify.event(s, "test", {"job": "Test"}, status="test", ok=True, job="Test", source="-", dest="-")
+    res = notify.send(s, ev, force=True)
+    if request.headers.get("Accept", "").startswith("application/json") or g.get("bridge"):
+        return {"ok": bool(res) and all(v is None for v in res.values()), "results": res,
+                "error": None if res else i18n.t("Kein Kanal aktiv.")}
+    if not res:
+        session["flash_err"] = i18n.t("Kein Kanal aktiv.")
+    else:
+        session["flash"] = i18n.t("Probe gesendet: {0}", ", ".join(f"{k} {'✓' if v is None else '✗ ' + v}" for k, v in res.items()))
+    return redirect("/settings")
+
+
+# ---------------------------------------------------------------- Versionshinweise
+def _cl_lang():
+    return "de" if i18n.current() == "de" else "en"
+
+
+@app.get("/changelog")
+def changelog_page():
+    items = changelog.entries(_cl_lang())
+    if request.headers.get("Accept", "").startswith("application/json"):
+        since = request.args.get("since", "")
+        rows = changelog.between(_cl_lang(), since, VERSION) if since else items
+        return {"ok": True, "version": VERSION, "entries": [{"version": e["version"], "date": e["date"], "text": e["md"]} for e in rows]}
+    return render_template("changelog.html", items=[dict(e, html=Markup(changelog.to_html(e["md"]))) for e in items],
+                           release_url=f"https://github.com/{update.REPO}/releases")
+
+
+@app.post("/changelog/seen")
+def changelog_seen():
+    if g.user and not g.get("bridge"):
+        u = store.get(g.user)
+        if u is not None and u.get("seen_version") != VERSION:
+            store.update(g.user, seen_version=VERSION)
+    return {"ok": True}
+
+
+def whats_new():
+    """Versionshinweise seit der zuletzt gesehenen Version des Benutzers (einmal nach einem Update)."""
+    if not g.get("user") or g.get("bridge") or request.path.startswith(("/changelog", "/setup", "/login")):
+        return None
+    u = store.get(g.user) or {}
+    seen = u.get("seen_version")
+    if seen == VERSION:
+        return None
+    if seen and changelog.vtuple(seen) > changelog.vtuple(VERSION):
+        return None
+    rows = changelog.between(_cl_lang(), seen or "", VERSION)[:8]
+    if not rows:
+        return None
+    return [dict(e, html=Markup(changelog.to_html(e["md"]))) for e in rows]
+
+
+app.jinja_env.globals["WHATS_NEW"] = whats_new
+
+
+# ---------------------------------------------------------------- Als App installieren (PWA)
+@app.get("/manifest.webmanifest")
+def pwa_manifest():
+    lang = i18n.current()
+    data = {"name": "MirrorSync", "short_name": "MirrorSync", "id": "/", "start_url": "/dashboard", "scope": "/",
+            "display": "standalone", "background_color": "#09090b", "theme_color": "#4f46e5", "lang": lang,
+            "description": i18n.t("Ordner 1:1 spiegeln mit rclone"),
+            "icons": [{"src": "/static/icon-192.png", "sizes": "192x192", "type": "image/png"},
+                      {"src": "/static/icon-512.png", "sizes": "512x512", "type": "image/png"},
+                      {"src": "/static/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"},
+                      {"src": "/static/favicon.svg", "sizes": "any", "type": "image/svg+xml"}],
+            "shortcuts": [{"name": i18n.t("Aufgaben"), "url": "/"}, {"name": i18n.t("Dashboard"), "url": "/dashboard"},
+                          {"name": i18n.t("Statistik"), "url": "/stats"}]}
+    return flask.Response(json.dumps(data, ensure_ascii=False), mimetype="application/manifest+json")
+
+
+SW_JS = """// MirrorSync Service Worker: macht die Oberflaeche installierbar. Seiten kommen immer frisch vom Server,
+// nur ohne Verbindung erscheint eine Hinweisseite.
+const C='mirrorsync-v1';const OFF='/offline';
+self.addEventListener('install',e=>{e.waitUntil(caches.open(C).then(c=>c.addAll([OFF,'/static/favicon.svg','/static/icon-192.png'])).then(()=>self.skipWaiting()))});
+self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==C).map(k=>caches.delete(k)))).then(()=>self.clients.claim()))});
+self.addEventListener('fetch',e=>{const r=e.request;if(r.method!=='GET')return;
+ if(r.mode==='navigate'){e.respondWith(fetch(r).catch(()=>caches.match(OFF)));return}
+ const u=new URL(r.url);if(u.origin===location.origin&&u.pathname.startsWith('/static/')){e.respondWith(caches.match(r).then(x=>x||fetch(r)))}});
+"""
+
+
+@app.get("/sw.js")
+def pwa_sw():
+    return flask.Response(SW_JS, mimetype="application/javascript",
+                          headers={"Cache-Control": "no-cache", "Service-Worker-Allowed": "/"})
+
+
+@app.get("/offline")
+def pwa_offline():
+    return render_template("offline.html")
+
+
 GEOIP_DOW = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
 
 
@@ -5055,6 +6471,7 @@ def _geoip_loop():
         time.sleep(86400)
 
 
+monitor.init(sys.modules[__name__])
 api.register(app, sys.modules[__name__])
 filemgr.register(app, sys.modules[__name__])
 apigui.register(app, sys.modules[__name__])
@@ -5110,6 +6527,10 @@ def main():
     if jobs:
         save_jobs(jobs)
     migrate_logs()
+    try:
+        monitor.backfill()   # Monatsstatistik einmalig aus dem bisherigen Verlauf fuellen
+    except Exception as e:  # noqa: BLE001
+        print(f"Statistik: Übernahme aus dem Verlauf fehlgeschlagen: {e}", flush=True)
     if "language" not in DB.get_map("settings") and store.load():
         st = load_settings()
         st["language"] = i18n.SOURCE   # bestehende Installation (bis 1.19): bisher alles Deutsch

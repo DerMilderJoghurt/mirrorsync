@@ -4,7 +4,7 @@
 
 # MirrorSync – 1:1-Spiegelung mit Web-GUI und Zeitplänen
 
-Version **1.51.0** · Änderungen siehe [CHANGELOG.md](CHANGELOG.md) (englisch) · [English version](README.md)
+Version **1.52.0** · Änderungen siehe [CHANGELOG.md](CHANGELOG.md) (englisch) · [English version](README.md)
 
 Ein Docker-Container, der Ordner **einweg 1:1 spiegelt** (wie FreeFileSync „Spiegeln"):
 Das Ziel wird exakt wie die Quelle, inklusive Löschungen. Als Sync-Motor dient
@@ -57,6 +57,13 @@ Dann `http://<docker-host>:8080` öffnen und den ersten Admin anlegen.
 - **Versionierung**: gelöschte/überschriebene Dateien landen in `<ziel>.versions/<datum>`, optional nur die
   letzten N Versionen bzw. höchstens X Tage behalten (Ältere werden nach jedem Lauf entfernt)
 - **Lösch-Schutz**: Lauf bricht ab, wenn mehr als N Dateien gelöscht würden
+- **Prüflauf nach dem Sync** (seit 1.52.0): vergleicht Quelle und Ziel Datei für Datei und zeigt „1:1 gleich“ oder die Abweichungen
+- **Löschwarnung** (seit 1.52.0): würde ein Lauf mehr als X % der Dateien löschen, pausiert er und fragt nach (Schutz vor Ransomware oder leerer Quelle)
+- **Papierkorb durchsuchen und wiederherstellen**, **Speicherprüfung am Ziel**, **automatisch neu versuchen**, **`.nosync`-Ordner überspringen**
+- **Skripte vor/nach dem Lauf**, **Snapshot am Ziel** (ZFS/Btrfs) und **Wake-on-LAN** mit Schlafenlegen danach
+- **Health-Check** `/health/jobs` (Uptime Kuma, Home Assistant), **Prometheus** `/metrics`, **Statistik pro Monat** mit Datenvolumen-Limit
+- **Wochenbericht**, **Ruhezeiten** und **Probe an alle Kanäle** bei den Benachrichtigungen
+- **Als App installierbar (PWA)**, „Neu in dieser Version“ nach Updates und Versionshinweise direkt in der GUI
 - **Benachrichtigungen** per Webhook (ntfy, Discord, Slack, Home Assistant, n8n …), E-Mail (SMTP), Telegram und **Apprise** (über 100 Dienste, direkt oder über einen Apprise-API-Server), mit Test-Knopf; wann (immer / nur bei Fehler / nie) als Standard für alle Aufgaben, oder direkt in der Aufgabe mit eigenen Kanälen, Empfängern, Chat-ID und Test-Knopf
 
 ## Betrieb als Vermittler (Server A → Server B)
@@ -68,7 +75,7 @@ Geänderte Dateien werden komplett neu übertragen (kein Delta wie bei rsync).
 
 ## Installation
 Das fertige Image liegt in der GitHub Container Registry: `ghcr.io/dermilderjoghurt/mirrorsync`
-(für amd64 und arm64, z. B. Raspberry Pi). Tags: `latest` (neueste Version), `1.51.0` (feste Version),
+(für amd64 und arm64, z. B. Raspberry Pi). Tags: `latest` (neueste Version), `1.52.0` (feste Version),
 `1.40` (neuester Patch dieser Version). Das Image wird nur veröffentlicht, wenn sich die Versionsnummer ändert.
 Update-Prüfer wie Dockhand oder Watchtower melden deshalb nur dann ein Update, wenn es wirklich eine neue Version gibt.
 
@@ -277,6 +284,66 @@ bleibt sie Basisordner, sonst wird der gemeinsame Elternordner zur Quelle.
   Auswahl aus** (seit 1.27.0): Die gewählten Ordner und Dateien landen direkt im Ziel, z. B. Quelle
   `NAS:share` mit Auswahl `10-Temp/` und Ziel `Familie-NAS:share` ergibt `Familie-NAS:share/10-Temp`.
 - Leeres Feld = der ganze Quellordner wie bisher.
+
+## Prüfen und schützen (seit 1.52.0)
+In der Aufgabe unter **Prüfen und schützen**:
+- **Prüflauf nach dem Sync**: aus, nach jedem Lauf, höchstens täglich oder wöchentlich. MirrorSync vergleicht mit
+  `rclone check` Quelle und Ziel (Prüfsumme, wenn beide Seiten eine gemeinsame haben, sonst Größe; oder Inhalt Byte für
+  Byte). Ergebnis im Verlauf („1:1 gleich (1234 Dateien)“ oder die Abweichungen im Log); Abweichungen machen den Lauf
+  zum Fehler. Im Log prüft **🔎 Jetzt prüfen** jederzeit, ohne zu spiegeln.
+- **Löschwarnung ab X %**: Vor jedem echten Lauf spielt MirrorSync den Abgleich als Test durch. Würden mindestens X %
+  der Dateien im Ziel gelöscht (und mindestens N Dateien), hält der Lauf an, nichts wird verändert, Status
+  „Freigabe nötig“ und Benachrichtigung. Freigeben oder verwerfen in der Übersicht, im Log oder per API/MCP
+  (`approve_job`, `dismiss_delete_warning`). Neues Recht `jobs.approve` (hat auch die Rolle Operator).
+- **Speicher am Ziel prüfen**: vor dem Lauf, ob genug Platz frei ist (laut Testlauf benötigte Menge plus optional ein
+  Mindestwert in GB). Warnen oder den Lauf gar nicht erst starten.
+- **Neu versuchen nach (Minuten)**, z. B. `5, 15, 60`: nur bei Netzwerkproblemen oder bei jedem Fehler. Gemeldet wird
+  erst, wenn auch der letzte Versuch scheitert.
+- **`.nosync`**: Liegt in einem Ordner der Quelle eine Datei `.nosync`, wird er übersprungen; im Ziel bleibt er
+  unberührt (bei neuen Aufgaben an).
+
+## Papierkorb und Wiederherstellen (seit 1.52.0)
+Mit eingeschalteter Versionierung landen gelöschte und überschriebene Dateien in `<ziel>.versions/<datum>`. Im Log
+der Aufgabe führt **🗑 Papierkorb** zur Suche nach Name oder Pfad, optional nur in einem Stand. Dateien lassen sich
+herunterladen oder mit einem Klick in die **Quelle** (empfohlen, der nächste Lauf spiegelt sie wieder) oder ins Ziel
+zurückholen. Recht `jobs.restore`. API/MCP: `list_versions`, `restore_versions`,
+`download_version`.
+
+## Skripte, Snapshot und Wake-on-LAN (seit 1.52.0)
+Nur mit dem Recht **`jobs.scripts`** („Skripte vor/nach dem Lauf, Snapshots und Wake-on-LAN einrichten“, hat zunächst nur der Admin).
+- **Skripte vor und nach dem Lauf**: Shell-Befehle im Container oder per SSH auf einem SFTP-Speicherort (dessen Host,
+  Benutzer, Passwort bzw. Schlüssel werden verwendet). Variablen `MS_JOB_NAME`, `MS_SOURCE`, `MS_DEST`, `MS_RUN_ID`,
+  nach dem Lauf `MS_STATUS`. Schlägt das Skript davor fehl: Lauf abbrechen oder trotzdem spiegeln.
+- **Snapshot am Ziel** nach jedem erfolgreichen Lauf: ZFS (`zfs snapshot`), Btrfs (`btrfs subvolume snapshot -r`,
+  Ordner außerhalb des Ziels) oder eigener Befehl, optional mit `sudo -n` und „nur die letzten N behalten“.
+- **Wake-on-LAN**: MirrorSync prüft vor dem Lauf, ob das Ziel erreichbar ist, schickt sonst ein Magic Packet und
+  wartet. Danach kann es den Server per SSH wieder schlafen legen (z. B. `systemctl suspend`), aber nur, wenn es ihn
+  selbst geweckt hat und keine andere Aufgabe ihn noch braucht. Im Bridge-Netz die Broadcast-Adresse des LANs eintragen.
+
+## Überwachung: Health-Check, Prometheus und Statistik (seit 1.52.0)
+- **`/health/jobs`** liefert HTTP 200, wenn alles in Ordnung ist, sonst 503 (Fehler, überfällig, Löschwarnung,
+  Abweichung beim Prüflauf), z. B. `{"status": "ok", "summary": "3 Aufgaben ok, letzter Sync vor 5 Minuten", …}`.
+  Eine Aufgabe: `/health/jobs/<ID oder Name>`; als Text: `?format=text`. Für Uptime Kuma (HTTP-Monitor oder Keyword)
+  und Home Assistant (RESTful-Sensor).
+- **`/metrics`** im Prometheus-Format: Läufe, übertragene Bytes, Dauer, Status, Alter des letzten Laufs, Prüfläufe,
+  Datenvolumen. Für Grafana.
+- Zugriff mit einem API-Key mit dem Recht `system.monitor` (oder `jobs.view`) (`Authorization: Bearer msk_…` oder `?key=msk_…`) oder unter
+  **Einstellungen → Allgemein → Überwachung** ohne Anmeldung freigeben. `/health` (nur „läuft“) bleibt wie bisher.
+- **Statistik** (Seitenleiste): übertragene Daten, Läufe, Fehler und Laufzeit pro Monat und Aufgabe. Optional ein
+  **Datenvolumen-Limit** pro Monat mit Warnung ab X % und Anhalten automatischer Läufe.
+- **Platzbedarf** (im Log der Aufgabe): größte Ordner und Dateien in Quelle oder Ziel zum Durchklicken, dazu die am
+  häufigsten übertragenen Ordner laut Logs.
+
+## Wochenbericht, Ruhezeiten, Probe an alle Kanäle (seit 1.52.0)
+Unter **Einstellungen → Benachrichtigungen**: **Ruhezeit** (z. B. 22:00–07:00, nur Fehler oder gar nichts melden),
+**Wochenbericht** (Tage, Uhrzeit, Zeitraum, Kanäle; „Bericht jetzt senden“) und **Probe an alle Kanäle**. Neue
+Ereignisse mit eigenen Texten: Löschwarnung, Speicher knapp, Datenvolumen, Wochenbericht; in Lauf-Meldungen steht
+das Prüfergebnis (`{pruefung}`, `{pruefung_block}`).
+
+## Als App installieren, Versionshinweise (seit 1.52.0)
+Die Weboberfläche lässt sich im Browser **als App installieren** (Chrome/Edge: „App installieren“, Android: „Zum
+Startbildschirm hinzufügen“, iOS: „Zum Home-Bildschirm“), ohne die Android-App. Die **Versionsnummer** unten links
+öffnet alle Versionshinweise; nach einem Update zeigt MirrorSync beim ersten Anmelden einmal, was neu ist.
 
 ## Diagramme im Dashboard (seit 1.51.0)
 Zusätzlich zu Zahl, Liste, Balken und Statusampel gibt es diese Darstellungen. Im Editor sind nur die wählbar, die zur
@@ -979,7 +1046,7 @@ MirrorSync kann sich selbst aktualisieren, wenn du den Docker-Socket in den Cont
   sie entfernt und die bisherige läuft wieder. Ergebnis und Ablauf stehen in der GUI, im Audit-Log
   („Update gestartet / abgeschlossen / fehlgeschlagen“) und in `config/selfupdate.json`.
 - **Voraussetzungen:** Das Image muss aus einem Registry kommen (`image: ghcr.io/dermilderjoghurt/mirrorsync:latest`).
-  Mit `build: .` gebaute Images kann MirrorSync nicht neu holen. Mit festem Versions-Tag (`:1.51.0`) wird nur dieser
+  Mit `build: .` gebaute Images kann MirrorSync nicht neu holen. Mit festem Versions-Tag (`:1.52.0`) wird nur dieser
   Tag neu geholt. `/config` muss als Volume oder Ordner eingebunden sein (ist es in der Beispiel-Compose).
 - **Recht:** `system.update` („MirrorSync aktualisieren“, Admins haben es automatisch). Automatik und Uhrzeit
   ändern braucht `system.settings`.

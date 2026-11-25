@@ -32,7 +32,8 @@ class BackupError(Exception):
 
 
 # Felder, die sich bei jedem Lauf oder jeder Anmeldung aendern: zaehlen nicht als Aenderung
-VOLATILE = {"job": {"history", "last_status", "last_run", "live_last", "live_checked", "live_failing", "live_fail_count"},
+VOLATILE = {"job": {"history", "last_status", "last_run", "live_last", "live_checked", "live_failing", "live_fail_count",
+                    "delete_hold", "retry_pending", "last_verify", "dest_space", "nosync_dirs"},
             "user": {"last_login", "last_ip", "last_country", "fail_count", "totp_last", "auto_lock_until"},
             "apikey": {"last_used", "last_ip", "uses"}}
 AUTO_PREFIX = "mirrorsync-auto-"
@@ -269,6 +270,7 @@ def state_hash(db, config_dir):
     data = db.dump()
     data.pop("login_log", None)
     data.pop("audit", None)
+    data.pop("stats", None)   # Monatsstatistik aendert sich mit jedem Lauf
     for ns, keys in VOLATILE.items():
         for v in (data.get(ns) or {}).values():
             if isinstance(v, dict):

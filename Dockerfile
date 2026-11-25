@@ -22,8 +22,10 @@ RUN pip uninstall -y pip setuptools wheel >/dev/null 2>&1; \
     rm -rf /usr/local/lib/python3*/ensurepip /usr/local/lib/python3*/site-packages/setuptools* \
            /usr/local/lib/python3*/site-packages/pip* /usr/local/bin/pip*
 COPY app/ .
+# Release notes for the /changelog page and "New in this version"
+COPY CHANGELOG*.md ./
 
-ARG VERSION=1.51.0
+ARG VERSION=1.52.0
 LABEL org.opencontainers.image.title="MirrorSync" org.opencontainers.image.version=$VERSION
 ENV TZ=Europe/Berlin CONFIG_DIR=/config LOG_DIR=/logs PORT=8080 PYTHONUNBUFFERED=1
 VOLUME ["/config", "/logs"]
