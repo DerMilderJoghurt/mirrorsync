@@ -139,6 +139,8 @@ users.CURRENT_VERSION = VERSION
 app.jinja_env.globals["ICON"] = {k: Markup(v) for k, v in ICONS.items()}
 # Hilfe-Tab: passender Abschnitt zur gerade offenen Einstellungsseite
 app.jinja_env.globals["HELP_ANCHOR"] = {"/settings": "#notify", "/settings/general": "#general", "/settings/access": "#access",
+                                        "/settings/security": "#security", "/settings/updates": "#maint", "/settings/restart": "#maint",
+                                        "/settings/logs": "#maint", "/settings/monitoring": "#monnet", "/settings/network": "#monnet",
                                         "/settings/api": "#api", "/settings/backup": "#backup", "/users": "#users",
                                         "/roles": "#users", "/groups": "#users", "/account": "#account", "/users/log": "#users"}
 # Einstellungen: Leiste links mit Gruppen und Suchindex (nur erlaubte Seiten)
@@ -1398,7 +1400,7 @@ def verify_text(v):
 
 def _pipeline(job_id, job, handle, cmd_fn, logf, started, dry, by, run_id, log_path, mode, opts):
     """Alle Schritte eines Laufs nacheinander (im Hintergrund)."""
-    info = {"attempt": opts.get("retry_attempt", 0), "by": by}
+    info = {"attempt": opts.get("retry_attempt", 0), "by": by, "solo": bool(opts.get("solo"))}
     rc = None
 
     def w(text):
@@ -1467,6 +1469,8 @@ def _pipeline(job_id, job, handle, cmd_fn, logf, started, dry, by, run_id, log_p
                 info["script_post_failed"] = True
                 info["no_retry"] = True
     info["retry"] = _retry_plan(job_id, job, rc, info, mode, dry, log_path, w)
+    if info["retry"] and info["solo"]:
+        info["retry"]["solo"] = True   # Wiederholung startet ebenfalls ohne Folgeaufgaben
     if woke and job.get("wol_sleep") and not info["retry"]:
         try:
             _wol_sleep(job_id, job, w)
@@ -1506,7 +1510,8 @@ def _schedule_retry(job_id, plan):
     if at < datetime.datetime.now():
         at = datetime.datetime.now() + datetime.timedelta(seconds=30)
     scheduler.add_job(start_job, DateTrigger(run_date=at, timezone=TZ), args=[job_id],
-                      kwargs={"by": f"Wiederholung {plan['attempt']}/{plan['of']}", "retry_attempt": plan["attempt"]},
+                      kwargs={"by": f"Wiederholung {plan['attempt']}/{plan['of']}", "retry_attempt": plan["attempt"],
+                              "solo": bool(plan.get("solo"))},
                       id=job_id + ":retry", replace_existing=True, misfire_grace_time=3600)
 
 
@@ -1717,7 +1722,7 @@ def _watch(job_id, job, rc, logf, started, dry, by, run_id, log_path, mode="full
             send_notifications(job_id, job, status, duration, dry, log_path, by, mode, extra)
     elif not delta or notify_now and status == "fehler":
         send_notifications(job_id, job, status, duration, dry, log_path, by, mode, extra)
-    if (not delta or mode == "livesync") and mode != "verify":    # Live wie Spiegeln: Folgeaufgaben nach jeder Runde mit Aenderungen
+    if (not delta or mode == "livesync") and mode != "verify" and not info.get("solo"):    # Live wie Spiegeln: Folgeaufgaben nach jeder Runde mit Aenderungen
         start_followers(job_id, status, dry, log_path)
     cleanup_logs(job_id)
 
@@ -1733,11 +1738,13 @@ def _log_results(log_path, results):
         pass
 
 
-def start_job(job_id, dry_run=False, by="Zeitplan", mode="full", manual=False, resync=False, guard_ok=False, retry_attempt=0):
+def start_job(job_id, dry_run=False, by="Zeitplan", mode="full", manual=False, resync=False, guard_ok=False, retry_attempt=0,
+              solo=False):
     """Startet einen Job im Hintergrund. False, wenn er schon laeuft (Laeufe ueberlappen nie).
     mode=delta: Live-Lauf, kopiert nur seit dem letzten erfolgreichen Lauf geaenderte Dateien.
     mode=verify: nur pruefen, ob Quelle und Ziel 1:1 gleich sind.
-    guard_ok: Loeschwarnung fuer diesen Lauf freigegeben. retry_attempt: Nummer der Wiederholung nach einem Fehler."""
+    guard_ok: Loeschwarnung fuer diesen Lauf freigegeben. retry_attempt: Nummer der Wiederholung nach einem Fehler.
+    solo: nur diese Aufgabe, Folgeaufgaben der Kette werden danach nicht gestartet (seit 1.56.0)."""
     with _lock:
         if job_id in _running:
             return False
@@ -1844,7 +1851,9 @@ def start_job(job_id, dry_run=False, by="Zeitplan", mode="full", manual=False, r
         update_job(job_id, **fields)
         if mode != "verify" and not retry_attempt:
             cancel_retry(job_id)   # neuer regulaerer Lauf ersetzt einen geplanten Wiederholungsversuch
-        opts = {"guard_ok": guard_ok, "retry_attempt": retry_attempt, "max_age": max_age}
+        opts = {"guard_ok": guard_ok, "retry_attempt": retry_attempt, "max_age": max_age, "solo": solo}
+        if solo:
+            logf.write("=== Nur diese Aufgabe: Folgeaufgaben werden danach nicht gestartet. ===\n")
     threading.Thread(target=_pipeline, args=(job_id, job, handle, cmd_fn, logf, time.time(), dry, by, run_id, log_path, mode, opts),
                      daemon=True).start()
     return True
@@ -2329,9 +2338,11 @@ ENDPOINT_PERMS = {
     "dashboard_page": None, "dashboard_save": None, "system_restart": "system.restart", "system_images": "system.update", "system_images_prune": "system.update",
     "auth_remote": "remotes.edit", "browse": "remotes.browse", "browse_list": "remotes.browse",
     "users_page": "users.view", "login_history": "users.view", "login_log_action": "users.manage", "user_unlock": "users.manage", "user_edit": "users.manage", "user_delete": "users.manage",
-    "roles_page": "roles.manage", "role_edit": "roles.manage", "role_delete": "roles.manage",
+    "roles_page": "roles.manage", "role_edit": "roles.manage", "role_delete": "roles.manage", "role_restore": "roles.manage",
     "groups_page": "groups.manage", "group_edit": "groups.manage", "group_delete": "groups.manage",
-    "general_settings": "system.settings", "audit_page": "system.audit", "audit_export": "system.audit",
+    "general_settings": "system.settings", "security_settings": "system.settings", "updates_settings": "system.settings",
+    "restart_settings": "system.settings", "logs_settings": "system.settings", "monitoring_settings": "system.settings",
+    "network_settings": "system.settings", "audit_page": "system.audit", "audit_export": "system.audit",
     "access_settings": "system.access", "access_block": "system.access", "access_unblock": "system.access",
     "job_approve": "jobs.approve", "job_hold_dismiss": "jobs.approve", "job_verify": "jobs.run",
     "job_versions": "jobs.restore", "job_versions_restore": "jobs.restore", "job_versions_download": "jobs.restore",
@@ -2350,8 +2361,16 @@ def endpoint_perm():
         return "remotes.edit" if va.get("name") else "remotes.create"
     if ep == "remote_wizard":
         return "remotes.edit" if g.access.has("remotes.edit") else "remotes.create"
+    if ep == "updates_settings" and not post and not g.access.has("system.settings") and g.access.has("system.update"):
+        return "system.update"   # Selbst-Update ansehen und starten geht auch ohne Recht auf die Einstellungen
+    if ep == "restart_settings" and not post and not g.access.has("system.settings") and g.access.has("system.restart"):
+        return "system.restart"
     if ep == "settings_page":
         return "notify.edit" if post else "notify.view"
+    if ep == "jobs_bulk":
+        return JOB_BULK.get(request.form.get("action"), "jobs.edit")
+    if ep == "remotes_bulk":
+        return REMOTE_BULK.get(request.form.get("action"), "remotes.edit")
     if ep == "files_op":
         return filemgr.OP_PERMS.get(va.get("op"), "files.edit")
     return ENDPOINT_PERMS.get(ep)
@@ -2580,10 +2599,12 @@ WRITE_METHODS = ("POST", "PUT", "PATCH", "DELETE")
 AUDIT_EP = {
     "edit_job": ["job"], "delete_job": ["job"], "job_pause": ["job"], "schedule_job": ["job"], "schedule_chains": ["job"],
     "edit_remote": ["remote"], "remote_wizard": ["remote"], "auth_remote": ["remote"], "delete_remote": ["remote"],
-    "duplicate_job": ["job"], "duplicate_remote": ["remote"],
-    "settings_page": ["settings"], "general_settings": ["settings"],
+    "duplicate_job": ["job"], "duplicate_remote": ["remote"], "jobs_bulk": ["job"], "remotes_bulk": ["remote"],
+    "settings_page": ["settings"], "general_settings": ["settings"], "security_settings": ["settings"],
+    "updates_settings": ["settings"], "restart_settings": ["settings"], "logs_settings": ["settings"],
+    "monitoring_settings": ["settings"], "network_settings": ["settings"],
     "access_settings": ["access"], "access_block": ["access"], "access_unblock": ["access"],
-    "role_edit": ["role"], "role_delete": ["role", "user"], "user_edit": ["user", "group"], "user_delete": ["user", "group"],
+    "role_edit": ["role"], "role_delete": ["role", "user"], "role_restore": ["role"], "user_edit": ["user", "group"], "user_delete": ["user", "group"],
     "group_edit": ["group"], "group_delete": ["group"], "api_key_edit": ["apikey", "group"],
     "user_unlock": ["user"], "account": ["user"], "setup": ["user"], "backup_settings": ["settings"],
 }
@@ -3275,7 +3296,7 @@ def _src_storage(c, f):
             except OSError:
                 pass
     rows.append({"label": i18n.translate("Logs von MirrorSync"), "pct": None, "value": round(usage / 1048576), "value_text": _size(usage),
-                 "used_text": _size(usage), "free_text": "", "status": "info", "status_text": _size(usage), "link": "/settings/general"})
+                 "used_text": _size(usage), "free_text": "", "status": "info", "status_text": _size(usage), "link": "/settings/logs"})
     return rows
 
 
@@ -4131,9 +4152,145 @@ def duplicate_job(job_id):
     return redirect(url_for("edit_job", job_id=nid))
 
 
+# ---------------------------------------------------------------- Mehrfachauswahl (seit 1.56.0)
+JOB_BULK = {"run": "jobs.run", "solo": "jobs.run", "dry": "jobs.dryrun", "verify": "jobs.run", "pause": "jobs.edit",
+            "resume": "jobs.edit", "duplicate": "jobs.create", "delete": "jobs.delete"}
+REMOTE_BULK = {"test": "remotes.test", "duplicate": "remotes.create", "delete": "remotes.delete"}
+
+
+def bulk_jobs(action, ids, by):
+    """Eine Aktion fuer mehrere Aufgaben. Liefert (erledigt, uebersprungen) als Listen von Namen."""
+    jobs = load_jobs()
+    done, skipped = [], []
+    for jid in dict.fromkeys(ids):
+        j = jobs.get(jid)
+        if not j or not g.access.job_ok(jid, j):
+            continue
+        name = j.get("name", jid)
+        if action in ("run", "solo", "dry", "verify"):
+            ok = start_job(jid, dry_run=action == "dry", by=by, manual=True, solo=action == "solo",
+                           mode="verify" if action == "verify" else "full")
+            (done if ok else skipped).append(name)
+            if ok:
+                audit_add("run", {"dry": "Testlauf gestartet", "verify": "Prüflauf gestartet"}.get(action, "gestartet"), name,
+                          detail="Mehrfachauswahl" + (", ohne Folgeaufgaben" if action == "solo" else ""))
+        elif action in ("pause", "resume"):
+            with _lock:
+                jj = load_jobs()
+                if jid in jj:
+                    if action == "resume":
+                        jj[jid].update(paused=False, paused_until="", paused_by="")
+                    else:
+                        jj[jid].update(paused=True, paused_until="", paused_by=g.user or "")
+                    save_jobs(jj)
+            done.append(name)
+        elif action == "duplicate":
+            duplicate_job_data(jid, user=g.user)
+            done.append(name)
+        elif action == "delete":
+            stop_job(jid)
+            with _lock:
+                jj = load_jobs()
+                jj.pop(jid, None)
+                for o in jj.values():
+                    if trigger_of(o) == "after" and o.get("after_job") == jid:
+                        o.update(trigger="manual", after_job="")
+                save_jobs(jj)
+            shutil.rmtree(os.path.join(LOG_DIR, jid), ignore_errors=True)
+            done.append(name)
+    if action in ("pause", "resume", "duplicate", "delete") and done:
+        schedule_all()
+    return done, skipped
+
+
+BULK_TEXT = {"run": "{0} Aufgaben gestartet.", "solo": "{0} Aufgaben ohne Folgeaufgaben gestartet.",
+             "dry": "{0} Testläufe gestartet.", "verify": "{0} Prüfläufe gestartet.", "pause": "{0} Aufgaben pausiert.",
+             "resume": "{0} Aufgaben fortgesetzt.", "duplicate": "{0} Aufgaben dupliziert (Kopien sind ausgeschaltet).",
+             "delete": "{0} Aufgaben entfernt."}
+
+
+@app.post("/jobs/bulk")
+def jobs_bulk():
+    action = request.form.get("action", "")
+    if action not in JOB_BULK:
+        abort(400)
+    done, skipped = bulk_jobs(action, request.form.getlist("ids"), g.user or "Web")
+    text = i18n.t(BULK_TEXT[action], len(done))
+    if skipped:
+        text += " " + i18n.t("Nicht gestartet (läuft schon oder pausiert): {0}", ", ".join(skipped))
+    if request.headers.get("Accept", "").startswith("application/json"):
+        return {"ok": True, "action": action, "done": done, "skipped": skipped, "message": text}
+    session["flash"] = text
+    return redirect(url_for("index"))
+
+
+def _dup_remote_name(name):
+    names = {r["name"] for r in list_remotes()}
+    nm, n = f"{name}-kopie", 2
+    while nm in names:
+        nm, n = f"{name}-kopie{n}", n + 1
+    return nm
+
+
+def _short_err(txt):
+    """Aussagekraeftigste Zeile einer rclone-Fehlerausgabe, ohne Zeitstempel."""
+    lines = [l.strip() for l in (txt or "").splitlines() if l.strip()]
+    pick = next((l for l in reversed(lines) if "CRITICAL" in l), None) or next((l for l in lines if "ERROR" in l), None) or (lines[-1] if lines else "")
+    return re.sub(r"^\d{4}/\d\d/\d\d \d\d:\d\d:\d\d (CRITICAL|ERROR|NOTICE) ?:? ?", "", pick)[:300]
+
+
+def bulk_remotes(action, names):
+    """Eine Aktion fuer mehrere Speicherorte. Liefert eine Liste {name, ok, text}."""
+    known = {r["name"]: r for r in list_remotes()}
+    out = []
+    for name in dict.fromkeys(names):
+        if name not in known or not g.access.remote_ok(name):
+            continue
+        if action == "test":
+            path = f"{name}:/" if known[name]["type"] in ABS_ROOT_TYPES else f"{name}:"
+            rc, txt = rclone("lsf", path, "--max-depth", "1", "--dirs-only", timeout=30)
+            out.append({"name": name, "ok": rc == 0, "text": i18n.t("Verbindung OK") if rc == 0 else _short_err(txt)})
+            audit_add("remote", "Verbindung getestet", name, detail="Mehrfachauswahl" + (": OK" if rc == 0 else ": Fehler"))
+        elif action == "duplicate":
+            new = _dup_remote_name(name)
+            err = duplicate_remote_data(name, new)
+            out.append({"name": name, "ok": not err, "text": i18n.t(err) if err else new})
+        elif action == "delete":
+            rclone("config", "delete", name)
+            _pending.pop(name, None)
+            meta = DB.get_map("remote_meta")
+            if meta.pop(name, None) is not None:
+                DB.put_map("remote_meta", meta)
+            out.append({"name": name, "ok": True, "text": ""})
+    return out
+
+
+@app.post("/remotes/bulk")
+def remotes_bulk():
+    action = request.form.get("action", "")
+    if action not in REMOTE_BULK:
+        abort(400)
+    res = bulk_remotes(action, request.form.getlist("ids"))
+    if request.headers.get("Accept", "").startswith("application/json"):
+        return {"ok": True, "action": action, "results": res}
+    good = [r for r in res if r["ok"]]
+    bad = [r for r in res if not r["ok"]]
+    if action == "test":
+        msg = "\n".join(("✓ " if r["ok"] else "✗ ") + r["name"] + ("" if r["ok"] else ": " + r["text"]) for r in res)
+        return render_remotes(msg=msg if not bad else None, err=msg if bad else None)
+    if action == "duplicate":
+        msg = i18n.t("{0} Speicherorte dupliziert: {1}", len(good), ", ".join(f"{r['name']} → {r['text']}" for r in good))
+    else:
+        msg = i18n.t("{0} Speicherorte gelöscht.", len(good))
+    if bad:
+        return render_remotes(msg=msg if good else None, err="\n".join(f"{r['name']}: {r['text']}" for r in bad))
+    return render_remotes(msg=msg)
+
+
 @app.post("/job/<job_id>/run")
 def run_job(job_id):
-    start_job(job_id, dry_run=request.form.get("dry") == "1", by=g.user or "Web", manual=True)
+    start_job(job_id, dry_run=request.form.get("dry") == "1", by=g.user or "Web", manual=True,
+              solo=request.form.get("solo") in ("1", "on", "true"))
     return redirect(url_for("show_log", job_id=job_id))
 
 
@@ -4267,7 +4424,9 @@ def show_log(job_id):
         text = "".join(i18n.translate(ln) if ln.startswith("===") else ln for ln in text.splitlines(True))
     runs, days = keep_limits()
     job = dict(job, dest=effective_dest(job))
-    return render_template("log.html", job=job, job_id=job_id, log=text, current=current, msg=session.pop("flash", None),
+    follower_names = sorted((j["name"] for j in load_jobs().values() if trigger_of(j) == "after" and j.get("after_job") == job_id),
+                            key=str.lower)
+    return render_template("log.html", job=job, job_id=job_id, log=text, current=current, follower_names=follower_names, msg=session.pop("flash", None),
                            running=running, auto_refresh=running, keep_runs=runs, keep_days=days,
                            has_file={h.get("run"): bool(h.get("run")) and os.path.exists(run_log_path(job_id, h["run"]))
                                      for h in hist})
@@ -4836,8 +4995,60 @@ def settings_page():
                            report_last=s.get("report_last"))
 
 
+# Seiten der Einstellungen, die frueher alle unter "Allgemein" lagen (seit 1.56.0 eigene Seiten in der Leiste).
+# Alle teilen sich einen Handler: jedes Formular schickt "section", die Seite bestimmt nur, was angezeigt wird.
+GENERAL_PAGES = {"general": "Allgemein", "security": "Anmeldung und Sicherheit", "updates": "Updates",
+                 "restart": "Neustart", "logs": "Logs", "monitoring": "Überwachung", "network": "Bandbreite"}
+
+
 @app.route("/settings/general", methods=["GET", "POST"])
 def general_settings():
+    return _general_page("general")
+
+
+@app.route("/settings/security", methods=["GET", "POST"])
+def security_settings():
+    return _general_page("security")
+
+
+@app.route("/settings/updates", methods=["GET", "POST"])
+def updates_settings():
+    return _general_page("updates")
+
+
+@app.route("/settings/restart", methods=["GET", "POST"])
+def restart_settings():
+    return _general_page("restart")
+
+
+@app.route("/settings/logs", methods=["GET", "POST"])
+def logs_settings():
+    return _general_page("logs")
+
+
+@app.route("/settings/monitoring", methods=["GET", "POST"])
+def monitoring_settings():
+    return _general_page("monitoring")
+
+
+@app.route("/settings/network", methods=["GET", "POST"])
+def network_settings():
+    return _general_page("network")
+
+
+def _update_history(limit=8):
+    """Letzte Selbst-Updates aus dem Audit-Log (neueste zuerst)."""
+    out = []
+    for e in audit_log.query(cat="system"):
+        if e.get("action") in ("Update abgeschlossen", "Update fehlgeschlagen"):
+            out.append({"ts": e.get("ts", ""), "target": e.get("target", ""), "ok": e["action"] == "Update abgeschlossen",
+                        "by": e.get("user", ""), "detail": e.get("detail", "")})
+            if len(out) >= limit:
+                break
+    return out
+
+
+def _general_page(gpage):
     s = load_settings()
     msg, err = session.pop("flash", None), session.pop("flash_err", None)
     purge = None
@@ -5006,21 +5217,22 @@ def general_settings():
             audit_log.prune()
             msg = "Gespeichert. Ältere Logs wurden aufgeräumt."
     usage = 0
-    for root, _, files in os.walk(LOG_DIR):
+    for root, _, files in (os.walk(LOG_DIR) if gpage == "logs" else ()):
         usage += sum(os.path.getsize(os.path.join(root, f)) for f in files)
     bw = s.get("bw") or bwlimit.EMPTY
     pk_rp_id, _, _pk_prob = _pk_rp()
-    selfupd = selfupdate_status() if g.access.has("system.update") or g.access.has("system.settings") else None
+    selfupd = selfupdate_status() if gpage == "updates" and (g.access.has("system.update") or g.access.has("system.settings")) else None
     old_imgs = None
     if selfupd and selfupd.get("available"):
         try:
             old_imgs = selfupdate.old_images()
         except Exception:  # noqa: BLE001 - nur Anzeige
             old_imgs = None
-    return render_template("general.html", s=s, msg=msg, err=err, usage=usage, bw_cfg=bw, geo=geoip.status(), pk_now=pk_rp_id,
+    return render_template("general.html", gpage=gpage, gtitle=GENERAL_PAGES[gpage],
+                           upd_hist=_update_history() if gpage == "updates" else [], s=s, msg=msg, err=err, usage=usage, bw_cfg=bw, geo=geoip.status(), pk_now=pk_rp_id,
                            attribution=Markup(geoip.ATTRIBUTION), my_ip=_client_ip(), my_loc=geoip.locate(_client_ip()),
                            next_geoip=next_run("_geoip"), tz=TZ, upd=update_status(), purge=purge, upd_channels=_notify_channel_list(),
-                           selfupd=selfupd, old_imgs=old_imgs, restart=restart_status() if g.access.has("system.restart") or g.access.has("system.settings") else None,
+                           selfupd=selfupd, old_imgs=old_imgs, restart=restart_status() if gpage == "restart" and (g.access.has("system.restart") or g.access.has("system.settings")) else None,
                            day_names=timewin.DAY_NAMES, vol=monitor.volume_state(s), base_url=_public_link("") or request.host_url.rstrip("/"),
                            fwd=request.headers.get("X-Forwarded-For", ""),
                            bw_desc=bwlimit.describe(bw, s.get("bw_unit") or "MB/s"), bw_tt=bwlimit.timetable(bw))
@@ -5494,7 +5706,8 @@ def roles_page():
     summary = {rid: [(gname.split(" ")[0], sum(p in r.get("perms", []) for p, _ in perms), len(perms))
                      for gname, perms in roles.PERM_GROUPS if any(p in r.get("perms", []) for p, _ in perms)]
                for rid, r in all_roles.items()}
-    return render_template("roles.html", roles=all_roles, counts=counts, summary=summary,
+    deleted = [(rid, roles.DEFAULT_ROLES[rid]) for rid in role_store.deleted_templates() if rid not in all_roles or not all_roles[rid].get("builtin")]
+    return render_template("roles.html", roles=all_roles, counts=counts, summary=summary, deleted=deleted,
                            msg=session.pop("flash", None))
 
 
@@ -5543,6 +5756,7 @@ def role_edit(rid=None):
 def role_delete(rid):
     all_roles = role_store.load()
     in_use = [n for n, u in store.load().items() if u.get("role") == rid]
+    in_use += [i18n.t("API-Key {0}", k.get("name", kid)) for kid, k in DB.get_map("apikey").items() if k.get("role") == rid]
     if rid not in all_roles:
         abort(404)
     if all_roles[rid].get("locked"):
@@ -5554,10 +5768,26 @@ def role_delete(rid):
     else:
         with roles._lock:
             all_roles = role_store.load()
-            all_roles.pop(rid, None)
+            gone = all_roles.pop(rid, None)
             role_store.save(all_roles)
-        session["flash"] = "Rolle gelöscht."
+            tpl = bool(gone and gone.get("builtin") and rid in roles.DEFAULT_ROLES)
+            if tpl:
+                role_store.mark_deleted(rid)   # Vorlage bleibt geloescht, bis sie wiederhergestellt wird
+        session["flash"] = ("Vorlage gelöscht. Unten unter „Gelöschte Vorlagen“ kannst du sie wiederherstellen."
+                            if tpl else "Rolle gelöscht.")
     return redirect(url_for("roles_page"))
+
+
+@app.post("/roles/restore/<rid>")
+def role_restore(rid):
+    if rid not in roles.DEFAULT_ROLES or rid == "admin":
+        abort(404)
+    if not within(roles.DEFAULT_ROLES[rid]):
+        _flash_err("Keine Berechtigung für diese Rolle.")
+        return redirect(url_for("roles_page"))
+    new = role_store.restore_template(rid)
+    session["flash"] = i18n.t("Vorlage „{0}“ wiederhergestellt.", i18n.t(roles.DEFAULT_ROLES[rid]["name"]))
+    return redirect(url_for("roles_page") + (f"#role-{new}" if new else ""))
 
 
 # ---------------------------------------------------------------- Gruppen
@@ -5845,8 +6075,8 @@ def update_apply():
         session["flash"] = text
     else:
         session["flash_err"] = text
-    back = request.form.get("back") or "/settings/general"
-    return redirect(back if back.startswith("/") and not back.startswith("//") else "/settings/general")
+    back = request.form.get("back") or "/settings/updates"
+    return redirect(back if back.startswith("/") and not back.startswith("//") else "/settings/updates")
 
 
 @app.get("/update/state")
@@ -5865,7 +6095,7 @@ def system_restart():
     if request.headers.get("Accept", "").startswith("application/json"):
         return {"ok": ok, "message": i18n.t(text)}, (200 if ok else 409)
     session["flash" if ok else "flash_err"] = text
-    return _back("/settings/general#restart")
+    return _back("/settings/restart")
 
 
 @app.get("/system/images")
@@ -5898,7 +6128,7 @@ def system_images_prune():
     if wants_json:
         return ({"ok": True, "message": text, **res}, 200) if res is not None else ({"ok": False, "error": i18n.t(text)}, 409)
     session["flash" if res is not None else "flash_err"] = text
-    return _back("/settings/general#selfupdate")
+    return _back("/settings/updates")
 
 
 @app.route("/account", methods=["GET", "POST"])

@@ -3,6 +3,40 @@
 Version numbers follow [SemVer](https://semver.org/): MAJOR.MINOR.PATCH
 (MAJOR = incompatible change, MINOR = new feature, PATCH = bug fix).
 
+## 1.56.0 – 2026-11-26
+**Settings re-sorted**
+- New groups in the bar: **Maintenance** (updates, restart, logs), **Monitoring** and **Network** (bandwidth).
+  **Sign-in and security** is its own page at the top of **Security**. **System → General** keeps language and file
+  manager. Every page has its own address (e.g. `/settings/updates`); old links like `/settings/general#bw` jump to the
+  new place automatically, and the search field finds everything in its new place.
+- **Updates** tidied up: at the top the installed and latest version with **Check now** and **Update now** and the
+  steps of an update, below "Check for updates" and "Update automatically" side by side, then **Container** (name,
+  image, compose project, Docker socket), **History** of the last updates and old images.
+- Users with only `system.update` or `system.restart` see the Updates or Restart page and can update or restart there,
+  but cannot change any settings.
+
+**Jobs**
+- **Only this job**: if a job has follow-up jobs, a **▶ Only this** button appears next to "Start". It starts just this
+  job; the chain does not continue afterwards (not even on a retry after an error).
+- **Multi-select**: **☑ Select** shows checkboxes on the left (shift-click selects a range). For all ticked jobs: start,
+  only this, dry run, verify, pause, resume, duplicate, open logs, remove. For **storages**: test, duplicate (as
+  `<name>-kopie`), remove. Each action needs the same permission as for a single item.
+
+**Audit log**
+- More compact: one line per entry with time, user, area, action and a short summary (e.g. the changed fields). A click
+  expands all details right below, plus "Expand all" and "Collapse all".
+
+**Fixed**
+- The template roles **Operator** and **Read only** could not be deleted, they came straight back. Now they stay
+  deleted and can be restored under **Roles → Deleted templates**. Admin still cannot be deleted. A role still used by
+  an API key can no longer be deleted.
+
+**API and MCP**
+- `run_job` or `POST /api/v1/jobs/<id>/run` with `only_this` (without follow-up jobs).
+- New `bulk_jobs` (`POST /api/v1/jobs/bulk`) and `bulk_remotes` (`POST /api/v1/remotes/bulk`) for multi-select,
+  `restore_role` and `list_deleted_role_templates` for deleted templates.
+- Help and all texts in five languages.
+
 ## 1.55.0 – 2026-11-26
 **Clearer settings**
 - **Settings** with a bar on the left instead of ten tabs side by side, in four groups: **Users & permissions** (users,

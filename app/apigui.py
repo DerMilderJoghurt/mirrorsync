@@ -1355,10 +1355,27 @@ def a_update_role(a):
 
 
 @action("delete_role", "DELETE", "/roles/{role_id}", "roles.manage", "Rollen",
-        "Rolle löschen (nur wenn kein Benutzer sie hat).", {"role_id": S(STR)}, ["role_id"])
+        "Rolle löschen (nur wenn kein Benutzer und kein API-Key sie hat). Auch die Vorlagen Operator und Nur lesen lassen sich löschen; "
+        "sie bleiben weg, bis sie mit restore_role wiederhergestellt werden. Admin ist nicht löschbar.", {"role_id": S(STR)}, ["role_id"])
 def a_delete_role(a):
     _role(a["role_id"])
     return ok(gui("POST", f"/roles/{a['role_id']}/delete", form={}), deleted=a["role_id"])
+
+
+@action("list_deleted_role_templates", "GET", "/roles/deleted", "roles.manage", "Rollen",
+        "Gelöschte Vorlagen (Operator, Nur lesen). Sie bleiben weg, bis sie mit restore_role wiederhergestellt werden.", ro=True)
+def a_deleted_roles(a):
+    need("roles.manage")
+    return [{"id": rid, "name": _t(core.roles.DEFAULT_ROLES[rid]["name"]), "description": _t(core.roles.DEFAULT_ROLES[rid]["description"])}
+            for rid in core.role_store.deleted_templates()]
+
+
+@action("restore_role", "POST", "/roles/restore/{role_id}", "roles.manage", "Rollen",
+        "Gelöschte Vorlage wiederherstellen (role_id: operator oder viewer).", {"role_id": S(STR, enum=["operator", "viewer"])}, ["role_id"])
+def a_restore_role(a):
+    if a["role_id"] not in ("operator", "viewer"):
+        raise ApiError(400, _t("Nur die Vorlagen operator und viewer lassen sich wiederherstellen."))
+    return ok(gui("POST", f"/roles/restore/{a['role_id']}", form={}))
 
 
 # ================================================================= Gruppen
@@ -2157,3 +2174,32 @@ def register(app, core_module):
         api.TOOLS.append((x["tool"], x["summary"], x["perm"], _schema(props, x["required"]),
                           (lambda fn: lambda a: fn(dict(a, _mcp=True)))(x["fn"]), x["ro"]))
     api.EXTRA_PATHS = _openapi_paths
+
+
+# ================================================================= Mehrfachauswahl (seit 1.56.0)
+@action("bulk_jobs", "POST", "/jobs/bulk", "jobs.view", "Aufgaben",
+        "Eine Aktion für mehrere Aufgaben auf einmal: run (starten), solo (nur diese, ohne Folgeaufgaben), dry (Testlauf), "
+        "verify (Prüflauf), pause, resume, duplicate, delete. Jede Aktion braucht ihr eigenes Recht (wie einzeln).",
+        {"action": S(STR, enum=["run", "solo", "dry", "verify", "pause", "resume", "duplicate", "delete"]), "job_ids": STRS}, ["action", "job_ids"])
+def a_bulk_jobs(a):
+    if a["action"] not in core.JOB_BULK:
+        raise ApiError(400, core.i18n.t("Unbekannte Aktion: {0}", a["action"]))
+    need(core.JOB_BULK[a["action"]])
+    r = gui("POST", "/jobs/bulk", form={"action": a["action"], "ids": list(a.get("job_ids") or [])},
+            headers={"Accept": "application/json"})
+    done(r)
+    body = r["resp"].get_json(silent=True) or {}
+    return {"ok": True, "message": _t(body.get("message", "")), "done": body.get("done", []), "skipped": body.get("skipped", [])}
+
+
+@action("bulk_remotes", "POST", "/remotes/bulk", "remotes.view", "Speicherorte",
+        "Eine Aktion für mehrere Speicherorte: test (Verbindung testen), duplicate (Kopie als <name>-kopie), delete. "
+        "Liefert pro Speicherort ok und Text.", {"action": S(STR, enum=["test", "duplicate", "delete"]), "names": STRS}, ["action", "names"])
+def a_bulk_remotes(a):
+    if a["action"] not in core.REMOTE_BULK:
+        raise ApiError(400, core.i18n.t("Unbekannte Aktion: {0}", a["action"]))
+    need(core.REMOTE_BULK[a["action"]])
+    r = gui("POST", "/remotes/bulk", form={"action": a["action"], "ids": list(a.get("names") or [])},
+            headers={"Accept": "application/json"})
+    done(r)
+    return {"ok": True, "results": (r["resp"].get_json(silent=True) or {}).get("results", [])}

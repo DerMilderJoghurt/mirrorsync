@@ -472,16 +472,18 @@ def op_job_delete(jid):
     return {"deleted": jid, "name": j["name"]}
 
 
-def op_job_run(jid, dry=False):
+def op_job_run(jid, dry=False, solo=False):
+    """solo=True: nur diese Aufgabe, Folgeaufgaben der Kette laufen danach nicht (seit 1.56.0)."""
     need("jobs.dryrun" if dry else "jobs.run")
     j = _job(jid)
     if jid in core._running:
         raise ApiError(409, "Die Aufgabe läuft bereits.")
-    ok = core.start_job(jid, dry_run=bool(dry), by=g.user, manual=True)
+    ok = core.start_job(jid, dry_run=bool(dry), by=g.user, manual=True, solo=bool(solo))
     if ok is False:
         raise ApiError(409, "Die Aufgabe konnte nicht gestartet werden (läuft bereits).")
-    core.audit_add("run", "Testlauf gestartet" if dry else "gestartet", j["name"], detail="über API")
-    return {"started": jid, "name": j["name"], "dry_run": bool(dry), "run": core._current_run.get(jid)}
+    core.audit_add("run", "Testlauf gestartet" if dry else "gestartet", j["name"],
+                   detail="über API" + (", ohne Folgeaufgaben" if solo else ""))
+    return {"started": jid, "name": j["name"], "dry_run": bool(dry), "only_this": bool(solo), "run": core._current_run.get(jid)}
 
 
 def op_job_resync(jid, dry=False):
@@ -638,9 +640,10 @@ TOOLS = [
      "jobs.logs", _schema(dict(JOB_ID, run_id={"type": "string"}, filter={"type": "string", "enum": ["all", "error", "copied", "deleted", "notice"]},
                                search={"type": "string"}, max_lines={"type": "integer", "default": 200}), ["job_id"]),
      lambda a: op_log(a["job_id"], a.get("run_id"), a.get("filter", "all"), a.get("search", ""), a.get("max_lines", 200)), True),
-    ("run_job", "Aufgabe jetzt starten (dry_run=true: nur Testlauf, ändert nichts).", "jobs.run",
-     _schema(dict(JOB_ID, dry_run={"type": "boolean", "default": False}), ["job_id"]),
-     lambda a: op_job_run(a["job_id"], a.get("dry_run", False)), False),
+    ("run_job", "Aufgabe jetzt starten (dry_run=true: nur Testlauf, ändert nichts; only_this=true: nur diese Aufgabe, "
+     "Folgeaufgaben der Kette laufen danach nicht).", "jobs.run",
+     _schema(dict(JOB_ID, dry_run={"type": "boolean", "default": False}, only_this={"type": "boolean", "default": False}), ["job_id"]),
+     lambda a: op_job_run(a["job_id"], a.get("dry_run", False), a.get("only_this", False)), False),
     ("resync_job", "Zwei-Wege-Sync neu zusammenführen (--resync): beide Seiten vereinen, ohne zu löschen. Nötig nach einem Abbruch.",
      "jobs.run", _schema(dict(JOB_ID, dry_run={"type": "boolean", "default": False}), ["job_id"]),
      lambda a: op_job_resync(a["job_id"], a.get("dry_run", False)), False),
@@ -857,7 +860,7 @@ def openapi():
             "/jobs/{job_id}": {"get": op("Aufgabe lesen", "jobs.view", [jid]),
                                "patch": op("Aufgabe ändern (nur angegebene Felder)", "jobs.edit", [jid], job_body),
                                "delete": op("Aufgabe löschen", "jobs.delete", [jid])},
-            "/jobs/{job_id}/run": {"post": op("Jetzt starten", "jobs.run bzw. jobs.dryrun", [jid, q("dry_run", "boolean", "nur Testlauf")])},
+            "/jobs/{job_id}/run": {"post": op("Jetzt starten", "jobs.run bzw. jobs.dryrun", [jid, q("dry_run", "boolean", "nur Testlauf"), q("only_this", "boolean", "nur diese Aufgabe, ohne Folgeaufgaben")])},
             "/jobs/{job_id}/resync": {"post": op("Zwei-Wege-Sync neu zusammenführen", "jobs.run bzw. jobs.dryrun", [jid, q("dry_run", "boolean", "nur Testlauf")])},
             "/jobs/{job_id}/stop": {"post": op("Stoppen", "jobs.run", [jid])},
             "/jobs/{job_id}/pause": {"post": op("Pausieren", "jobs.edit", [jid, q("hours", "number"), q("until", d="JJJJ-MM-TTTHH:MM")])},
@@ -919,7 +922,8 @@ def register(app, core_module):
                      methods=["PATCH", "PUT"])
     app.add_url_rule(R + "/jobs/<job_id>", "api_job_delete", lambda job_id: j(op_job_delete, job_id), methods=["DELETE"])
     app.add_url_rule(R + "/jobs/<job_id>/run", "api_job_run", lambda job_id: j(
-        op_job_run, job_id, truthy(request.args.get("dry_run") or (request.get_json(silent=True) or {}).get("dry_run", ""))),
+        op_job_run, job_id, truthy(request.args.get("dry_run") or (request.get_json(silent=True) or {}).get("dry_run", "")),
+        truthy(request.args.get("only_this") or (request.get_json(silent=True) or {}).get("only_this", ""))),
         methods=["POST"])
     app.add_url_rule(R + "/jobs/<job_id>/resync", "api_job_resync", lambda job_id: j(
         op_job_resync, job_id, truthy(request.args.get("dry_run") or (request.get_json(silent=True) or {}).get("dry_run", ""))),

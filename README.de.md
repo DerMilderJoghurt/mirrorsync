@@ -4,7 +4,7 @@
 
 # MirrorSync – 1:1-Spiegelung mit Web-GUI und Zeitplänen
 
-Version **1.55.0** · Änderungen siehe [CHANGELOG.md](CHANGELOG.md) (englisch) · [English version](README.md)
+Version **1.56.0** · Änderungen siehe [CHANGELOG.md](CHANGELOG.md) (englisch) · [English version](README.md)
 
 Ein Docker-Container, der Ordner **einweg 1:1 spiegelt** (wie FreeFileSync „Spiegeln"):
 Das Ziel wird exakt wie die Quelle, inklusive Löschungen. Als Sync-Motor dient
@@ -57,7 +57,8 @@ Dann `http://<docker-host>:8080` öffnen und den ersten Admin anlegen.
 - **Versionierung**: gelöschte/überschriebene Dateien landen in `<ziel>.versions/<datum>`, optional nur die
   letzten N Versionen bzw. höchstens X Tage behalten (Ältere werden nach jedem Lauf entfernt)
 - **Lösch-Schutz**: Lauf bricht ab, wenn mehr als N Dateien gelöscht würden
-- **Übersichtliche Einstellungen** (seit 1.55.0): Leiste links mit Gruppen und Suchfeld, „Allgemein“ in Bereichen zum Aufklappen, Aufgaben mit Reitern und Zusammenfassung, Speicherorte komplett bearbeitbar (auch umbenennen)
+- **Mehrfachauswahl** (seit 1.56.0): mehrere Aufgaben oder Speicherorte markieren und gemeinsam starten, testen, duplizieren oder löschen; **▶ Nur diese** startet eine Aufgabe ohne Folgeaufgaben
+- **Übersichtliche Einstellungen** (seit 1.55.0): Leiste links mit Gruppen und Suchfeld, Gruppen für Sicherheit, Wartung, Monitoring und Netzwerk, Aufgaben mit Reitern und Zusammenfassung, Speicherorte komplett bearbeitbar (auch umbenennen)
 - **Hilfe mit Suche** (seit 1.54.0): erklärt jede Einstellung, mit Anleitungen für API, MCP, Uptime Kuma und Home Assistant
 - **Ziel verschlüsseln** (seit 1.53.0): Daten liegen auf Server B nur verschlüsselt (rclone crypt), Dateinamen wahlweise auch
 - **Prüflauf nach dem Sync** (seit 1.52.0): vergleicht Quelle und Ziel Datei für Datei und zeigt „1:1 gleich“ oder die Abweichungen
@@ -78,7 +79,7 @@ Geänderte Dateien werden komplett neu übertragen (kein Delta wie bei rsync).
 
 ## Installation
 Das fertige Image liegt in der GitHub Container Registry: `ghcr.io/dermilderjoghurt/mirrorsync`
-(für amd64 und arm64, z. B. Raspberry Pi). Tags: `latest` (neueste Version), `1.55.0` (feste Version),
+(für amd64 und arm64, z. B. Raspberry Pi). Tags: `latest` (neueste Version), `1.56.0` (feste Version),
 `1.40` (neuester Patch dieser Version). Das Image wird nur veröffentlicht, wenn sich die Versionsnummer ändert.
 Update-Prüfer wie Dockhand oder Watchtower melden deshalb nur dann ein Update, wenn es wirklich eine neue Version gibt.
 
@@ -165,7 +166,7 @@ Unter **Einstellungen → Mein Konto** richtet jeder Benutzer selbst 2FA ein (QR
 Authenticator, Aegis, 2FAS, Bitwarden … scannen) und bekommt 10 Backup-Codes, die nur einmal angezeigt werden.
 Passwörter werden gehasht in der Datenbank `config/mirrorsync.db` gespeichert.
 
-**2FA erzwingen** (seit 1.41.0): Unter **Einstellungen → Allgemein → Anmeldung und Sicherheit** wählst du global
+**2FA erzwingen** (seit 1.41.0): Unter **Einstellungen → Sicherheit → Anmeldung und Sicherheit** wählst du global
 *Aus (nur pro Benutzer)*, *Für neue Benutzer* oder *Für alle Benutzer*. Pro Benutzer gibt es unter
 **Benutzer → Bearbeiten** das Häkchen **„2FA erzwingen“** (bei „Für neue Benutzer“ ist es beim Anlegen schon
 gesetzt). Wer 2FA einrichten muss, landet nach der Anmeldung direkt bei „Mein Konto“ mit dem QR-Code und kann
@@ -201,7 +202,7 @@ Konto → Passkeys**, mehrere pro Benutzer möglich (umbenennen, entfernen). Auf
   `http://192.168.1.50` bietet MirrorSync keine Passkeys an und erklärt, warum: Browser erlauben Passkeys nur
   auf sicheren HTTPS-Seiten, und ein Passkey ist immer an einen Domainnamen gebunden, nie an eine IP.
 - MirrorSync nimmt die aufgerufene Adresse. Leitet der Proxy den Host nicht durch, unter **Einstellungen →
-  Allgemein → Passkeys** die öffentliche Adresse eintragen (oder `PUBLIC_URL=` in der Compose-Datei).
+  Sicherheit → Anmeldung und Sicherheit → Passkeys** die öffentliche Adresse eintragen (oder `PUBLIC_URL=` in der Compose-Datei).
   Eine spätere Änderung der Adresse macht bestehende Passkeys unbrauchbar.
 - Gerät verloren: Ein Admin entfernt die Passkeys des Benutzers unter „Bearbeiten“. Anmelden mit Passwort
   geht immer weiter. Hinzufügen und Entfernen steht im Audit-Log.
@@ -305,6 +306,18 @@ In der Aufgabe unter **Prüfen und schützen**:
 - **`.nosync`**: Liegt in einem Ordner der Quelle eine Datei `.nosync`, wird er übersprungen; im Ziel bleibt er
   unberührt (bei neuen Aufgaben an).
 
+## Einstellungen, Mehrfachauswahl und Ketten (seit 1.56.0)
+- Leiste der Einstellungen: **Benutzer & Rechte**, **Sicherheit** (Anmeldung und Sicherheit, Zugriff, API), **System**
+  (Allgemein, Benachrichtigungen, Sicherung), **Wartung** (Updates, Neustart, Logs), **Monitoring** (Überwachung),
+  **Netzwerk** (Bandbreite) und **Persönlich**. Jede Seite hat eine eigene Adresse, z. B. `/settings/updates`.
+- **Updates**: oben Status mit „Jetzt prüfen“ und „Jetzt aktualisieren“, darunter Suche, automatisches Update,
+  Container-Infos, Verlauf und alte Images.
+- **▶ Nur diese**: startet eine Aufgabe ohne ihre Folgeaufgaben (API: `only_this`).
+- **☑ Auswahl** in den Übersichten von Aufgaben und Speicherorten: mehrere markieren und gemeinsam starten, testen,
+  pausieren, duplizieren, löschen usw. (API/MCP: `bulk_jobs`, `bulk_remotes`).
+- **Audit-Log** mit einer Zeile pro Eintrag, Details per Klick.
+- Die Vorlage-Rollen Operator und Nur lesen lassen sich löschen und unter „Gelöschte Vorlagen“ wiederherstellen.
+
 ## Übersichtliche Einstellungen (seit 1.55.0)
 - **Einstellungen** haben links eine Leiste mit Gruppen statt einer langen Tab-Reihe: **Benutzer & Rechte** (Benutzer,
   Rollen, Gruppen), **Sicherheit** (Zugriff, API), **System** (Allgemein, Benachrichtigungen, Sicherung) und
@@ -313,8 +326,8 @@ In der Aufgabe unter **Prüfen und schützen**:
 - **Suchfeld** über der Leiste: springt direkt zur passenden Einstellung (z. B. „2FA“, „Bandbreite“, „Passkeys“),
   öffnet den Bereich und hebt ihn kurz hervor. `/` springt ins Suchfeld, Pfeiltasten und Enter wählen. Findet sie
   nichts, geht es mit einem Klick in die Hilfe.
-- **Allgemein** in Bereichen zum Auf- und Zuklappen: Oberfläche, Updates und Neustart, Überwachung, Logs, Anmeldung und
-  Sicherheit, Leistung. Der Browser merkt sich, welche offen sind.
+- **Allgemein** war in 1.55.0 in Bereiche zum Aufklappen aufgeteilt; seit 1.56.0 sind daraus eigene Seiten unter
+  Sicherheit, Wartung, Monitoring und Netzwerk geworden.
 - **Aufgabe bearbeiten** mit Reitern: Grundlagen, Filter, Verhalten, Prüfen & schützen, Benachrichtigungen, Erweitert.
   Abzeichen zeigen, wo etwas eingestellt ist („3 Regeln“, „2 aktiv“), „Alle anzeigen“ zeigt alles untereinander.
   Oben steht immer eine Zusammenfassung (Quelle → Ziel, Start, Papierkorb, Prüflauf, Löschwarnung …). Die Leiste mit
@@ -416,7 +429,7 @@ Nur mit dem Recht **`jobs.scripts`** („Skripte vor/nach dem Lauf, Snapshots un
 - **`/metrics`** im Prometheus-Format: Läufe, übertragene Bytes, Dauer, Status, Alter des letzten Laufs, Prüfläufe,
   Datenvolumen. Für Grafana.
 - Zugriff mit einem API-Key mit dem Recht `system.monitor` (oder `jobs.view`) (`Authorization: Bearer msk_…` oder `?key=msk_…`) oder unter
-  **Einstellungen → Allgemein → Überwachung** ohne Anmeldung freigeben. `/health` (nur „läuft“) bleibt wie bisher.
+  **Einstellungen → Monitoring → Überwachung** ohne Anmeldung freigeben. `/health` (nur „läuft“) bleibt wie bisher.
 - **Statistik** (Seitenleiste): übertragene Daten, Läufe, Fehler und Laufzeit pro Monat und Aufgabe. Optional ein
   **Datenvolumen-Limit** pro Monat mit Warnung ab X % und Anhalten automatischer Läufe.
 - **Platzbedarf** (im Log der Aufgabe): größte Ordner und Dateien in Quelle oder Ziel zum Durchklicken, dazu die am
@@ -498,7 +511,7 @@ erscheinen nicht. Das Layout gilt pro Benutzer (und pro API-Key). API/MCP: `get_
 (`tiles` mit `id`, `w`, `h`; `reset`).
 
 ## Neustart und alte Images (seit 1.51.0)
-Unter **Einstellungen → Allgemein → Neustart** lässt sich der Container von MirrorSync neu starten: von Hand mit
+Unter **Einstellungen → Wartung → Neustart** lässt sich der Container von MirrorSync neu starten: von Hand mit
 „Jetzt neu starten“ oder nach Zeitplan (Uhrzeit und Wochentage). Laufen gerade Aufgaben, lehnt der Knopf ab, außer du
 setzt „auch wenn Aufgaben laufen“ (dann werden sie abgebrochen). Der Zeitplan wartet, bis keine Aufgabe mehr läuft.
 
@@ -605,7 +618,7 @@ im Ziel standardmäßig liegen; mit „Ausgeschlossenes auch im Ziel löschen" w
   deaktiviert, gesperrt bis …) und Fehlversuche. „Anmeldeverlauf“ listet die letzten 1000 Versuche.
 - **Konto bearbeiten:** Aktiv oder Deaktiviert, dazu optional ein Sperrzeitraum mit „gesperrt ab“ und
   „wieder aktiv ab“ (z. B. Urlaub eines Mitarbeiters). Das Konto wird zur Uhrzeit automatisch gesperrt bzw. wieder frei.
-- **Einstellungen → Allgemein → Anmeldung und Sicherheit:** nach wie vielen Fehlversuchen ein Konto gesperrt
+- **Einstellungen → Sicherheit → Anmeldung und Sicherheit:** nach wie vielen Fehlversuchen ein Konto gesperrt
   wird, für wie lange (0 = bis ein Admin es freigibt) und ob du benachrichtigt wirst. Zusätzlich bremst MirrorSync
   pro IP-Adresse für 5 Minuten.
 - **Land:** Der Container lädt die freie Länder-Datenbank von DB-IP (ca. 8 MB) nach `config/geoip/` und erneuert
@@ -885,10 +898,10 @@ das Ziel und die Lauf-Nummer. Alte Einträge zeigen, was damals gespeichert wurd
 Passwörter, Tokens, 2FA-Schlüssel und andere Geheimnisse landen nie im Log, nur der Hinweis „geändert“. Filter
 nach Bereich, Benutzer und Zeitraum, Freitextsuche (auch in alten und neuen Werten), Export als CSV (für Excel,
 mit `;` getrennt) mit denselben Filtern. Gespeichert in `config/audit.jsonl`, Aufbewahrung unter
-Einstellungen → Allgemein (Standard 365 Tage, höchstens 20 000 Einträge).
+Einstellungen → Wartung → Logs (Standard 365 Tage, höchstens 20 000 Einträge).
 
 ## Bandbreite
-Unter Einstellungen → Allgemein legst du die Standard-Bandbreite fest, in jeder Aufgabe unter „Bandbreite“
+Unter Einstellungen → Netzwerk → Bandbreite legst du die Standard-Bandbreite fest, in jeder Aufgabe unter „Bandbreite“
 lässt sie sich überschreiben („Standard verwenden“, „Eigene Grenzen“, „Immer unbegrenzt“).
 
 - **Außerhalb der Zeitfenster:** Grenze, die gilt, wenn kein Zeitfenster passt (leer = unbegrenzt).
@@ -913,7 +926,7 @@ auf einen Lauf öffnet sein ganzes Log:
 - „Herunterladen" speichert das vollständige Log als Textdatei
 - Ein laufender Lauf aktualisiert sich alle 3 Sekunden
 
-Aufbewahrung unter Einstellungen → Allgemein → Logs aufbewahren:
+Aufbewahrung unter Einstellungen → Wartung → Logs:
 - **Läufe pro Aufgabe** (Standard 50, 0 = unbegrenzt).
 - **Höchstens so lange** als Zahl in Tagen, Wochen oder Monaten (Standard 30 Tage, 0 = unbegrenzt, ein Monat = 30 Tage).
 
@@ -1092,13 +1105,13 @@ MirrorSync fragt regelmäßig (Standard: einmal pro Stunde) bei GitHub (`api.git
 neuere Version gibt. Wenn ja, steht unten links unter der Versionsnummer „⬆ vX.Y.Z verfügbar“, ein Klick öffnet das
 Release mit allen Änderungen. Übertragen wird dabei nur die eigene Versionsnummer.
 
-- Ein- und ausschalten unter **Einstellungen → Allgemein → Updates**, dort auch „Jetzt prüfen“ (prüft sofort, ohne Eingaben zu speichern; seit 1.47.0 getrennt von „Speichern“) und
+- Ein- und ausschalten unter **Einstellungen → Wartung → Updates**, dort auch „Jetzt prüfen“ (prüft sofort, ohne Eingaben zu speichern; seit 1.47.0 getrennt von „Speichern“) und
   wann zuletzt geprüft wurde. Den **Abstand** stellst du dort ebenfalls ein: Zahl eingeben, Minuten oder Stunden
   wählen (5 Minuten bis 720 Stunden, Standard 1 Stunde). Aktualisiert wird nur, wenn du das Selbst-Update nutzt (siehe unten), sonst bleibt das bei dir.
 - API/MCP: `GET /api/v1/update` (`get_update`), `POST /api/v1/update/check` (`check_update`),
   `PATCH /api/v1/settings/update` mit `{"update_check": false}` und/oder `{"update_interval": 120}` (Minuten)
   (`update_update_settings`); `/status` enthält `update` mit `interval_minutes`.
-- **Benachrichtigung bei neuer Version** (seit 1.46.0): unter Einstellungen → Allgemein → Updates „Benachrichtigung
+- **Benachrichtigung bei neuer Version** (seit 1.46.0): unter Einstellungen → Wartung → Updates „Benachrichtigung
   schicken, wenn eine neue Version verfügbar ist“ anhaken und optional die Kanäle wählen (keiner = alle
   eingeschalteten). Je neue Version kommt genau eine Nachricht. Den Text änderst du unter Benachrichtigungen →
   Texte der Benachrichtigungen („Neue MirrorSync-Version verfügbar“, Variablen `{neu}`, `{url}`,
@@ -1120,8 +1133,8 @@ MirrorSync kann sich selbst aktualisieren, wenn du den Docker-Socket in den Cont
 > Ohne Socket ist die Funktion ausgeschaltet und du aktualisierst wie bisher (Dockhand, Portainer,
 > `docker compose pull && docker compose up -d`).
 
-- **Jetzt aktualisieren:** unten links beim Hinweis „⬆ vX.Y.Z verfügbar“ und unter **Einstellungen → Allgemein →
-  Selbst aktualisieren**. Optional **automatisch einmal am Tag** ab einer Uhrzeit. Läuft gerade eine Aufgabe, wartet
+- **Jetzt aktualisieren:** unten links beim Hinweis „⬆ vX.Y.Z verfügbar“ und unter **Einstellungen → Wartung →
+  Updates**. Optional **automatisch einmal am Tag** ab einer Uhrzeit. Läuft gerade eine Aufgabe, wartet
   das Update, bis sie fertig ist.
 - **So läuft es ab:** MirrorSync holt das Image neu (derselbe Name und Tag wie beim laufenden Container, z. B.
   `:latest`). Ist es neuer, startet ein kurzlebiger Hilfs-Container aus dem neuen Image. Er stoppt den alten

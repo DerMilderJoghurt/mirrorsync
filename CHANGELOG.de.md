@@ -3,6 +3,42 @@
 Versionsnummern nach [SemVer](https://semver.org/lang/de/): MAJOR.MINOR.PATCH
 (MAJOR = inkompatible Änderung, MINOR = neue Funktion, PATCH = Fehlerbehebung).
 
+## 1.56.0 – 2026-11-26
+**Einstellungen neu sortiert**
+- Neue Gruppen in der Leiste: **Wartung** (Updates, Neustart, Logs), **Monitoring** (Überwachung) und **Netzwerk**
+  (Bandbreite). **Anmeldung und Sicherheit** ist eine eigene Seite und steht oben unter **Sicherheit**. Unter
+  **System → Allgemein** bleiben Sprache und Dateimanager. Jede Seite hat eine eigene Adresse (z. B.
+  `/settings/updates`), alte Links wie `/settings/general#bw` springen automatisch an die neue Stelle; das Suchfeld
+  findet alles an der neuen Stelle.
+- **Updates** aufgeräumt: oben installierte und neueste Version mit **Jetzt prüfen** und **Jetzt aktualisieren** und
+  dem Ablauf eines Updates, darunter „Nach Updates suchen“ und „Automatisch aktualisieren“ nebeneinander, dann
+  **Container** (Name, Image, Compose-Projekt, Docker-Socket), **Verlauf** der letzten Updates und alte Images.
+- Wer nur `system.update` bzw. `system.restart` hat, sieht die Seiten Updates bzw. Neustart und kann dort
+  aktualisieren bzw. neu starten, aber nichts an den Einstellungen ändern.
+
+**Aufgaben**
+- **Nur diese Aufgabe**: Hat eine Aufgabe Folgeaufgaben, gibt es neben „Start“ den Knopf **▶ Nur diese**. Er startet
+  nur diese Aufgabe, die Kette läuft danach nicht weiter (auch nicht bei einem neuen Versuch nach einem Fehler).
+- **Mehrfachauswahl**: **☑ Auswahl** blendet links Kästchen ein (Umschalt-Klick wählt einen Bereich). Für alle
+  markierten Aufgaben: Starten, Nur diese, Testlauf, Prüfen, Pausieren, Fortsetzen, Duplizieren, Logs öffnen,
+  Entfernen. Bei **Speicherorten**: Testen, Duplizieren (als `<name>-kopie`), Entfernen. Jede Aktion braucht dasselbe
+  Recht wie einzeln.
+
+**Audit-Log**
+- Kompakter: pro Eintrag eine Zeile mit Zeit, Benutzer, Bereich, Aktion und Kurzfassung (z. B. die geänderten Felder).
+  Ein Klick klappt alle Details direkt darunter auf, dazu „Alle aufklappen“ und „Alle zuklappen“.
+
+**Fehler behoben**
+- Die Vorlage-Rollen **Operator** und **Nur lesen** ließen sich nicht löschen, sie kamen sofort wieder. Jetzt bleiben
+  sie gelöscht und lassen sich unter **Rollen → Gelöschte Vorlagen** wiederherstellen. Admin bleibt unlöschbar. Eine
+  Rolle, die ein API-Key noch verwendet, lässt sich nicht mehr löschen.
+
+**API und MCP**
+- `run_job` bzw. `POST /api/v1/jobs/<id>/run` mit `only_this` (ohne Folgeaufgaben).
+- Neu `bulk_jobs` (`POST /api/v1/jobs/bulk`) und `bulk_remotes` (`POST /api/v1/remotes/bulk`) für die
+  Mehrfachauswahl, `restore_role` und `list_deleted_role_templates` für gelöschte Vorlagen.
+- Hilfe und alle Texte in fünf Sprachen.
+
 ## 1.55.0 – 2026-11-26
 **Übersichtliche Einstellungen**
 - **Einstellungen** mit einer Leiste links statt zehn Tabs nebeneinander, in vier Gruppen: **Benutzer & Rechte**

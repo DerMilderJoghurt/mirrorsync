@@ -25,7 +25,7 @@ COPY app/ .
 # Release notes for the /changelog page and "New in this version"
 COPY CHANGELOG*.md ./
 
-ARG VERSION=1.55.0
+ARG VERSION=1.56.0
 LABEL org.opencontainers.image.title="MirrorSync" org.opencontainers.image.version=$VERSION
 ENV TZ=Europe/Berlin CONFIG_DIR=/config LOG_DIR=/logs PORT=8080 PYTHONUNBUFFERED=1
 VOLUME ["/config", "/logs"]

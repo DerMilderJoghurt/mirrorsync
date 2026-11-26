@@ -4,7 +4,7 @@
 
 # MirrorSync – 1:1 mirroring with a web GUI and schedules
 
-Version **1.55.0** · Changes: [CHANGELOG.md](CHANGELOG.md) · [Deutsche Version](README.de.md)
+Version **1.56.0** · Changes: [CHANGELOG.md](CHANGELOG.md) · [Deutsche Version](README.de.md)
 
 A Docker container that **mirrors folders one-way, 1:1** (like FreeFileSync "Mirror"):
 the destination becomes an exact copy of the source, including deletions. The sync engine is
@@ -56,7 +56,8 @@ Then open `http://<docker-host>:8080` and create the first admin.
 - **Versioning**: deleted/overwritten files go to `<destination>.versions/<date>`, optionally keep only the
   last N versions or at most X days (older ones are removed after each run)
 - **Deletion protection**: the run aborts if more than N files would be deleted
-- **Clearer settings** (since 1.55.0): bar on the left with groups and a search field, "General" in expandable sections, jobs with tabs and a summary, storage fully editable (including rename)
+- **Multi-select** (since 1.56.0): tick several jobs or storages and start, test, duplicate or delete them together; **▶ Only this** starts a job without its follow-up jobs
+- **Clearer settings** (since 1.55.0): bar on the left with groups and a search field, groups for security, maintenance, monitoring and network, jobs with tabs and a summary, storage fully editable (including rename)
 - **Help with search** (since 1.54.0): explains every setting, with guides for API, MCP, Uptime Kuma and Home Assistant
 - **Encrypt the destination** (since 1.53.0): data on server B is stored only encrypted (rclone crypt), optionally file names too
 - **Verification after the sync** (since 1.52.0): compares source and destination file by file and shows "1:1 identical" or the differences
@@ -77,7 +78,7 @@ Changed files are transferred completely (no delta transfer like rsync).
 
 ## Installation
 The ready-made image is in the GitHub Container Registry: `ghcr.io/dermilderjoghurt/mirrorsync`
-(for amd64 and arm64, e.g. Raspberry Pi). Tags: `latest` (newest version), `1.55.0` (fixed version),
+(for amd64 and arm64, e.g. Raspberry Pi). Tags: `latest` (newest version), `1.56.0` (fixed version),
 `1.40` (newest patch of this version). The image is only published when the version number changes, so
 update checkers such as Dockhand or Watchtower only report an update when there really is a new version.
 
@@ -163,7 +164,7 @@ Under **Settings → My account** every user sets up 2FA themselves (scan the QR
 Authenticator, Aegis, 2FAS, Bitwarden …) and receives 10 backup codes that are shown only once.
 Passwords are stored hashed in the database `config/mirrorsync.db`.
 
-**Require 2FA** (since 1.41.0): Under **Settings → General → Sign-in and security** choose globally
+**Require 2FA** (since 1.41.0): Under **Settings → Security → Sign-in and security** choose globally
 *Off (per user only)*, *For new users* or *For all users*. Per user there is the **“Require 2FA”** checkbox under
 **Users → Edit** (with “For new users” it is already ticked when you create a user). A user who has to set up 2FA
 lands on “My account” with the QR code right after signing in and can do nothing else until the authenticator app
@@ -197,7 +198,7 @@ per user are possible (rename, remove). On the login page, click "Sign in with p
   Via `http://192.168.1.50` MirrorSync does not offer passkeys and explains why: browsers only allow passkeys
   on secure HTTPS pages, and a passkey is always bound to a domain name, never to an IP.
 - MirrorSync uses the address it is called with. If the proxy does not pass the host through, enter the public
-  address under **Settings → General → Passkeys** (or `PUBLIC_URL=` in the compose file).
+  address under **Settings → Security → Sign-in and security → Passkeys** (or `PUBLIC_URL=` in the compose file).
   Changing the address later makes existing passkeys unusable.
 - Device lost: an admin removes the user's passkeys under "Edit". Signing in with the password always keeps
   working. Adding and removing is recorded in the audit log.
@@ -299,6 +300,18 @@ In the job under **Verify and protect**:
 - **`.nosync`**: if a source folder contains a file `.nosync`, it is skipped; it stays untouched in the destination
   (on for new jobs).
 
+## Settings, multi-select and chains (since 1.56.0)
+- Settings bar: **Users & permissions**, **Security** (sign-in and security, access, API), **System** (general,
+  notifications, backup), **Maintenance** (updates, restart, logs), **Monitoring**, **Network** (bandwidth) and
+  **Personal**. Every page has its own address, e.g. `/settings/updates`.
+- **Updates**: status at the top with "Check now" and "Update now", below that the check, automatic update, container
+  info, history and old images.
+- **▶ Only this**: starts a job without its follow-up jobs (API: `only_this`).
+- **☑ Select** in the job and storage lists: tick several and start, test, pause, duplicate, delete them together and
+  more (API/MCP: `bulk_jobs`, `bulk_remotes`).
+- **Audit log** with one line per entry, details on click.
+- The template roles Operator and Read only can be deleted and restored under "Deleted templates".
+
 ## Clearer settings (since 1.55.0)
 - **Settings** have a bar on the left with groups instead of a long row of tabs: **Users & permissions** (users, roles,
   groups), **Security** (access, API), **System** (general, notifications, backup) and **Personal** (my account,
@@ -307,8 +320,8 @@ In the job under **Verify and protect**:
 - **Search field** above the bar: jumps straight to the matching setting (e.g. "2FA", "bandwidth", "passkeys"), opens
   its section and highlights it briefly. `/` jumps into the search field, arrow keys and Enter pick a result. Without a
   match, one click takes you to the help.
-- **General** in expandable sections: Interface, Updates and restart, Monitoring, Logs, Sign-in and security,
-  Performance. The browser remembers which ones are open.
+- **General** was split into expandable sections in 1.55.0; since 1.56.0 these are separate pages under Security,
+  Maintenance, Monitoring and Network.
 - **Editing a job** with tabs: Basics, Filter, Behaviour, Verify & protect, Notifications, Advanced. Badges show where
   something is set ("3 rules", "2 active"), "Show all" shows everything one below the other. A summary at the top
   always shows source → destination, start, recycle bin, verification, delete warning and more. The bar with **Save**
@@ -406,7 +419,7 @@ initially admin only).
 - **`/metrics`** in Prometheus format: runs, transferred bytes, duration, status, age of the last run, verifications,
   data volume. For Grafana.
 - Access with an API key with the permission `system.monitor` (or `jobs.view`) (`Authorization: Bearer msk_…` or
-  `?key=msk_…`), or allow access without login under **Settings → General → Monitoring**. `/health` (just "running")
+  `?key=msk_…`), or allow access without login under **Settings → Monitoring**. `/health` (just "running")
   stays as before.
 - **Statistics** (sidebar): transferred data, runs, errors and run time per month and job. Optionally a **monthly data
   cap** with a warning from X % and pausing automatic runs.
@@ -493,7 +506,7 @@ needed permission are not shown. The layout is per user (and per API key). API/M
 `update_dashboard` (`tiles` with `id`, `w`, `h`; `reset`).
 
 ## Restart and old images (since 1.51.0)
-Under **Settings → General → Restart** you can restart the MirrorSync container: by hand with "Restart now" or on a
+Under **Settings → Maintenance → Restart** you can restart the MirrorSync container: by hand with "Restart now" or on a
 schedule (time and weekdays). If jobs are running, the button refuses unless you tick "even if jobs are running" (they
 are then cancelled). The schedule waits until no job is running.
 
@@ -596,7 +609,7 @@ destination; with "Also delete excluded files in the destination" they are remov
   disabled, locked until …) and failed attempts. "Sign-in history" lists the last 1000 attempts.
 - **Edit account:** active or disabled, plus an optional lock period with "locked from" and "active again from"
   (e.g. an employee's vacation). The account is locked and unlocked automatically at that time.
-- **Settings → General → Sign-in and security:** after how many failed attempts an account is locked, for how
+- **Settings → Security → Sign-in and security:** after how many failed attempts an account is locked, for how
   long (0 = until an admin unlocks it) and whether you are notified. In addition MirrorSync throttles each IP
   address for 5 minutes.
 - **Country:** the container downloads the free country database from DB-IP (about 8 MB) to `config/geoip/` and
@@ -866,11 +879,11 @@ the time. The API returns the same fields (`changes[].added/removed/old_full/new
 
 Passwords, tokens, 2FA secrets and other secrets never end up in the log, only the note "changed". Filter by
 area, user and time range, full-text search (also in old and new values), export as CSV (for Excel, separated
-by `;`) with the same filters. Stored in `config/audit.jsonl`, retention under Settings → General (default
+by `;`) with the same filters. Stored in `config/audit.jsonl`, retention under Settings → Maintenance → Logs (default
 365 days, at most 20,000 entries).
 
 ## Bandwidth
-Under Settings → General you set the default bandwidth, in every job it can be overridden under "Bandwidth"
+Under Settings → Network → Bandwidth you set the default bandwidth, in every job it can be overridden under "Bandwidth"
 ("Use default", "Custom limits", "Always unlimited").
 
 - **Outside the time windows:** limit that applies when no time window matches (empty = unlimited).
@@ -894,7 +907,7 @@ with the number of copied, deleted and failed files. Clicking a run opens its fu
 - "Download" saves the complete log as a text file
 - A running run refreshes every 3 seconds
 
-Retention under Settings → General → Keep logs:
+Retention under Settings → Maintenance → Logs:
 - **Runs per job** (default 50, 0 = unlimited).
 - **At most this long** as a number of days, weeks or months (default 30 days, 0 = unlimited, a month = 30 days).
 
@@ -1068,13 +1081,13 @@ Regularly (by default once an hour) MirrorSync asks GitHub (`api.github.com`, re
 version exists. If so, the bottom left shows "⬆ vX.Y.Z available" below the version number; clicking it opens the
 release with all changes. Only the installed version number is sent.
 
-- Turn it on or off under **Settings → General → Updates**, which also has "Check now" (checks right away without saving your input; separate from "Save" since 1.47.0) and shows when the
+- Turn it on or off under **Settings → Maintenance → Updates**, which also has "Check now" (checks right away without saving your input; separate from "Save" since 1.47.0) and shows when the
   last check happened. You also set the **interval** there: enter a number and pick minutes or hours (5 minutes to
   720 hours, default 1 hour). Nothing is updated automatically unless you use the self-update (see below).
 - API/MCP: `GET /api/v1/update` (`get_update`), `POST /api/v1/update/check` (`check_update`),
   `PATCH /api/v1/settings/update` with `{"update_check": false}` and/or `{"update_interval": 120}` (minutes)
   (`update_update_settings`); `/status` contains `update` with `interval_minutes`.
-- **Notification for a new version** (since 1.46.0): under Settings → General → Updates tick "Send a notification
+- **Notification for a new version** (since 1.46.0): under Settings → Maintenance → Updates tick "Send a notification
   when a new version is available" and optionally pick channels (none = all enabled ones). Exactly one message per
   new version. Change the text under Notifications → Notification texts ("New MirrorSync version available",
   variables `{neu}`, `{url}`, `{veroeffentlicht}`). API/MCP: `update_notify` and `update_notify_channels` in
@@ -1095,7 +1108,7 @@ MirrorSync can update itself if you mount the Docker socket into the container:
 > Only mount it if you want that, and give the permission "Update MirrorSync" to admins only. Without the socket
 > the feature is off and you update as before (Dockhand, Portainer, `docker compose pull && docker compose up -d`).
 
-- **Update now:** at the bottom left next to "⬆ vX.Y.Z available" and under **Settings → General → Self-update**.
+- **Update now:** at the bottom left next to "⬆ vX.Y.Z available" and under **Settings → Maintenance → Updates**.
   Optionally **automatically once a day** from a set time. If a job is running, the update waits until it has
   finished.
 - **How it works:** MirrorSync pulls the image again (same name and tag as the running container, e.g. `:latest`).
@@ -1108,7 +1121,7 @@ MirrorSync can update itself if you mount the Docker socket into the container:
   previous one runs again. Result and steps are shown in the GUI, in the audit log ("Update started / completed /
   failed") and in `config/selfupdate.json`.
 - **Requirements:** the image has to come from a registry (`image: ghcr.io/dermilderjoghurt/mirrorsync:latest`).
-  MirrorSync cannot pull images built with `build: .`. With a fixed version tag (`:1.55.0`) only that tag is pulled
+  MirrorSync cannot pull images built with `build: .`. With a fixed version tag (`:1.56.0`) only that tag is pulled
   again. `/config` has to be a volume or bind mount (it is in the example compose file).
 - **Permission:** `system.update` ("Update MirrorSync", admins have it automatically). Changing the automatic
   update and its time needs `system.settings`.

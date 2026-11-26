@@ -2,7 +2,9 @@
 
 Quelltexte sind Deutsch, uebersetzt wird ueber die i18n-Kataloge (t()).
 Rechte: Jede Seite hat ein Recht (None = jeder angemeldete Benutzer, "admin" = nur Admins). Eine Seite und ihre
-Suchtreffer erscheinen nur, wenn der Benutzer das Recht hat, genau wie frueher die Tabs.
+Suchtreffer erscheinen nur, wenn der Benutzer das Recht hat, genau wie frueher die Tabs. Ein Tupel als Recht
+heisst: eines der Rechte genuegt.
+Seit 1.56.0 sind die Bereiche von "Allgemein" eigene Seiten unter Sicherheit, Wartung, Monitoring und Netzwerk.
 """
 import i18n
 
@@ -11,19 +13,28 @@ PAGES = {
     "users": ("Benutzer", "/users", "users.view", "👤"),
     "roles": ("Rollen", "/roles", "roles.manage", "🏷"),
     "groups": ("Gruppen", "/groups", "groups.manage", "👥"),
+    "security": ("Anmeldung und Sicherheit", "/settings/security", "system.settings", "🔐"),
     "access": ("Zugriff", "/settings/access", "system.access", "🛡"),
     "api": ("API", "/settings/api", "system.api", "🔑"),
     "general": ("Allgemein", "/settings/general", "system.settings", "⚙"),
     "notify": ("Benachrichtigungen", "/settings", "notify.view", "🔔"),
     "backup": ("Sicherung", "/settings/backup", "admin", "💾"),
+    "updates": ("Updates", "/settings/updates", ("system.settings", "system.update"), "⬆"),
+    "restart": ("Neustart", "/settings/restart", ("system.settings", "system.restart"), "🔄"),
+    "logs": ("Logs", "/settings/logs", "system.settings", "📜"),
+    "monitoring": ("Überwachung", "/settings/monitoring", "system.settings", "📈"),
+    "network": ("Bandbreite", "/settings/network", "system.settings", "🚀"),
     "account": ("Mein Konto", "/account", None, "🪪"),
     "help": ("Hilfe", "/help", None, "❓"),
 }
 
 GROUPS = [
     ("Benutzer & Rechte", ["users", "roles", "groups"]),
-    ("Sicherheit", ["access", "api"]),
+    ("Sicherheit", ["security", "access", "api"]),
     ("System", ["general", "notify", "backup"]),
+    ("Wartung", ["updates", "restart", "logs"]),
+    ("Monitoring", ["monitoring"]),
+    ("Netzwerk", ["network"]),
     ("Persönlich", ["account", "help"]),
 ]
 
@@ -32,21 +43,22 @@ INDEX = [
     # Allgemein
     ("Sprache", "general", "lang", "Standardsprache language Deutsch English Oberfläche"),
     ("Dateimanager: Tempo", "general", "files", "parallel kopieren verschieben schnell"),
-    ("Nach Updates suchen", "general", "update", "neue Version prüfen Intervall GitHub Benachrichtigung"),
-    ("Selbst aktualisieren", "general", "selfupdate", "Docker-Socket automatisch Update Image"),
-    ("Alte Images löschen", "general", "selfupdate", "prune Speicherplatz Docker"),
-    ("Neustart des Containers", "general", "restart", "neu starten Zeitplan Docker"),
-    ("Überwachung (Health, Prometheus)", "general", "monitor", "Uptime Kuma Home Assistant Grafana metrics health"),
-    ("Datenvolumen pro Monat", "general", "volume", "Limit GB Traffic Warnschwelle"),
-    ("Logs aufbewahren", "general", "logs", "Läufe behalten Audit-Log Tage Wochen Monate"),
-    ("Alte Logs löschen", "general", "purge", "Datum aufräumen Speicher"),
-    ("Konto sperren nach Fehlversuchen", "general", "security", "Sperre Passwort falsch Anmeldung Sperrdauer"),
-    ("Zwei-Faktor-Anmeldung erzwingen", "general", "security", "2FA Authenticator TOTP"),
-    ("Meldung bei fehlgeschlagener Anmeldung", "general", "security", "Login Fehlversuch Benachrichtigung"),
-    ("Reverse-Proxy und IP-Adresse", "general", "proxy", "X-Forwarded-For Nginx Traefik Caddy"),
-    ("Passkeys: öffentliche Adresse", "general", "passkeys", "Domain HTTPS public url WebAuthn"),
-    ("Länder-Datenbank (GeoIP)", "general", "geoip", "DB-IP Land Flagge"),
-    ("Bandbreite (Standard)", "general", "bw", "bwlimit Geschwindigkeit Zeittabelle drosseln"),
+    ("Nach Updates suchen", "updates", "update", "neue Version prüfen Intervall GitHub Benachrichtigung"),
+    ("Selbst aktualisieren", "updates", "selfupdate", "Docker-Socket automatisch Update Image"),
+    ("Update-Verlauf", "updates", "history", "Updates früher Versionen Ergebnis"),
+    ("Alte Images löschen", "updates", "images", "prune Speicherplatz Docker"),
+    ("Neustart des Containers", "restart", "restart", "neu starten Zeitplan Docker"),
+    ("Überwachung (Health, Prometheus)", "monitoring", "monitor", "Uptime Kuma Home Assistant Grafana metrics health"),
+    ("Datenvolumen pro Monat", "monitoring", "volume", "Limit GB Traffic Warnschwelle"),
+    ("Logs aufbewahren", "logs", "logs", "Läufe behalten Audit-Log Tage Wochen Monate"),
+    ("Alte Logs löschen", "logs", "purge", "Datum aufräumen Speicher"),
+    ("Konto sperren nach Fehlversuchen", "security", "security", "Sperre Passwort falsch Anmeldung Sperrdauer"),
+    ("Zwei-Faktor-Anmeldung erzwingen", "security", "security", "2FA Authenticator TOTP"),
+    ("Meldung bei fehlgeschlagener Anmeldung", "security", "security", "Login Fehlversuch Benachrichtigung"),
+    ("Reverse-Proxy und IP-Adresse", "security", "proxy", "X-Forwarded-For Nginx Traefik Caddy"),
+    ("Passkeys: öffentliche Adresse", "security", "passkeys", "Domain HTTPS public url WebAuthn"),
+    ("Länder-Datenbank (GeoIP)", "security", "geoip", "DB-IP Land Flagge"),
+    ("Bandbreite (Standard)", "network", "bw", "bwlimit Geschwindigkeit Zeittabelle drosseln"),
     # Benachrichtigungen
     ("Standard-Benachrichtigungen", "notify", "std", "Webhook E-Mail Telegram Apprise ntfy Discord Gotify Kanäle"),
     ("Ruhezeiten", "notify", "quiet", "Nacht nicht stören leise"),
@@ -93,6 +105,8 @@ def _allowed(perm, can, is_admin):
         return True
     if perm == "admin":
         return bool(is_admin)
+    if isinstance(perm, tuple):
+        return any(can(p) for p in perm)
     return bool(can(perm))
 
 

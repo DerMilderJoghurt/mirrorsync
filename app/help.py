@@ -189,6 +189,10 @@ SECTIONS = [
         ("Start, Test, Stopp",
          "**Start** spiegelt sofort, **Test** zeigt nur, was passieren würde, **Stopp** bricht ab. Laufende Aufgaben "
          "und Kopieraufträge zeigt der Knopf **Aufträge** oben rechts."),
+        ("Nur diese Aufgabe",
+         "Hat eine Aufgabe Folgeaufgaben (Kette), startet **▶ Nur diese** nur sie selbst. Die Folgeaufgaben laufen danach nicht, auch nicht bei einem neuen Versuch nach einem Fehler. **Start** startet wie bisher die ganze Kette."),
+        ("Mehrfachauswahl",
+         "**☑ Auswahl** oben rechts blendet links Kästchen ein. Markierte Aufgaben lassen sich gemeinsam starten (auch ohne Folgeaufgaben), testen, prüfen, pausieren, fortsetzen, duplizieren und entfernen, **Logs öffnen** öffnet jedes Log in einem eigenen Tab. Umschalt-Klick markiert einen Bereich. Jede Aktion braucht dasselbe Recht wie einzeln."),
         ("Log",
          "Jeder Lauf hat ein eigenes Log mit Filter (Fehler, kopiert, gelöscht, Hinweise), Suche und Download. Läuft "
          "die Aufgabe, aktualisiert es sich laufend."),
@@ -209,6 +213,8 @@ SECTIONS = [
          "Rund 55 Speicherarten: SMB, SFTP, WebDAV, FTP, S3, B2, Google Drive, OneDrive, Dropbox u. v. m. Der Assistent "
          "fragt die nötigen Angaben ab; bei Clouds mit Browser-Anmeldung (OAuth) führt er Schritt für Schritt durch. "
          "Der Name darf nur Buchstaben, Ziffern, - und _ enthalten."),
+        ("Mehrere Speicherorte auf einmal",
+         "Mit **☑ Auswahl** mehrere Speicherorte markieren und gemeinsam **testen**, **duplizieren** (als `<name>-kopie`, mit denselben Zugangsdaten) oder **entfernen**."),
         ("Testen", "Prüft die Verbindung und listet die oberste Ebene."),
         ("Bearbeiten und neu anmelden",
          "Beim Bearbeiten ist alles änderbar, aufgeteilt in **Verbindung**, **Anmeldedaten**, **Erweiterte Optionen** und "
@@ -271,28 +277,13 @@ SECTIONS = [
         ("Sprache",
          "Standardsprache für neue Benutzer, die Anmeldeseite, Berichte und die API. Jeder Benutzer stellt seine eigene "
          "unter Mein Konto ein."),
-        ("Bereiche zum Aufklappen",
-         "Allgemein ist in Bereiche aufgeteilt, die sich auf- und zuklappen lassen: **Oberfläche** (Sprache, "
-         "Dateimanager), **Updates und Neustart**, **Überwachung** (Health, Prometheus, Datenvolumen), **Logs**, "
-         "**Anmeldung und Sicherheit** (Kontosperre, 2FA, Reverse-Proxy, Passkeys, Länder-Datenbank) und **Leistung** "
-         "(Bandbreite). MirrorSync merkt sich im Browser, welche Bereiche offen sind."),
+        ("Aufbau der Einstellungen",
+         "Die Leiste links ist nach Themen sortiert: **Benutzer & Rechte**, **Sicherheit** (Anmeldung und Sicherheit, "
+         "Zugriff, API), **System** (Allgemein, Benachrichtigungen, Sicherung), **Wartung** (Updates, Neustart, Logs), "
+         "**Monitoring** (Überwachung) und **Netzwerk** (Bandbreite). Das Suchfeld oben findet jede Einstellung."),
         ("Dateimanager: Tempo", "Wie schnell Kopieren und Verschieben im Dateimanager laufen."),
-        ("Updates",
-         "Regelmäßig nach neuen Versionen suchen und optional benachrichtigen. Der Hinweis erscheint unten in der "
-         "Seitenleiste."),
-        ("Selbst aktualisieren",
-         "Mit Docker-Socket: Knopf „Jetzt aktualisieren“ oder automatisch einmal am Tag ab einer Uhrzeit, optional das "
-         "alte Image danach löschen. **Alte MirrorSync-Images** listet und löscht übrige Images."),
-        ("Neustart", "Container sofort oder nach Zeitplan (Uhrzeit, Wochentage) neu starten, auf Wunsch auch während Aufgaben laufen."),
-        ("Überwachung",
-         "`/health/jobs` und `/metrics` ohne Anmeldung abrufbar machen. Sonst brauchen sie einen API-Key mit dem Recht "
-         "`system.monitor`."),
-        ("Datenvolumen pro Monat",
-         "Limit in GB, Warnschwelle in %, Benachrichtigung und auf Wunsch automatische Läufe bis Monatsende anhalten."),
-        ("Logs aufbewahren",
-         "Läufe pro Aufgabe (Standard 50) und höchstens so lange (Standard 30 Tage, 0 = unbegrenzt). Dazu die "
-         "Aufbewahrung des Audit-Logs in Tagen."),
-        ("Alte Logs löschen", "Einmalig alle Läufe vor einem Datum löschen; vorher zeigt MirrorSync die Anzahl."),
+    ]),
+    ("security", "🔐", "Einstellungen: Anmeldung und Sicherheit", "/settings/security", [
         ("Anmeldung und Sicherheit",
          "Konto nach so vielen Fehlversuchen für X Minuten sperren, 2FA erzwingen (aus, für neue oder alle Benutzer) und "
          "über fehlgeschlagene Anmeldungen benachrichtigen."),
@@ -300,6 +291,29 @@ SECTIONS = [
          "Hinter einem Reverse-Proxy (z. B. Nginx Proxy Manager) den Haken setzen, damit die echte IP erkannt wird. Die "
          "Länder-Datenbank (DB-IP Lite) wird automatisch geladen und nach Intervall oder Zeitplan erneuert."),
         ("Passkeys", "Öffentliche Adresse von MirrorSync (z. B. `https://sync.example.de`), nötig für Passkeys."),
+    ]),
+    ("maint", "🛠", "Einstellungen: Wartung", "/settings/updates", [
+        ("Updates",
+         "Regelmäßig nach neuen Versionen suchen und optional benachrichtigen. Der Hinweis erscheint unten in der "
+         "Seitenleiste."),
+        ("Update-Seite",
+         "Oben stehen installierte und neueste Version mit **Jetzt prüfen** und **Jetzt aktualisieren**. Darunter: "
+         "Nach Updates suchen, Automatisch aktualisieren, Container-Infos, der Verlauf der letzten Updates und alte Images."),
+        ("Selbst aktualisieren",
+         "Mit Docker-Socket: Knopf „Jetzt aktualisieren“ oder automatisch einmal am Tag ab einer Uhrzeit, optional das "
+         "alte Image danach löschen. **Alte MirrorSync-Images** listet und löscht übrige Images."),
+        ("Neustart", "Container sofort oder nach Zeitplan (Uhrzeit, Wochentage) neu starten, auf Wunsch auch während Aufgaben laufen."),
+        ("Logs aufbewahren",
+         "Läufe pro Aufgabe (Standard 50) und höchstens so lange (Standard 30 Tage, 0 = unbegrenzt). Dazu die "
+         "Aufbewahrung des Audit-Logs in Tagen."),
+        ("Alte Logs löschen", "Einmalig alle Läufe vor einem Datum löschen; vorher zeigt MirrorSync die Anzahl."),
+    ]),
+    ("monnet", "📈", "Einstellungen: Monitoring und Netzwerk", "/settings/monitoring", [
+        ("Überwachung",
+         "`/health/jobs` und `/metrics` ohne Anmeldung abrufbar machen. Sonst brauchen sie einen API-Key mit dem Recht "
+         "`system.monitor`."),
+        ("Datenvolumen pro Monat",
+         "Limit in GB, Warnschwelle in %, Benachrichtigung und auf Wunsch automatische Läufe bis Monatsende anhalten."),
         ("Bandbreite (Standard)",
          "Limit für alle Aufgaben, die „Standard“ verwenden, wahlweise nach Uhrzeit und Wochentag gestaffelt."),
     ]),
@@ -324,11 +338,15 @@ SECTIONS = [
         ("Rollen",
          "Eine Rolle ist eine Sammlung von Rechten, optional beschränkt auf ausgewählte Aufgaben und Speicherorte. "
          "Vorlagen wie Admin, Operator oder Nur lesen helfen beim Start. Vergeben kann man nur Rechte, die man selbst hat."),
+        ("Vorlagen löschen und wiederherstellen",
+         "Die Vorlagen **Operator** und **Nur lesen** lassen sich löschen, wenn kein Benutzer und kein API-Key sie hat. Sie bleiben dann weg und stehen unter **Gelöschte Vorlagen** zum Wiederherstellen bereit. Admin lässt sich nicht löschen."),
         ("Gruppen",
          "Fassen Benutzer und API-Keys zusammen, geben zusätzliche Rechte und bestimmen, welche Aufgaben und "
          "Speicherorte die Mitglieder sehen."),
         ("Anmeldeverlauf", "Wer sich wann von wo angemeldet hat, mit Fehlversuchen und Entsperren."),
         ("Audit-Log", "Wer hat wann was geändert, mit Vorher/Nachher, Filter, Suche und CSV-Export. Recht `system.audit`."),
+        ("Audit-Log kompakt",
+         "Jeder Eintrag steht in einer Zeile mit Aktion und Kurzfassung (z. B. den geänderten Feldern). Ein Klick klappt alle Details darunter auf: Vorher/Nachher, IP-Adresse, Anfrage. **Alle aufklappen** zeigt alles auf einmal."),
     ]),
     ("account", "👤", "Mein Konto", "/account", [
         ("Sprache", "Deine Sprache für die Oberfläche."),
@@ -415,7 +433,7 @@ SECTIONS = [
          "Lege für jeden Assistenten einen eigenen Key mit passender Rolle an (z. B. nur ansehen und starten). So lässt "
          "er sich einzeln sperren, und das Audit-Log zeigt, was er getan hat."),
     ]),
-    ("monitor", "📈", "Überwachung mit Uptime Kuma und Home Assistant", "/settings/general", [
+    ("monitor", "📈", "Überwachung mit Uptime Kuma und Home Assistant", "/settings/monitoring", [
         ("Health-Check /health/jobs",
          "Antwortet mit HTTP 200, wenn alle Aufgaben in Ordnung sind, sonst 503 (Fehler, überfällig, Löschwarnung, "
          "Abweichung beim Prüflauf), z. B. `{\"status\": \"ok\", \"summary\": \"3 Aufgaben ok, letzter Sync vor 5 "

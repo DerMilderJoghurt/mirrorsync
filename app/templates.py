@@ -166,6 +166,8 @@ details summary{cursor:pointer;color:var(--mut);font-weight:500}
 .jtabs button{background:none;border:0;border-bottom:2px solid transparent;margin-bottom:-1px;padding:10px 13px;color:var(--mut);font:inherit;font-weight:500;white-space:nowrap;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
 .jtabs button:hover{color:var(--fg)}.jtabs button.on{color:var(--acc);border-bottom-color:var(--acc)}.jtabs .n{font-size:11px;padding:1px 7px;border-radius:10px;background:var(--acc-soft);color:var(--acc)}
 @media(max-width:700px){.savebar{position:static!important}}.jtabs .jall{margin-left:auto;font-size:12.5px}.savebar{position:sticky;bottom:0;z-index:15;display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:12px 16px;margin-top:10px;background:var(--card);border:1px solid var(--bd);border-radius:12px;box-shadow:0 -4px 16px rgba(0,0,0,.06)}
+.seltable .selc{display:none;width:34px;padding-right:0}.seltable.sel-on .selc{display:table-cell}.selc input{width:17px;height:17px;margin:0;cursor:pointer}.seltable tr.selrow td{background:var(--acc-soft,rgba(79,70,229,.08))}.selbar{position:sticky;top:8px;z-index:20;display:flex;gap:6px;flex-wrap:wrap;align-items:center;padding:8px 10px;margin:0 0 8px;border:1px solid var(--bd);border-radius:10px;background:var(--card);box-shadow:var(--shadow)}.selbar[hidden]{display:none}.selbar .selcount{margin-right:6px}.selbar button:disabled{opacity:.45;cursor:not-allowed}#selbtn[aria-pressed=true]{border-color:var(--acc);color:var(--acc)}
+.cgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 16px;align-items:start}.cgrid>.card{min-width:0}@media(max-width:900px){.cgrid{grid-template-columns:minmax(0,1fr)}}.upd-top{display:flex;gap:22px;align-items:center;flex-wrap:wrap}.upd-v{display:flex;flex-direction:column;gap:3px;align-items:flex-start}.upd-v>b{font-size:24px;font-weight:700}.upd-v>b a{text-decoration:none}.upd-sp{flex:1}.upd-steps{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:14px}.upd-steps span{font-size:12.5px;padding:3px 10px;border:1px solid var(--bd);border-radius:12px;color:var(--mut)}.upd-steps i{font-style:normal;color:var(--mut)}.kv{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:6px 16px;font-size:13.5px;align-items:center}.kv>b{font-weight:500;color:var(--mut)}.kv>code,.kv>span{word-break:break-all;justify-self:start}
 .g2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px 18px}.g2>div{min-width:0}@media(max-width:760px){.g2{grid-template-columns:minmax(0,1fr)}}
 .rfield.nomatch{display:none!important}.advtools{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin:4px 0 12px}.advtools input{flex:1 1 260px}.advtools .check{white-space:nowrap;flex:0 0 auto}
 details.rsec>summary{list-style:none;cursor:pointer;display:flex;align-items:center;color:var(--fg)}details.rsec>summary::-webkit-details-marker{display:none}details.rsec>summary h2{margin:0;flex:1}
@@ -264,6 +266,13 @@ poll();})();
 </div></div>
 <script>
 // Meldungen (gespeichert, gelöscht, Fehler) mit X wegklicken
+function selToggle(id){const t=document.getElementById(id),bar=document.getElementById(id+'-bar'),b=document.getElementById('selbtn');if(!t)return;const on=!t.classList.contains('sel-on');t.classList.toggle('sel-on',on);bar.hidden=!on;if(b)b.setAttribute('aria-pressed',on);if(!on){t.querySelectorAll('.selbox,.selall').forEach(x=>{x.checked=false});selUpd(t)}try{sessionStorage.setItem('ms-sel-'+id,on?'1':'')}catch(e){}}
+function selUpd(t){const bar=document.getElementById(t.id+'-bar');const bx=[...t.querySelectorAll('.selbox')];const n=bx.filter(x=>x.checked).length;bx.forEach(x=>x.closest('tr').classList.toggle('selrow',x.checked));const a=t.querySelector('.selall');if(a){a.checked=n>0&&n===bx.length;a.indeterminate=n>0&&n<bx.length}bar.querySelector('.selcount').textContent=n+' '+'ausgewählt';bar.querySelectorAll('button[data-a],button[data-open]').forEach(b=>{b.disabled=!n})}
+document.addEventListener('DOMContentLoaded',()=>{document.querySelectorAll('table.seltable').forEach(t=>{const bar=document.getElementById(t.id+'-bar');t.addEventListener('change',e=>{if(e.target.classList.contains('selall'))t.querySelectorAll('.selbox').forEach(x=>{x.checked=e.target.checked});if(e.target.matches('.selbox,.selall'))selUpd(t)});
+let last=null;t.addEventListener('click',e=>{const x=e.target.closest('.selbox');if(!x)return;const bx=[...t.querySelectorAll('.selbox')];if(e.shiftKey&&last){const [i,j]=[bx.indexOf(last),bx.indexOf(x)].sort((p,q)=>p-q);for(let k=i;k<=j;k++)bx[k].checked=x.checked;selUpd(t)}last=x});
+bar.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;const ids=[...t.querySelectorAll('.selbox:checked')].map(x=>x.value);if(b.dataset.open){e.preventDefault();ids.forEach(id=>window.open(b.dataset.open.replace('{id}',encodeURIComponent(id)),'_blank'));return}if(!b.dataset.a)return;if(!ids.length||(b.dataset.q&&!confirm(b.dataset.q))){e.preventDefault();return}
+bar.querySelectorAll('input[name=ids]').forEach(x=>x.remove());ids.forEach(id=>{const i=document.createElement('input');i.type='hidden';i.name='ids';i.value=id;bar.append(i)});bar.querySelector('input[name=action]').value=b.dataset.a});
+selUpd(t);let keep='';try{keep=sessionStorage.getItem('ms-sel-'+t.id)}catch(e){}if(keep)selToggle(t.id)})});
 function msgClose(root){(root||document).querySelectorAll('.msg.flash:not(.hasx)').forEach(m=>{m.classList.add('hasx');const b=document.createElement('button');b.type='button';b.className='msgx';b.innerHTML='&times;';b.title='Meldung schließen';b.setAttribute('aria-label',b.title);b.onclick=()=>m.remove();m.prepend(b)})}
 msgClose();
 // Pause- und Ändern-Menüs schließen, sobald man daneben klickt oder Esc drückt; immer nur eins offen
@@ -289,7 +298,7 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){window.addEventLis
 
 "index.html": r"""{% extends "base.html" %}{% block title %}Aufgaben{% endblock %}
 {% block subtitle %}<p>Spiegel-Aufgaben: Das Ziel wird exakt wie die Quelle.</p>{% endblock %}
-{% block actions %}{% if can("jobs.create") %}<a class="btn pri" href="/job/new">{{ ICON.plus }} Neue Aufgabe</a>{% endif %}{% endblock %}
+{% block actions %}{% if jobs and (can("jobs.run") or can("jobs.dryrun") or can("jobs.edit") or can("jobs.create") or can("jobs.delete")) %}<button type="button" class="btn" id="selbtn" onclick="selToggle('jobsel')" aria-pressed="false">☑ Auswahl</button>{% endif %}{% if can("jobs.create") %}<a class="btn pri" href="/job/new">{{ ICON.plus }} Neue Aufgabe</a>{% endif %}{% endblock %}
 {% block body %}
 <div class="stats">
 <div class="stat"><div class="k">Aufgaben</div><div class="v">{{ jobs|length }}</div></div>
@@ -302,8 +311,14 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){window.addEventLis
 {% if not jobs %}<div class="empty"><p style="font-size:15px;color:var(--fg);margin-bottom:4px">Noch keine Aufgaben</p>
 <p>Lege zuerst unter <a href="/remotes">Speicherorte</a> deine Server an, dann eine Aufgabe.</p>
 {% if can("jobs.create") %}<p><a class="btn pri" href="/job/new">{{ ICON.plus }} Neue Aufgabe</a></p>{% endif %}</div>
-{% else %}<table><tr><th>Aufgabe</th><th class="hide-sm">Zeitplan</th><th>Status</th><th style="text-align:right">Aktionen</th></tr>
-{% for j in jobs %}<tr class="{{ 'paused' if j.is_paused }}">
+{% else %}<form method="post" action="/jobs/bulk" class="selbar" id="jobsel-bar" hidden><input type="hidden" name="action"><b class="selcount">0 ausgewählt</b>
+{% if can("jobs.run") %}<button class="btn sm pri" data-a="run">{{ ICON.play }} Starten</button><button class="btn sm" data-a="solo" title="Ohne die Folgeaufgaben der Kette">▶ Nur diese</button>{% endif %}{% if can("jobs.dryrun") %}<button class="btn sm" data-a="dry">Testlauf</button>{% endif %}{% if can("jobs.run") %}<button class="btn sm" data-a="verify">🔎 Prüfen</button>{% endif %}
+{% if can("jobs.edit") %}<button class="btn sm" data-a="pause">Pausieren</button><button class="btn sm" data-a="resume">▶ Fortsetzen</button>{% endif %}{% if can("jobs.create") %}<button class="btn sm" data-a="duplicate">⧉ Duplizieren</button>{% endif %}
+{% if can("jobs.logs") %}<button type="button" class="btn sm" data-open="/job/{id}/log" title="Log jeder Aufgabe in einem eigenen Tab öffnen">Logs öffnen</button>{% endif %}
+{% if can("jobs.delete") %}<button class="btn sm del" data-a="delete" data-q="{{ _('Die ausgewählten Aufgaben wirklich entfernen? Die Dateien in Quelle und Ziel bleiben unberührt.') }}">Entfernen</button>{% endif %}
+<button type="button" class="btn sm" onclick="selToggle('jobsel')">Fertig</button></form>
+<table id="jobsel" class="seltable"><tr><th class="selc"><input type="checkbox" class="selall" aria-label="Alle auswählen"></th><th>Aufgabe</th><th class="hide-sm">Zeitplan</th><th>Status</th><th style="text-align:right">Aktionen</th></tr>
+{% for j in jobs %}<tr class="{{ 'paused' if j.is_paused }}"><td class="selc"><input type="checkbox" class="selbox" value="{{ j.id }}" aria-label="{{ j.name }}"></td>
 <td style="{{ 'padding-left:%dpx' % (10 + 22 * j.depth) if j.depth }}">{% if j.depth %}<span class="chain">↳</span>{% endif %}<a href="/job/{{ j.id }}" style="color:inherit;text-decoration:none"><span class="jobname">{{ j.name }}</span></a>{% if j.is_paused %} <span class="tag pausetag" title="{{ 'von ' ~ j.paused_by if j.paused_by }}">{{ j.pause_text }}</span>{% endif %}
 <div class="path">{% if j.direction == "bisync" %}<span title="Zwei-Wege-Sync">{{ j.source }} ⇄ {{ j.eff_dest }}</span>{% else %}{{ j.source }} → {{ j.eff_dest }}{% endif %}</div>
 {% if j.direction == "bisync" and j.bisync_need_resync %}<small class="fehler">Zwei-Wege-Sync abgebrochen, bitte neu zusammenführen.</small>
@@ -328,7 +343,7 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){window.addEventLis
 {% else %}<small class="mut">{{ _("keiner geplant") }}</small>{% endif %}{% if j.window_open and not j.running %}<br><span class="tag" title="Startet automatisch, sobald das Zeitfenster aufgeht">🕘 <span>wartet auf Zeitfenster</span> ({{ j.window_open }})</span>{% endif %}</div></td>
 <td style="text-align:right;white-space:nowrap">
 {% if j.running %}{% if can("jobs.run") %}<form class="inline" method="post" action="/job/{{ j.id }}/stop"><button class="btn sm del">Stopp</button></form>{% endif %}
-{% else %}{% if can("jobs.run") %}<form class="inline" method="post" action="/job/{{ j.id }}/run"><button class="btn sm pri" title="Jetzt spiegeln">{{ ICON.play }} Start</button></form>{% endif %}
+{% else %}{% if can("jobs.run") %}<form class="inline" method="post" action="/job/{{ j.id }}/run"><button class="btn sm pri" title="{{ 'Jetzt spiegeln, danach laufen die Folgeaufgaben' if j.followers else 'Jetzt spiegeln' }}">{{ ICON.play }} Start</button></form>{% if j.followers %}<form class="inline" method="post" action="/job/{{ j.id }}/run"><input type="hidden" name="solo" value="1"><button class="btn sm" title="Nur diese Aufgabe starten, ohne die Folgeaufgaben der Kette">▶ Nur diese</button></form>{% endif %}{% endif %}
 {% if can("jobs.dryrun") %}<form class="inline" method="post" action="/job/{{ j.id }}/run"><input type="hidden" name="dry" value="1"><button class="btn sm" title="Testlauf: zeigt nur, was passieren würde">Test</button></form>{% endif %}{% endif %}
 {% if can("jobs.edit") %}{% if j.is_paused %}<form class="inline" method="post" action="/job/{{ j.id }}/pause"><input type="hidden" name="action" value="resume"><button class="btn sm" title="Pause beenden">▶ Fortsetzen</button></form>
 {% else %}<details class="pausemenu"><summary class="btn sm" title="Pausieren: startet nicht per Zeitplan, Live oder Kette">Pause</summary><div class="pmenu">
@@ -692,7 +707,7 @@ const TZN='{{ tz }}';
 <option value="global" {{ "selected" if (job.bw_mode or "global") == "global" }}>Standard verwenden ({{ glob.bw }})</option>
 <option value="custom" {{ "selected" if job.bw_mode == "custom" }}>Eigene Grenzen für diese Aufgabe</option>
 <option value="off" {{ "selected" if job.bw_mode == "off" }}>Immer unbegrenzt</option></select>
-<div class="hint bwglobal">Den Standard legst du unter {% if can("system.settings") %}<a href="/settings/general">Einstellungen → Allgemein</a>{% else %}Einstellungen → Allgemein{% endif %} fest.</div>
+<div class="hint bwglobal">Den Standard legst du unter {% if can("system.settings") %}<a href="/settings/network">Einstellungen → Netzwerk → Bandbreite</a>{% else %}Einstellungen → Netzwerk → Bandbreite{% endif %} fest.</div>
 <div id="bwcustom" style="margin-top:12px">{% include "bw_editor.html" %}</div>
 <script>function bwshow(){const c=document.getElementById('bwmode').value;document.getElementById('bwcustom').style.display=c==='custom'?'':'none';document.querySelector('.bwglobal').style.display=c==='global'?'':'none'}bwshow()</script>
 </div>
@@ -1048,7 +1063,7 @@ jtShow(start,true);if(hc)setTimeout(()=>he.scrollIntoView({block:'start'}),50);}
 <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
 <h2 style="margin:0">{{ "Aktueller Lauf" if running else "Letzter Lauf" }} {% if running %}<span class="tag laeuft">läuft</span>{% endif %}</h2>
 <div>{% if running %}{% if can("jobs.run") %}<form class="inline" method="post" action="/job/{{ job_id }}/stop"><button class="btn del">Stopp</button></form>{% endif %}
-{% else %}{% if can("jobs.run") %}<form class="inline" method="post" action="/job/{{ job_id }}/run"><button class="btn pri">Jetzt spiegeln</button></form>{% endif %}
+{% else %}{% if can("jobs.run") %}<form class="inline" method="post" action="/job/{{ job_id }}/run"><button class="btn pri" {% if follower_names %}title="{{ _('Danach laufen: {0}', follower_names|join(', ')) }}"{% endif %}>Jetzt spiegeln</button></form>{% if follower_names %}<form class="inline" method="post" action="/job/{{ job_id }}/run"><input type="hidden" name="solo" value="1"><button class="btn" title="Nur diese Aufgabe starten, ohne die Folgeaufgaben der Kette">▶ Nur diese Aufgabe</button></form>{% endif %}{% endif %}
 {% if can("jobs.dryrun") %}<form class="inline" method="post" action="/job/{{ job_id }}/run"><input type="hidden" name="dry" value="1"><button class="btn">Testlauf</button></form>{% endif %}
 {% if can("jobs.run") %}<form class="inline" method="post" action="/job/{{ job_id }}/verify"><button class="btn" title="Quelle und Ziel vergleichen, ohne etwas zu ändern">🔎 Jetzt prüfen</button></form>{% endif %}{% endif %}
 {% if current %}<a class="btn" href="/job/{{ job_id }}/run/{{ current }}">Ganzes Log mit Filter</a>{% endif %}
@@ -1057,7 +1072,7 @@ jtShow(start,true);if(hc)setTimeout(()=>he.scrollIntoView({block:'start'}),50);}
 </div>
 
 <div class="card"><h2>Verlauf</h2>
-<p class="hint" style="margin-top:-6px">Klick auf einen Lauf zeigt sein vollständiges Log. Aufbewahrt werden die letzten {{ keep_runs }} Läufe{% if keep_days %}, höchstens {{ keep_days }} Tage{% endif %}{% if can("system.settings") %} (<a href="/settings/general">ändern</a>){% endif %}.</p>
+<p class="hint" style="margin-top:-6px">Klick auf einen Lauf zeigt sein vollständiges Log. Aufbewahrt werden die letzten {{ keep_runs }} Läufe{% if keep_days %}, höchstens {{ keep_days }} Tage{% endif %}{% if can("system.settings") %} (<a href="/settings/logs">ändern</a>){% endif %}.</p>
 {% if job.history or running %}<table><tr><th>Start</th><th class="hide-sm">Dauer</th><th>Status</th><th title="kopiert">Kopiert</th><th title="gelöscht">Gelöscht</th><th>Fehler</th><th class="hide-sm">Gestartet von</th><th></th></tr>
 {% if running and current %}<tr class="click" onclick="location='/job/{{ job_id }}/run/{{ current }}'"><td>jetzt</td><td class="hide-sm">–</td><td><span class="tag laeuft">läuft</span></td><td>–</td><td>–</td><td>–</td><td class="hide-sm">–</td><td><a class="btn sm" href="/job/{{ job_id }}/run/{{ current }}">Log</a></td></tr>{% endif %}
 {% for h in job.history %}{% set ok = has_file.get(h.run) %}<tr {% if ok %}class="click" onclick="location='/job/{{ job_id }}/run/{{ h.run }}'"{% endif %}>
@@ -1074,13 +1089,17 @@ jtShow(start,true);if(hc)setTimeout(()=>he.scrollIntoView({block:'start'}),50);}
 <script>const l=document.getElementById('log');l.scrollTop=l.scrollHeight</script>
 {% endblock %}""",
 
-"remotes.html": r"""{% extends "base.html" %}{% block title %}Speicherorte{% endblock %}{% block subtitle %}<p>Server und Clouds, zwischen denen gespiegelt wird.</p>{% endblock %}{% block actions %}{% if can("remotes.create") %}<a class="btn pri" href="/remotes/new">{{ ICON.plus }} Neuer Speicherort</a>{% endif %}{% endblock %}{% block body %}
+"remotes.html": r"""{% extends "base.html" %}{% block title %}Speicherorte{% endblock %}{% block subtitle %}<p>Server und Clouds, zwischen denen gespiegelt wird.</p>{% endblock %}{% block actions %}{% if remotes and (can("remotes.test") or can("remotes.create") or can("remotes.delete")) %}<button type="button" class="btn" id="selbtn" onclick="selToggle('remsel')" aria-pressed="false">☑ Auswahl</button>{% endif %}{% if can("remotes.create") %}<a class="btn pri" href="/remotes/new">{{ ICON.plus }} Neuer Speicherort</a>{% endif %}{% endblock %}{% block body %}
 {% if msg %}<div class="msg ok flash" role="status">{{ msg }}</div>{% endif %}
 {% if err %}<div class="msg err flash" role="status">{{ err }}</div>{% endif %}
 <div class="card">
 
-{% if remotes %}<table><tr><th>Name</th><th>Typ</th><th class="hide-sm">Im Job verwenden als</th><th></th></tr>
-{% for r in remotes %}<tr><td><b>{{ r.name }}</b>{% if r.no_token %}<br><span class="tag fehler">Anmeldung fehlt</span>{% endif %}</td><td>{{ r.type }}</td><td class="hide-sm"><code>{{ r.name }}:pfad/zum/ordner</code></td>
+{% if remotes %}<form method="post" action="/remotes/bulk" class="selbar" id="remsel-bar" hidden><input type="hidden" name="action"><b class="selcount">0 ausgewählt</b>
+{% if can("remotes.test") %}<button class="btn sm pri" data-a="test">Testen</button>{% endif %}{% if can("remotes.create") %}<button class="btn sm" data-a="duplicate" title="Kopie mit denselben Zugangsdaten, Name mit -kopie">⧉ Duplizieren</button>{% endif %}
+{% if can("remotes.delete") %}<button class="btn sm del" data-a="delete" data-q="{{ _('Die ausgewählten Speicherorte wirklich entfernen? Aufgaben, die sie verwenden, funktionieren danach nicht mehr.') }}">Entfernen</button>{% endif %}
+<button type="button" class="btn sm" onclick="selToggle('remsel')">Fertig</button></form>
+<table id="remsel" class="seltable"><tr><th class="selc"><input type="checkbox" class="selall" aria-label="Alle auswählen"></th><th>Name</th><th>Typ</th><th class="hide-sm">Im Job verwenden als</th><th></th></tr>
+{% for r in remotes %}<tr><td class="selc"><input type="checkbox" class="selbox" value="{{ r.name }}" aria-label="{{ r.name }}"></td><td><b>{{ r.name }}</b>{% if r.no_token %}<br><span class="tag fehler">Anmeldung fehlt</span>{% endif %}</td><td>{{ r.type }}</td><td class="hide-sm"><code>{{ r.name }}:pfad/zum/ordner</code></td>
 <td style="white-space:nowrap">{% if can("remotes.test") %}<form class="inline" method="post" action="/remotes/{{ r.name }}/test"><button class="btn sm">Testen</button></form>{% endif %}{% if can("remotes.edit") %}
 {% if r.oauth %}<form class="inline" method="post" action="/remotes/{{ r.name }}/auth"><button class="btn sm {{ 'pri' if r.no_token }}">Anmelden</button></form>{% endif %}
 <a class="btn sm" href="/remotes/{{ r.name }}/edit">Bearbeiten</a>{% endif %}{% if can("remotes.create") %}
@@ -2086,7 +2105,7 @@ window.ui=SwaggerUIBundle({url:'/api/v1/openapi.json',dom_id:'#ui',deepLinking:t
 <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><span><b>{{ vol.used|hbytes }}</b> von {{ vol.limit|hbytes }}</span><span class="{{ 'fehler' if vol.exceeded else ('gestoppt' if vol.warn else 'ok') }}">{{ vol.pct }} %</span></div>
 <div class="fm-bar" style="width:100%;height:10px;margin-top:6px"><i style="width:{{ [vol.pct,100]|min }}%;background:{{ 'var(--err)' if vol.exceeded else ('var(--warn)' if vol.warn else 'var(--ok)') }}"></i></div>
 {% if vol.exceeded and vol.stop %}<p class="fehler" style="margin-bottom:0">Limit erreicht: Automatische Läufe sind bis zum Monatsende angehalten.</p>{% endif %}
-{% if can("system.settings") %}<p class="hint"><a href="/settings/general#monitor">Limit ändern</a></p>{% endif %}</div>{% endif %}
+{% if can("system.settings") %}<p class="hint"><a href="/settings/monitoring#volume">Limit ändern</a></p>{% endif %}</div>{% endif %}
 {% if not months %}<div class="card"><div class="empty">Noch keine Läufe gezählt.</div></div>{% else %}
 {% set mx = months|map(attribute="totals")|map(attribute="bytes")|max %}
 <div class="card"><h2>Verlauf</h2><table><tr><th>Monat</th><th style="width:38%">Übertragen</th><th class="num">Läufe</th><th class="num">ok</th><th class="num">Fehler</th><th class="num hide-sm">Kopiert</th><th class="num hide-sm">Gelöscht</th><th class="num hide-sm">Laufzeit</th></tr>
@@ -2329,7 +2348,7 @@ async function pkAdd(){const m=document.getElementById('pkmsg');m.className='hin
 {% if msg %}<div class="msg info flash" role="status">{{ msg }}</div>{% endif %}
 <div class="card" style="padding:6px 8px">
 <table><tr><th>Rolle</th><th>Rechte</th><th class="hide-sm">Gilt für</th><th>Benutzer</th><th style="text-align:right">Aktionen</th></tr>
-{% for rid, r in roles.items() %}<tr>
+{% for rid, r in roles.items() %}<tr id="role-{{ rid }}">
 <td><b>{{ r.name }}</b>{% if r.locked %} <span class="tag">fest</span>{% elif r.builtin %} <span class="tag">Vorlage</span>{% endif %}<br><small>{{ r.description }}</small></td>
 <td><small>{% for gname, n, total in summary[rid] %}{{ gname }} {{ n }}/{{ total }}<br>{% else %}keine{% endfor %}</small></td>
 <td class="hide-sm"><small>Aufgaben: {{ "alle" if r.jobs == "all" else (r.jobs|length ~ " ausgewählte") }}<br>Speicherorte: {{ "alle" if r.remotes == "all" else (r.remotes|length ~ " ausgewählte") }}</small></td>
@@ -2339,7 +2358,9 @@ async function pkAdd(){const m=document.getElementById('pkmsg');m.className='hin
 <a class="btn sm" href="/roles/new?from={{ rid }}" title="Neue Rolle mit diesen Rechten als Ausgangspunkt">Als Vorlage</a>
 {% if not r.locked and not counts.get(rid) %}<form class="inline" method="post" action="/roles/{{ rid }}/delete" onsubmit="return confirm('Rolle {{ r.name }} löschen?')"><button class="btn sm del">Entfernen</button></form>{% endif %}
 </td></tr>{% endfor %}</table></div>
-<p class="hint">Die Rolle Admin hat immer alle Rechte und kann nicht geändert werden, damit sich niemand aussperrt. Änderungen an einer Rolle gelten sofort für alle ihre Benutzer.</p>
+{% if deleted %}<div class="card" id="deleted"><h2>Gelöschte Vorlagen</h2><p class="mut" style="margin-top:-4px">Diese mitgelieferten Rollen hast du gelöscht. Sie bleiben weg, bis du sie wiederherstellst.</p>
+<table>{% for rid, r in deleted %}<tr><td><b>{{ r.name }}</b><br><small>{{ r.description }}</small></td><td style="text-align:right"><form class="inline" method="post" action="/roles/restore/{{ rid }}"><button class="btn sm">↩ Wiederherstellen</button></form></td></tr>{% endfor %}</table></div>{% endif %}
+<p class="hint">Die Rolle Admin hat immer alle Rechte und kann nicht geändert werden, damit sich niemand aussperrt. Die Vorlagen Operator und Nur lesen lassen sich löschen und später wiederherstellen. Änderungen an einer Rolle gelten sofort für alle ihre Benutzer.</p>
 {% include "tabs_end.html" %}{% endblock %}
 """,
 "api_key_edit.html": r"""{% extends "base.html" %}{% block title %}{{ key.name }}{% endblock %}
@@ -2506,11 +2527,10 @@ scope();
 </div>
 <script>const l=document.getElementById('log');if(l&&{{ 'true' if live else 'false' }})l.scrollTop=l.scrollHeight</script>
 {% endblock %}""",
-"general.html": r"""{% extends "base.html" %}{% block title %}Einstellungen{% endblock %}{% block body %}{% include "tabs.html" %}
+"general.html": r"""{% extends "base.html" %}{% block title %}{{ gtitle }}{% endblock %}{% block body %}{% include "tabs.html" %}
 {% if msg %}<div class="msg ok flash" role="status">{{ msg }}</div>{% endif %}
 {% if err %}<div class="msg err flash" role="status">{{ err }}</div>{% endif %}
-<div class="setsec-tools"><button type="button" class="btn sm" onclick="secAll(true)">Alle aufklappen</button> <button type="button" class="btn sm" onclick="secAll(false)">Alle zuklappen</button></div>
-<details class="setsec" id="sec-ui"><summary><span class="ic">🖥</span><span class="tt"><b>Oberfläche</b><small>Sprache, Dateimanager</small></span></summary><div class="setsec-b">
+{% if gpage == "general" %}
 <form method="post" class="card" id="lang"><input type="hidden" name="section" value="lang"><h2>Sprache</h2>
 <div class="row"><div><label>Standardsprache</label><select name="language">{% for c, n in LANGS() %}<option value="{{ c }}" {{ "selected" if c == s.language }}>{{ n }}</option>{% endfor %}</select></div>
 <div style="align-self:end"><button class="btn pri">Speichern</button></div></div>
@@ -2523,55 +2543,73 @@ scope();
 <option value="max" {{ "selected" if fsp == "max" }}>Sehr schnell (16 parallel)</option></select></div>
 <div style="align-self:end"><button class="btn pri">Speichern</button></div></div>
 <div class="hint">Wie viele Dateien der Dateimanager gleichzeitig überträgt. Mehr parallel lohnt sich vor allem bei vielen kleinen Dateien und bei Clouds. Aufgaben haben ihr eigenes Tempo unter „Optionen“.</div></form>
-</div></details>
-<details class="setsec" id="sec-updates"><summary><span class="ic">⬆</span><span class="tt"><b>Updates und Neustart</b><small>Nach Updates suchen, selbst aktualisieren, alte Images, Neustart</small></span></summary><div class="setsec-b">
-<form method="post" class="card" id="update"><input type="hidden" name="section" value="update"><h2>Updates</h2>
-<label class="check"><input type="checkbox" name="update_check" {{ "checked" if upd.enabled }}> Nach neuen Versionen suchen</label>
-{% set upd_h = upd.interval_minutes % 60 == 0 %}<div class="row" style="margin-top:8px"><div style="flex:0 0 300px"><label>Prüfen alle</label><div style="display:flex;gap:8px"><input type="number" name="update_interval_value" min="1" max="43200" value="{{ (upd.interval_minutes // 60) if upd_h else upd.interval_minutes }}" style="width:110px"><select name="update_interval_unit"><option value="min" {{ "selected" if not upd_h }}>Minuten</option><option value="h" {{ "selected" if upd_h }}>Stunden</option></select></div></div></div>
-<div class="hint">Fragt im eingestellten Abstand bei GitHub nach, ob es eine neuere Version gibt, und zeigt sie unten links neben der Versionsnummer an. Übertragen wird dabei nur die eigene Versionsnummer. Erlaubt sind 5 Minuten bis 720 Stunden, Standard 1 Stunde.</div>
-<label class="check" style="margin-top:12px"><input type="checkbox" name="update_notify" {{ "checked" if upd.notify }}> Benachrichtigung schicken, wenn eine neue Version verfügbar ist</label>
-<div style="display:flex;gap:14px;flex-wrap:wrap;padding:4px 0 0 26px"><span class="mut">Kanäle:</span>{% for c, n, on in upd_channels %}<label class="check" style="margin:0"><input type="checkbox" name="update_ch_{{ c }}" {{ "checked" if c in upd.notify_channels }}> {{ n }}{% if not on %} <small class="mut">(global aus)</small>{% endif %}</label>{% endfor %}</div>
-<div class="hint" style="margin-left:26px">Je neue Version kommt genau eine Nachricht. Kein Kanal angehakt = alle eingeschalteten Kanäle. Den Text kannst du unter Benachrichtigungen → Texte der Benachrichtigungen anpassen („Neue MirrorSync-Version verfügbar“).</div>
-<p style="margin:10px 0 0"><span class="mut">Installiert:</span> <b>v{{ upd.current }}</b>{% if upd.latest %} &nbsp;·&nbsp; <span class="mut">Neueste Version:</span> <a href="{{ upd.url }}" target="_blank" rel="noopener">v{{ upd.latest }}</a>{% if upd.update_available %} <span class="tag ok">Neue Version verfügbar</span>{% elif upd.enabled %} <span class="tag">aktuell</span>{% endif %}{% endif %}</p>
-{% if upd.checked %}<p class="mut" style="margin:4px 0 0"><small>Zuletzt geprüft: {{ upd.checked }}</small></p>{% endif %}
-{% if upd.error %}<p style="margin:4px 0 0;color:var(--err)"><small>Fehler bei der letzten Prüfung: {{ upd.error }}</small></p>{% endif %}
-<p style="margin-top:12px"><button class="btn pri">Speichern</button> <button class="btn" name="check_only" value="1" formnovalidate>Jetzt prüfen</button></p></form>
-{% if selfupd %}{% set su = selfupd %}{% set sst = su.state or {} %}<div class="card" id="selfupdate"><h2>Selbst aktualisieren</h2>
-{% if not su.available %}<p class="mut" style="margin-top:-4px">Ausgeschaltet. MirrorSync kann sich selbst aktualisieren, wenn der Docker-Socket in den Container eingebunden ist (in der Compose-Datei unter <code>volumes:</code> die Zeile <code>- /var/run/docker.sock:/var/run/docker.sock</code>). Achtung: Wer den Socket hat, hat volle Kontrolle über alle Container auf dem Host. Ohne Socket aktualisierst du wie bisher über Dockhand, Portainer oder <code>docker compose pull &amp;&amp; docker compose up -d</code>.</p>{% if su.reason and su.reason != "socket" %}<p class="hint fehler"><span>Socket gefunden, aber Docker antwortet nicht:</span> <code>{{ su.reason }}</code></p>{% endif %}
-{% else %}<p class="mut" style="margin-top:-4px">Holt das Image neu und legt den Container mit genau denselben Einstellungen neu an (Name, Ports, Volumes, Umgebungsvariablen, Netzwerke mit fester IP, Neustart-Regel, Labels von Docker Compose). Startet die neue Version nicht, läuft automatisch wieder die bisherige.</p>
-<p class="hint"><span>Container:</span> <b>{{ su.container }}</b> · <span>Image:</span> <code>{{ su.image }}</code>{% if su.compose_project %} · <span>Compose-Projekt:</span> <code>{{ su.compose_project }}</code>{% endif %}</p>
+{% endif %}
+{% if gpage == "updates" %}{% set su = selfupd or {} %}{% set sst = su.state or {} %}
+<div class="card upd-hero" id="update-status"><div class="upd-top">
+<div class="upd-v"><span class="mut">Installiert</span><b>v{{ upd.current }}</b></div>
+<div class="upd-v"><span class="mut">Neueste Version</span><b>{% if upd.latest %}<a href="{{ upd.url }}" target="_blank" rel="noopener">v{{ upd.latest }}</a>{% else %}–{% endif %}</b></div>
+<div class="upd-v">{% if upd.update_available %}<span class="tag freigabe">Neue Version verfügbar</span>{% elif upd.latest %}<span class="tag ok">✓ aktuell</span>{% elif not upd.enabled %}<span class="tag">Suche aus</span>{% endif %}
+{% if upd.checked %}<small class="mut">Zuletzt geprüft: {{ upd.checked }}</small>{% endif %}</div>
+<span class="upd-sp"></span>
+{% if can("system.settings") %}<form method="post" style="margin:0"><input type="hidden" name="section" value="update"><input type="hidden" name="check_only" value="1"><button class="btn">🔎 Jetzt prüfen</button></form>{% endif %}
+{% if selfupd and su.available and can("system.update") %}<form method="post" action="/update/apply" style="margin:0" onsubmit="return confirm('MirrorSync jetzt aktualisieren? Ist ein neueres Image da, wird der Container neu gestartet und die Oberfläche ist etwa eine Minute nicht erreichbar.')"><input type="hidden" name="back" value="/settings/updates"><button class="btn pri" {{ "disabled" if su.local_only or su.jobs_running or sst.state in ("pulling", "running") }}>⬆ Jetzt aktualisieren</button></form>{% endif %}
+</div>
+{% if upd.error %}<p class="hint fehler">Fehler bei der letzten Prüfung: {{ upd.error }}</p>{% endif %}
+{% if sst.state in ("pulling", "running") %}<div class="msg info" style="margin:12px 0 0"><span>Update läuft seit</span> {{ sst.started }} …{% if sst.log %} <small>{{ sst.log[-1] }}</small>{% endif %}</div>
+{% elif sst.state in ("failed", "error") %}<p style="margin:12px 0 0"><span class="tag fehler">Letztes Update fehlgeschlagen</span> <small class="mut">{{ sst.finished }}: {{ sst.error }}</small></p>{% endif %}
+{% if selfupd and su.available and su.jobs_running %}<p class="hint">Es laufen gerade Aufgaben, das Update ist erst danach möglich.</p>{% endif %}
+{% if selfupd and su.available %}<div class="upd-steps"><span>📦 Image holen</span><i>→</i><span>🧱 Container mit denselben Einstellungen neu anlegen</span><i>→</i><span>✅ Start prüfen</span><i>→</i><span>↩ sonst automatisch zurück</span></div>
+{% elif selfupd %}<p class="hint" style="margin-top:12px">Selbst aktualisieren ist aus, weil der Docker-Socket nicht eingebunden ist. Mehr dazu unten unter „Container“.</p>{% endif %}
+</div>
+<div class="cgrid">
+<form method="post" class="card" id="update"><input type="hidden" name="section" value="update"><h2>Nach Updates suchen</h2>
+<label class="check"><input type="checkbox" name="update_check" {{ "checked" if upd.enabled }}> Regelmäßig bei GitHub nachsehen</label>
+{% set upd_h = upd.interval_minutes % 60 == 0 %}<div class="row" style="margin-top:8px"><div style="flex:0 0 280px"><label>Prüfen alle</label><div style="display:flex;gap:8px"><input type="number" name="update_interval_value" min="1" max="43200" value="{{ (upd.interval_minutes // 60) if upd_h else upd.interval_minutes }}" style="width:110px"><select name="update_interval_unit"><option value="min" {{ "selected" if not upd_h }}>Minuten</option><option value="h" {{ "selected" if upd_h }}>Stunden</option></select></div></div></div>
+<div class="hint">Übertragen wird nur die eigene Versionsnummer. Erlaubt sind 5 Minuten bis 720 Stunden, Standard 1 Stunde. Eine neue Version erscheint auch unten links neben der Versionsnummer.</div>
+<label class="check" style="margin-top:12px"><input type="checkbox" name="update_notify" {{ "checked" if upd.notify }}> Benachrichtigen, wenn eine neue Version da ist</label>
+<div style="display:flex;gap:14px;flex-wrap:wrap;padding:4px 0 0 26px">{% for c, n, on in upd_channels %}<label class="check" style="margin:0"><input type="checkbox" name="update_ch_{{ c }}" {{ "checked" if c in upd.notify_channels }}> {{ n }}{% if not on %} <small class="mut">(global aus)</small>{% endif %}</label>{% endfor %}</div>
+<div class="hint" style="margin-left:26px">Je neue Version kommt genau eine Nachricht. Kein Kanal angehakt = alle eingeschalteten Kanäle.</div>
+<p style="margin-top:14px"><button class="btn pri" {{ "disabled" if not can("system.settings") }}>Speichern</button></p></form>
+{% if selfupd %}<form method="post" class="card" id="selfupdate"><input type="hidden" name="section" value="selfupdate"><h2>Automatisch aktualisieren</h2>
+{% if not su.available %}<p class="mut" style="margin-top:-4px">Geht nur mit eingebundenem Docker-Socket (siehe „Container“).</p>{% endif %}
+<label class="check"><input type="checkbox" name="selfupdate_auto" {{ "checked" if su.auto }} {{ "disabled" if not su.available }}> Einmal am Tag selbst aktualisieren</label>
+<div class="row"><div style="flex:0 0 200px"><label>Ab Uhrzeit</label><input type="time" name="selfupdate_time" value="{{ su.time }}"></div></div>
+<label class="check"><input type="checkbox" name="selfupdate_prune" {{ "checked" if s.selfupdate_prune is not defined or s.selfupdate_prune }}> Altes Image danach löschen</label>
+<div class="hint">Läuft gerade eine Aufgabe, wartet das Update, bis sie fertig ist. Zeitzone des Containers. Das alte Image wird nur gelöscht, wenn es kein anderer Container mehr verwendet.</div>
+<p style="margin-top:14px"><button class="btn pri" {{ "disabled" if not can("system.settings") }}>Speichern</button></p></form>{% endif %}
+</div>
+{% if selfupd %}<div class="cgrid">
+<div class="card" id="container"><h2>Container</h2>
+{% if su.available %}<div class="kv"><b>Name</b><span>{{ su.container }}</span><b>Image</b><code>{{ su.image }}</code>{% if su.compose_project %}<b>Compose-Projekt</b><code>{{ su.compose_project }}</code>{% endif %}<b>Docker-Socket</b><span><span class="tag ok">verbunden</span></span></div>
 {% if su.local_only %}<p class="hint fehler">Das Image wurde lokal gebaut (<code>build: .</code>) und liegt in keinem Registry, daher kann MirrorSync kein neues holen. Für Selbst-Updates in der Compose-Datei <code>image: ghcr.io/dermilderjoghurt/mirrorsync:latest</code> verwenden und <code>build: .</code> entfernen.</p>
 {% elif su.pinned %}<p class="hint">Hinweis: Das Image hat einen festen Versions-Tag. Aktualisieren holt nur diesen Tag neu. Für neue Versionen <code>:latest</code> verwenden.</p>{% endif %}
-{% if sst.state in ("pulling", "running") %}<div class="msg info"><span>Update läuft seit</span> {{ sst.started }} …{% if sst.log %} <small>{{ sst.log[-1] }}</small>{% endif %}</div>
-{% elif sst.state == "ok" %}<p><span class="tag ok">Letztes Update erfolgreich</span> <small class="mut">v{{ sst.from_version }} → v{{ sst.to_version }}, {{ sst.finished }}</small></p>
-{% elif sst.state in ("failed", "error") %}<p><span class="tag fehler">Letztes Update fehlgeschlagen</span> <small class="mut">{{ sst.finished }}: {{ sst.error }}</small></p>
-{% elif sst.state == "current" %}<p><span class="tag">aktuell</span> <small class="mut"><span>Zuletzt geprüft</span> {{ sst.checked }}</small></p>{% endif %}
-{% if can("system.update") %}<form method="post" action="/update/apply" onsubmit="return confirm('MirrorSync jetzt aktualisieren? Ist ein neueres Image da, wird der Container neu gestartet und die Oberfläche ist etwa eine Minute nicht erreichbar.')"><input type="hidden" name="back" value="/settings/general#selfupdate"><button class="btn pri" {{ "disabled" if su.local_only }}>Jetzt aktualisieren</button>{% if su.jobs_running %} <small class="mut">Es laufen gerade Aufgaben, das Update ist erst danach möglich.</small>{% endif %}</form>{% endif %}
-<form method="post" style="margin-top:16px"><input type="hidden" name="section" value="selfupdate">
-<label class="check"><input type="checkbox" name="selfupdate_auto" {{ "checked" if su.auto }}> Automatisch aktualisieren, einmal am Tag</label>
-<div class="row"><div style="flex:0 0 200px"><label>Ab Uhrzeit</label><input type="time" name="selfupdate_time" value="{{ su.time }}"></div></div>
-<label class="check"><input type="checkbox" name="selfupdate_prune" {{ "checked" if s.selfupdate_prune is not defined or s.selfupdate_prune }}> Altes Image nach dem Update löschen</label>
-<div class="hint">Läuft gerade eine Aufgabe, wartet das Update, bis sie fertig ist. Zeitzone des Containers. Das alte Image wird nur gelöscht, wenn es kein anderer Container mehr verwendet.</div>
-<p><button class="btn pri">Speichern</button></p></form>
-{% if old_imgs is not none %}<h3 style="margin-top:18px">Alte MirrorSync-Images</h3>
+<p class="hint">Holt das Image neu und legt den Container mit genau denselben Einstellungen neu an (Name, Ports, Volumes, Umgebungsvariablen, Netzwerke mit fester IP, Neustart-Regel, Labels von Docker Compose). Startet die neue Version nicht, läuft automatisch wieder die bisherige.</p>
+{% else %}<div class="kv"><b>Docker-Socket</b><span><span class="tag">nicht eingebunden</span></span></div>
+<p class="hint">MirrorSync kann sich selbst aktualisieren, wenn der Docker-Socket in den Container eingebunden ist (in der Compose-Datei unter <code>volumes:</code> die Zeile <code>- /var/run/docker.sock:/var/run/docker.sock</code>). Achtung: Wer den Socket hat, hat volle Kontrolle über alle Container auf dem Host. Ohne Socket aktualisierst du wie bisher über Dockhand, Portainer oder <code>docker compose pull &amp;&amp; docker compose up -d</code>.</p>{% if su.reason and su.reason != "socket" %}<p class="hint fehler"><span>Socket gefunden, aber Docker antwortet nicht:</span> <code>{{ su.reason }}</code></p>{% endif %}{% endif %}</div>
+<div class="card" id="history"><h2>Verlauf</h2>
+{% if upd_hist %}<table><tr><th>Wann</th><th>Von → nach</th><th>Ergebnis</th></tr>{% for h in upd_hist %}<tr><td>{{ h.ts[8:10] }}.{{ h.ts[5:7] }}. {{ h.ts[11:16] }}</td><td>{{ h.target }}</td><td>{% if h.ok %}<span class="tag ok">ok</span>{% else %}<span class="tag fehler" title="{{ h.detail }}">fehlgeschlagen</span>{% endif %}</td></tr>{% endfor %}</table>
+{% else %}<p class="mut">Noch keine Selbst-Updates.</p>{% endif %}</div></div>
+{% if old_imgs is not none %}<div class="card" id="images"><h2>Alte MirrorSync-Images</h2>
 {% if old_imgs %}<table><tr><th>Version</th><th>Image-Tag</th><th>Erstellt</th><th>Größe</th></tr>{% for im in old_imgs %}<tr><td>{{ "v" ~ im.version if im.version else "–" }}</td><td><code>{{ im.tags|join(", ") or im.id[7:19] }}</code></td><td>{{ im.created }}</td><td>{{ (im.size / 1048576)|round|int }} MB</td></tr>{% endfor %}</table>
-{% if can("system.update") %}<form method="post" action="/system/images/prune" onsubmit="return confirm('Die alten MirrorSync-Images löschen? Ein Zurückspringen auf diese Versionen braucht danach wieder einen Download.')" style="margin-top:10px"><input type="hidden" name="back" value="/settings/general#selfupdate"><button class="btn del">Alte Images entfernen</button></form>{% endif %}
-{% else %}<p class="mut">Keine alten Images vorhanden.</p>{% endif %}{% endif %}{% endif %}</div>{% endif %}
+{% if can("system.update") %}<form method="post" action="/system/images/prune" onsubmit="return confirm('Die alten MirrorSync-Images löschen? Ein Zurückspringen auf diese Versionen braucht danach wieder einen Download.')" style="margin-top:10px"><input type="hidden" name="back" value="/settings/updates"><button class="btn del">Alte Images entfernen</button></form>{% endif %}
+{% else %}<p class="mut">Keine alten Images vorhanden.</p>{% endif %}</div>{% endif %}{% endif %}
+{% endif %}
+{% if gpage == "restart" %}
 {% if restart %}{% set rs = restart %}<div class="card" id="restart"><h2>Neustart</h2>
 <p class="mut" style="margin-top:-4px">Startet den Container von MirrorSync neu, zum Beispiel wenn eine Verbindung hängt. Die Oberfläche ist danach einige Sekunden nicht erreichbar. Laufende Aufgaben werden dabei abgebrochen.</p>
 {% if rs.socket %}<p class="hint"><span>Weg:</span> <b><span>Docker-Socket</span></b> · <span>Neustart-Regel:</span> <code>{{ rs.policy or "?" }}</code></p>
 {% else %}<p class="hint">Ohne Docker-Socket beendet sich MirrorSync und Docker startet den Container über die Neustart-Regel wieder. Dafür muss in der Compose-Datei <code>restart: unless-stopped</code> (oder <code>always</code>) stehen, sonst bleibt MirrorSync aus.</p>{% endif %}
 {% if rs.socket and rs.policy in ("no", "") %}<p class="hint fehler"><span>Achtung: Die Neustart-Regel des Containers ist</span> <code>{{ rs.policy or "no" }}</code>. <span>Der Neustart klappt über den Socket trotzdem, aber nach einem Neustart des Hosts startet MirrorSync nicht von selbst.</span></p>{% endif %}
 {% if rs.last and rs.last.done %}<p><span class="tag ok">Letzter Neustart</span> <small class="mut">{{ rs.last.done }} · {{ rs.last.by }}</small></p>{% endif %}
-{% if can("system.restart") %}<form method="post" action="/system/restart" onsubmit="return confirm('MirrorSync jetzt neu starten? Die Oberfläche ist einige Sekunden nicht erreichbar.')"><input type="hidden" name="back" value="/settings/general#restart"><button class="btn pri">Jetzt neu starten</button>{% if rs.jobs_running %} <label class="check" style="display:inline-flex;margin-left:10px"><input type="checkbox" name="force" value="1"> <span>auch wenn Aufgaben laufen</span> ({{ rs.jobs_running|length }})</label>{% endif %}</form>{% endif %}
+{% if can("system.restart") %}<form method="post" action="/system/restart" onsubmit="return confirm('MirrorSync jetzt neu starten? Die Oberfläche ist einige Sekunden nicht erreichbar.')"><input type="hidden" name="back" value="/settings/restart"><button class="btn pri">Jetzt neu starten</button>{% if rs.jobs_running %} <label class="check" style="display:inline-flex;margin-left:10px"><input type="checkbox" name="force" value="1"> <span>auch wenn Aufgaben laufen</span> ({{ rs.jobs_running|length }})</label>{% endif %}</form>{% endif %}
 <form method="post" style="margin-top:16px"><input type="hidden" name="section" value="restart">
 <label class="check"><input type="checkbox" name="restart_auto" {{ "checked" if rs.auto }}> Nach Zeitplan neu starten</label>
 <div class="row"><div style="flex:0 0 200px"><label>Uhrzeit</label><input type="time" name="restart_time" value="{{ rs.time }}"></div>
 <div><label>Wochentage</label><div style="display:flex;gap:10px;flex-wrap:wrap">{% for d in range(7) %}<label class="check" style="margin:0"><input type="checkbox" name="restart_day_{{ d }}" {{ "checked" if d in rs.days }}> {{ day_names[d] }}</label>{% endfor %}</div></div></div>
 <div class="hint">Läuft gerade eine Aufgabe, wartet der Neustart, bis sie fertig ist (höchstens bis Mitternacht). Zeitzone des Containers.</div>
-<p><button class="btn pri">Speichern</button></p></form></div>{% endif %}
-</div></details>
-<details class="setsec" id="sec-monitoring"><summary><span class="ic">📈</span><span class="tt"><b>Überwachung</b><small>Health, Prometheus, Datenvolumen pro Monat</small></span></summary><div class="setsec-b">
+<p><button class="btn pri" {{ "disabled" if not can("system.settings") }}>Speichern</button></p></form></div>{% endif %}
+{% endif %}
+{% if gpage == "monitoring" %}
 <form method="post" class="card" id="monitor"><input type="hidden" name="section" value="monitor"><h2>Überwachung und Datenvolumen</h2>
 <p class="mut" style="margin-top:-4px">Für Uptime Kuma, Home Assistant, Grafana und andere: Zustand der Aufgaben und Kennzahlen abrufen.</p>
 <table class="chg" style="margin:6px 0 8px"><tr><td><b>Health</b></td><td><code>{{ base_url }}/health/jobs</code></td></tr>
@@ -2588,8 +2626,8 @@ scope();
 <label class="check"><input type="checkbox" name="volume_stop" {{ "checked" if s.volume_stop }}> Bei erreichtem Limit automatische Läufe bis zum Monatsende anhalten (von Hand gestartete laufen weiter)</label>
 <div class="hint">Gezählt wird, was MirrorSync in echten Läufen überträgt. Den Verlauf je Monat und Aufgabe zeigt die Seite <a href="/stats">Statistik</a>.</div></div>
 <p><button class="btn pri">Speichern</button></p></form>
-</div></details>
-<details class="setsec" id="sec-logsec"><summary><span class="ic">📜</span><span class="tt"><b>Logs</b><small>Aufbewahrung, alte Logs löschen</small></span></summary><div class="setsec-b">
+{% endif %}
+{% if gpage == "logs" %}
 <form method="post"><div class="card"><h2 id="logs">Logs aufbewahren</h2>
 <p class="mut" style="margin-top:-4px">Jeder Lauf bekommt ein eigenes Log. Ältere Läufe werden nach jedem Lauf automatisch gelöscht.</p>
 <div class="row"><div><label>Läufe pro Aufgabe behalten</label><input type="text" inputmode="numeric" name="log_keep_runs" value="{{ s.log_keep_runs }}"><div class="hint">0 bis 1000, 0 = unbegrenzt</div></div>
@@ -2602,9 +2640,9 @@ scope();
 <div class="row"><div style="flex:0 0 260px"><label>Läufe löschen, die gestartet sind vor dem</label><input type="date" name="purge_before" value="{{ purge.before if purge else '' }}" required></div></div>
 <p style="margin-top:12px"><button class="btn" name="purge_action" value="preview">Anzahl anzeigen</button>{% if purge and purge.runs %} <button class="btn del" name="purge_action" value="delete" onclick="return confirm('Die angezeigten Läufe und ihre Logs endgültig löschen? Das lässt sich nicht rückgängig machen.')">Jetzt endgültig löschen</button>{% endif %}</p></div></form>
 
-</div></details>
-<details class="setsec" id="sec-secsec"><summary><span class="ic">🔐</span><span class="tt"><b>Anmeldung und Sicherheit</b><small>Kontosperre, 2FA erzwingen, Meldungen, Reverse-Proxy, Passkeys, Länder-Datenbank</small></span></summary><div class="setsec-b">
-<form method="post"><input type="hidden" name="section" value="security"><div class="card"><h2 id="security">Anmeldung und Sicherheit</h2>
+{% endif %}
+{% if gpage == "security" %}
+<form method="post"><input type="hidden" name="section" value="security"><div class="card"><h2 id="security">Kontosperre und Anmeldung</h2>
 <div class="row"><div><label>Konto sperren nach so vielen Fehlversuchen</label><input type="text" inputmode="numeric" name="lock_attempts" value="{{ s.lock_attempts }}"><div class="hint">0 = nie sperren. Falsches Passwort und falscher 2FA-Code zählen.</div></div>
 <div><label>Sperrdauer in Minuten</label><input type="text" inputmode="numeric" name="lock_minutes" value="{{ s.lock_minutes }}"><div class="hint">0 = dauerhaft deaktivieren, bis ein Admin es wieder freigibt. Der letzte Admin wird höchstens 15 Minuten gesperrt.</div></div></div>
 {% set r2 = s.require_2fa_mode if s.require_2fa_mode in ("off", "new", "all") else "off" %}
@@ -2641,18 +2679,15 @@ scope();
 Die Abfrage erfolgt lokal im Container, es werden keine Adressen an fremde Dienste geschickt. Eigene Datei (z. B. <code>GeoLite2-Country.mmdb</code>) kannst du nach <code>config/geoip/</code> legen. {{ attribution }}</div>
 <p style="margin-top:16px"><button class="btn pri">Speichern</button> <button class="btn" name="geoip_now" value="1">Speichern und Länder-Datenbank jetzt laden</button></p></div></form>
 
-</div></details>
-<details class="setsec" id="sec-perf"><summary><span class="ic">🚀</span><span class="tt"><b>Leistung</b><small>Bandbreite (Standard) für alle Aufgaben</small></span></summary><div class="setsec-b">
+{% endif %}
+{% if gpage == "network" %}
 <form method="post"><input type="hidden" name="section" value="bw"><div class="card"><h2 id="bw">Bandbreite (Standard)</h2>{% set bw_unit_select = true %}
 <p class="mut" style="margin-top:-4px">Gilt für alle Aufgaben mit „Standard verwenden“. Jede Aufgabe kann eigene Grenzen haben.<br>Aktuell: <b>{{ bw_desc }}</b></p>
 {% include "bw_editor.html" %}
 {% if bw_tt %}<details style="margin-top:10px"><summary class="hint" style="cursor:pointer">rclone-Zeittabelle anzeigen</summary><pre style="margin-top:6px">--bwlimit "{{ bw_tt }}"</pre></details>{% endif %}
 <p style="margin-top:16px"><button class="btn pri">Bandbreite speichern</button></p></div></form>
-</div></details>
-<script>(function(){const K='ms-gen-open';let st={};try{st=JSON.parse(localStorage.getItem(K)||'{}')}catch(e){}
-const all=[...document.querySelectorAll('details.setsec')];const any=Object.keys(st).length>0;
-all.forEach((d,i)=>{d.open=any?!!st[d.id]:i===0;d.addEventListener('toggle',()=>{st[d.id]=d.open;try{localStorage.setItem(K,JSON.stringify(st))}catch(e){}})});
-window.secAll=o=>all.forEach(d=>{d.open=o});})()</script>
+{% endif %}
+{% if gpage == "general" %}<script>(function(){const m={update:'updates',selfupdate:'updates',restart:'restart',monitor:'monitoring',volume:'monitoring',logs:'logs',purge:'logs',security:'security',proxy:'security',passkeys:'security',geoip:'security',bw:'network'};const h=location.hash.slice(1);if(m[h])location.replace('/settings/'+m[h]+'#'+h)})()</script>{% endif %}
 {% include "tabs_end.html" %}{% endblock %}""",
 "bw_editor.html": r"""<input type="hidden" name="bw_json" id="bw_json">
 {% if bw_unit_select %}<div class="row"><div style="flex:0 0 220px"><label>Einheit</label><select name="bw_unit" id="bw_unit"><option value="MB/s" {{ "selected" if bw_unit() == "MB/s" }}>MB/s (Megabyte pro Sekunde)</option><option value="Mbit/s" {{ "selected" if bw_unit() == "Mbit/s" }}>Mbit/s (Megabit pro Sekunde)</option></select></div></div>{% endif %}
@@ -2745,17 +2780,16 @@ f.net.value=ip;f.minutes.value=parseInt(d)||0;f.note.value='aus dem Anmeldeverla
 <div style="flex:0 0 auto;display:flex;gap:6px"><button class="btn pri">Filtern</button>{% if args %}<a class="btn" href="/audit">Zurücksetzen</a>{% endif %}</div>
 </form></div>
 <div class="card" style="padding:6px 8px">
-{% if entries %}<table class="audit"><tr><th>Zeit</th><th>Benutzer</th><th>Bereich</th><th>Aktion</th><th>Details</th></tr>
-{% for e in entries %}<tr class="arow" data-i="{{ loop.index }}" title="Klicken für alle Details">
-<td style="white-space:nowrap"><small>{{ e.ts[8:10] }}.{{ e.ts[5:7] }}.{{ e.ts[:4] }}<br>{{ e.ts[11:] }}</small></td>
-<td><a href="?user={{ e.user|urlencode }}">{{ e.user }}</a>{% if e.ip %}<br><small class="mut">{{ e.flag }} <code>{{ e.ip }}</code></small>{% endif %}</td>
-<td><a class="tag" href="?cat={{ e.cat }}" style="text-decoration:none">{{ cats.get(e.cat, e.cat) }}</a></td>
-<td><b>{{ e.action }}</b>{% if e.target %}<br><span>{{ e.target }}</span>{% endif %}</td>
-<td>{% if e.detail %}<div class="mut">{{ e.detail }}</div>{% endif %}
-{% if e.changes %}<table class="chg">{% for c in e.changes %}<tr><td class="mut">{{ c.label }}</td>{% if c.secret %}<td colspan="2"><i>geändert</i></td>{% elif e.action == "angelegt" %}<td colspan="2"><code>{{ c.new }}</code></td>{% else %}<td><del>{{ c.old }}</del></td><td><ins>{{ c.new }}</ins></td>{% endif %}</tr>{% endfor %}</table>{% endif %}</td>
-</tr>{% endfor %}</table>
-<div hidden>{% for e in entries %}<div id="ad-{{ loop.index }}">
-<h2 style="margin:0 0 4px">{{ e.action }}{% if e.target %} · {{ e.target }}{% endif %}</h2>
+{% if entries %}<div class="atools"><button type="button" class="btn sm" onclick="audAll(true)">Alle aufklappen</button> <button type="button" class="btn sm" onclick="audAll(false)">Alle zuklappen</button></div>
+<table class="audit"><tr><th>Zeit</th><th>Benutzer</th><th>Aktion</th><th class="hide-sm">Kurz</th><th></th></tr>
+{% for e in entries %}<tr class="arow" data-i="{{ loop.index }}" title="Klicken für alle Details" tabindex="0" aria-expanded="false">
+<td style="white-space:nowrap"><small>{{ e.ts[8:10] }}.{{ e.ts[5:7] }}. {{ e.ts[11:16] }}</small></td>
+<td><a href="?user={{ e.user|urlencode }}">{{ e.user }}</a></td>
+<td><a class="tag" href="?cat={{ e.cat }}" style="text-decoration:none">{{ cats.get(e.cat, e.cat) }}</a> <b>{{ e.action }}</b>{% if e.target %} <span>{{ e.target }}</span>{% endif %}</td>
+<td class="hide-sm ashort">{% if e.changes and e.action not in ("angelegt", "gelöscht") %}{% set labs = e.changes|map(attribute="label")|list %}{{ labs[:3]|join(", ") }}{% if labs|length > 3 %} {{ _("und {0} weitere", labs|length - 3) }}{% endif %}{% elif e.changes %}{{ _("{0} Felder", e.changes|length) }}{% if e.detail %} · {{ e.detail }}{% endif %}{% elif e.detail %}{{ e.detail }}{% endif %}</td>
+<td class="acaret">▸</td></tr>
+<tr class="adet" id="ad-{{ loop.index }}" hidden><td colspan="5"><div class="adbox">
+
 <table class="adt">
 <tr><th>Zeit</th><td>{{ e.ts[8:10] }}.{{ e.ts[5:7] }}.{{ e.ts[:4] }} {{ e.ts[11:] }}</td></tr>
 <tr><th>Ausgeführt von</th><td>{{ e.user }}</td></tr>
@@ -2775,20 +2809,21 @@ f.net.value=ip;f.minutes.value=parseInt(d)||0;f.note.value='aus dem Anmeldeverla
 {% elif e.action == "gelöscht" %}<div><code>{{ c.old }}</code></div>
 {% else %}<div><del>{{ c.old }}</del> → <ins>{{ c.new }}</ins></div>{% endif %}</div>{% endfor %}{% endif %}
 <p class="mut" style="margin-top:12px"><small>Eintrag {{ e.id }}</small></p>
-</div>{% endfor %}</div>
-<dialog id="audlg" class="adlg"><div id="audbody"></div><p style="text-align:right;margin:12px 0 0"><button type="button" class="btn" onclick="document.getElementById('audlg').close()">Schließen</button></p></dialog>
-<style>.arow{cursor:pointer}.arow:hover td{background:var(--hover,rgba(99,102,241,.06))}.adlg{max-width:min(860px,94vw);width:100%;border:1px solid var(--bd);border-radius:12px;background:var(--card);color:var(--fg);padding:18px 20px}
-.adlg::backdrop{background:rgba(0,0,0,.35)}.adt{width:100%}.adt th{text-align:left;width:190px;vertical-align:top;color:var(--mut);font-weight:500;padding:4px 8px 4px 0}.adt td{padding:4px 0;word-break:break-word}
+</div></td></tr>{% endfor %}</table>
+<style>.atools{display:flex;gap:6px;justify-content:flex-end;padding:6px 6px 2px}.arow{cursor:pointer}.arow:hover td{background:var(--hover,rgba(99,102,241,.06))}.arow td{vertical-align:middle}
+.ashort{color:var(--mut);font-size:13px;max-width:420px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.acaret{width:24px;color:var(--mut);text-align:center;transition:transform .15s}.arow[aria-expanded=true] .acaret{transform:rotate(90deg)}
+.arow[aria-expanded=true] td{background:var(--hover,rgba(99,102,241,.06));border-bottom:0}.adet>td{padding:0 10px 14px;background:var(--hover,rgba(99,102,241,.04))}.adbox{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:12px 14px}
+.adt{width:100%}.adt th{text-align:left;width:190px;vertical-align:top;color:var(--mut);font-weight:500;padding:4px 8px 4px 0}.adt td{padding:4px 0;word-break:break-word}
 .apre{white-space:pre-wrap;word-break:break-word;max-height:320px;overflow:auto;background:var(--bg);border:1px solid var(--bd);border-radius:8px;padding:8px;margin:2px 0;font-size:12px}
 .achg{padding:8px 0;border-top:1px solid var(--bd)}.aadd{color:var(--ok);font-family:monospace;font-size:13px}.adel{color:var(--err);font-family:monospace;font-size:13px}.arow2{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px}</style>
-<script>document.querySelectorAll('.arow').forEach(r=>r.addEventListener('click',e=>{if(e.target.closest('a'))return;
-  document.getElementById('audbody').innerHTML=document.getElementById('ad-'+r.dataset.i).innerHTML;document.getElementById('audlg').showModal()}));
-document.getElementById('audlg').addEventListener('click',e=>{if(e.target.id==='audlg')e.target.close()});</script>
+<script>function audSet(r,o){r.setAttribute('aria-expanded',o);document.getElementById('ad-'+r.dataset.i).hidden=!o}
+function audAll(o){document.querySelectorAll('.arow').forEach(r=>audSet(r,o))}
+document.querySelectorAll('.arow').forEach(r=>{const go=e=>{if(e.target.closest('a'))return;audSet(r,r.getAttribute('aria-expanded')!=='true')};r.addEventListener('click',go);r.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();go(e)}})});</script>
 {% if pages > 1 %}<div style="display:flex;gap:6px;justify-content:center;padding:12px;align-items:center">{% if page > 1 %}<a class="btn sm" href="?{{ dict(args, page=page-1)|urlencode }}">‹ neuer</a>{% endif %}<small class="mut">Seite {{ page }} von {{ pages }}</small>{% if page < pages %}<a class="btn sm" href="?{{ dict(args, page=page+1)|urlencode }}">älter ›</a>{% endif %}</div>{% endif %}
 {% else %}<div class="empty">Keine Einträge{% if args %} für diesen Filter{% endif %}.</div>{% endif %}
 </div>
 <p class="hint">{{ total }} Einträge{% if args %} gefunden{% endif %}. Passwörter, Tokens und andere Geheimnisse werden nie gespeichert, nur dass sie geändert wurden.
-Aufbewahrung: {{ keep if keep != "0" else "unbegrenzt" }}{% if keep != "0" %} Tage{% endif %}{% if can("system.settings") %} (<a href="/settings/general">ändern</a>){% endif %}. Gespeichert in der Datenbank.</p>
+Aufbewahrung: {{ keep if keep != "0" else "unbegrenzt" }}{% if keep != "0" %} Tage{% endif %}{% if can("system.settings") %} (<a href="/settings/logs">ändern</a>){% endif %}. Gespeichert in der Datenbank.</p>
 {% endblock %}""",
 "schedules.html": r"""{% extends "base.html" %}{% block title %}Zeitpläne{% endblock %}
 {% block subtitle %}<p>Wann welche Aufgabe startet. Änderungen hier gelten sofort auch in der Aufgabe und umgekehrt.</p>{% endblock %}
@@ -3085,8 +3120,8 @@ setInterval(async()=>{if(editing||document.hidden||String(getSelection())!=='')r
 <div class="card"><h2 id="conn">Deine Verbindung</h2>
 <p style="margin:0">Deine Adresse: <code>{{ my_ip }}</code> {{ my_loc.flag }} {{ my_loc.name }} ·
 {% if my_verdict %}<span class="tag fehler">wäre gesperrt: {{ my_verdict[0] }}</span>{% else %}<span class="tag ok">erlaubt</span>{% endif %}</p>
-{% if fwd and not trust_proxy %}<div class="msg err" style="margin:10px 0 0">Du kommst über einen Reverse-Proxy (<code>X-Forwarded-For: {{ fwd }}</code>), aber „Reverse-Proxy“ ist unter <a href="/settings/general">Allgemein</a> aus. Dann sieht MirrorSync für alle Besucher nur die Adresse des Proxys ({{ my_ip }}), und eine Sperre würde alle treffen. Bitte zuerst dort das Häkchen setzen.</div>
-{% else %}<p class="hint">Hinter einem Reverse-Proxy (z. B. OPNsense/HAProxy, Nginx Proxy Manager) wirken die Sperren nur richtig, wenn unter <a href="/settings/general">Allgemein</a> „Reverse-Proxy“ eingeschaltet ist.</p>{% endif %}
+{% if fwd and not trust_proxy %}<div class="msg err" style="margin:10px 0 0">Du kommst über einen Reverse-Proxy (<code>X-Forwarded-For: {{ fwd }}</code>), aber „Reverse-Proxy“ ist unter <a href="/settings/security#proxy">Anmeldung und Sicherheit</a> aus. Dann sieht MirrorSync für alle Besucher nur die Adresse des Proxys ({{ my_ip }}), und eine Sperre würde alle treffen. Bitte zuerst dort das Häkchen setzen.</div>
+{% else %}<p class="hint">Hinter einem Reverse-Proxy (z. B. OPNsense/HAProxy, Nginx Proxy Manager) wirken die Sperren nur richtig, wenn unter <a href="/settings/security#proxy">Anmeldung und Sicherheit</a> „Reverse-Proxy“ eingeschaltet ist.</p>{% endif %}
 <p class="hint">Schutz vor dem Aussperren: Regeln, die deine aktuelle Adresse sperren würden, werden nicht gespeichert. Der Container selbst (127.0.0.1) ist nie gesperrt. Notfall-Zurücksetzen siehe README.</p></div>
 
 <form method="post">
@@ -3105,7 +3140,7 @@ setInterval(async()=>{if(editing||document.hidden||String(getSelection())!=='')r
 <option value="block" {{ "selected" if cfg.country_mode == "block" }}>diese Länder sperren</option></select></div>
 <div style="flex:2"><label>Länder (ISO-Codes, mit Komma)</label><input type="text" name="countries" id="cc" value="{{ cfg.countries|join(', ') }}" placeholder="DE, AT, CH"></div></div>
 <div class="chips" style="margin-top:8px">{% for code, name in countries %}<a href="#" class="chip {{ 'active' if code in cfg.countries }}" onclick="tog(this,'{{ code }}');return false">{{ code }} <span>{{ name }}</span></a>{% endfor %}</div>
-<div class="hint">Das lokale Netz ist von der Länderregel immer ausgenommen. {% if geo.ok %}Länder-Datenbank: <code>{{ geo.file }}</code>{% if geo.date %} vom {{ geo.date }}{% endif %}.{% else %}<span class="fehler">Keine Länder-Datenbank geladen, die Länderregel wirkt deshalb noch nicht.</span> Laden unter <a href="/settings/general">Allgemein</a>.{% endif %} Adressen, deren Land unbekannt ist, werden nicht gesperrt.</div>
+<div class="hint">Das lokale Netz ist von der Länderregel immer ausgenommen. {% if geo.ok %}Länder-Datenbank: <code>{{ geo.file }}</code>{% if geo.date %} vom {{ geo.date }}{% endif %}.{% else %}<span class="fehler">Keine Länder-Datenbank geladen, die Länderregel wirkt deshalb noch nicht.</span> Laden unter <a href="/settings/security#geoip">Anmeldung und Sicherheit</a>.{% endif %} Adressen, deren Land unbekannt ist, werden nicht gesperrt.</div>
 </div>
 
 <div class="card"><h2 id="autoban">Automatisch sperren</h2>

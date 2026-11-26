@@ -96,12 +96,38 @@ class RoleStore:
     def __init__(self, db):
         self.db = db
 
+    def deleted_templates(self):
+        """Vorlagen (Operator, Nur lesen), die ein Admin geloescht hat (seit 1.56.0). Sie werden nicht neu angelegt."""
+        return [x for x in (self.db.meta("roles_deleted") or "").split(",") if x in DEFAULT_ROLES and x != "admin"]
+
+    def mark_deleted(self, rid):
+        if rid in DEFAULT_ROLES and rid != "admin":
+            with _lock:
+                self.db.set_meta("roles_deleted", ",".join(sorted(set(self.deleted_templates()) | {rid})))
+
+    def restore_template(self, rid):
+        """Geloeschte Vorlage wieder anlegen. Liefert die ID der neuen Rolle oder None."""
+        if rid not in DEFAULT_ROLES or rid == "admin":
+            return None
+        with _lock:
+            self.db.set_meta("roles_deleted", ",".join(x for x in self.deleted_templates() if x != rid))
+            data = self.db.get_map("role")
+            if rid in data and data[rid].get("builtin"):
+                return rid
+            new = rid if rid not in data else new_id(DEFAULT_ROLES[rid]["name"], data)
+            data[new] = json.loads(json.dumps(DEFAULT_ROLES[rid]))
+            if new != rid:
+                data[new]["builtin"] = False   # ID schon von einer eigenen Rolle belegt: als normale Rolle anlegen
+            self.save(data)
+            return new
+
     def load(self):
         with _lock:
             data = self.db.get_map("role")
             changed = False
-            for rid, role in DEFAULT_ROLES.items():   # Vorlagen immer vorhanden, Admin immer vollstaendig
-                if rid not in data:
+            gone = set(self.deleted_templates())
+            for rid, role in DEFAULT_ROLES.items():   # Vorlagen vorhanden (ausser geloeschte), Admin immer vollstaendig
+                if rid not in data and rid not in gone:
                     data[rid] = json.loads(json.dumps(role))
                     changed = True
             op = data.get("operator")
