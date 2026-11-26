@@ -3,6 +3,26 @@
 Version numbers follow [SemVer](https://semver.org/): MAJOR.MINOR.PATCH
 (MAJOR = incompatible change, MINOR = new feature, PATCH = bug fix).
 
+## 1.53.0 – 2026-11-26
+**Encrypt the destination**
+- Each job can now **encrypt its destination** (card "🔒 Encrypt destination"): MirrorSync sets up its own encrypted
+  storage location (rclone crypt) on top of the destination. File contents are always encrypted, file and folder names
+  either encrypted, only obfuscated or readable; optionally with a second password (salt). Anyone with access to server
+  B only sees gibberish.
+- Inside the encrypted storage location the data lives in the folder `data`, the trash in `data.versions`; the
+  destination itself only shows encrypted names and contents. Trash, restore, preview and space usage work decrypted as usual.
+- **Verification** through the encryption: if the storage supports checksums, MirrorSync compares real checksums via
+  `rclone cryptcheck`, otherwise size and count.
+- Clear warning when enabling: without the password the data is lost. The password has to be entered twice and its safe
+  keeping confirmed. It is never shown or returned by the API and cannot be changed afterwards (it can optionally be
+  checked when saving).
+- Turning encryption off keeps the encrypted storage location (it then shows up under Storage locations) so the data
+  stays readable. Duplicating keeps the key. Not available together with two-way sync.
+- The overview marks affected jobs with "🔒 encrypted".
+- New permission `jobs.encrypt` ("Set up or turn off destination encryption"), granted to Admin only by default.
+- API and MCP: fields `encrypt`, `encrypt_password`, `encrypt_password_confirm`, `encrypt_ack`, `encrypt_names`,
+  `encrypt_dirnames`, `encrypt_password2` (passwords write-only), read-only `encrypted`. All texts in five languages.
+
 ## 1.52.0 – 2026-11-25
 **Safe mirroring**
 - **Verification after the sync** (per job: off, after every run, daily or weekly): `rclone check` compares source and

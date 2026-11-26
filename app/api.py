@@ -256,6 +256,7 @@ def _job(jid):
 
 
 SECRET_JOB = ("notify_telegram_token", "notify_apprise_urls", "notify_webhook_url")
+ENC_WRITE_ONLY = ("encrypt_password", "encrypt_password_confirm", "encrypt_password2", "encrypt_ack")
 
 
 def _next_start(jid):
@@ -275,6 +276,8 @@ def public_job(jid, j, history=False):
     out.setdefault("msg_tpl_on", False)
     out.setdefault("visible_to", "all")
     out["live_mode"] = core.live_mode(j)
+    out.update(encrypt=bool(j.get("encrypt")), encrypted=core.is_encrypted(j),
+               encrypt_names=j.get("encrypt_names") or "standard", encrypt_dirnames=j.get("encrypt_dirnames", True) is not False)
     out.update(compare=core.compare_of(j), compare_window=core.compare_window(j), speed=core.speed_of(j),
                checksum=core.compare_of(j) == "checksum")
     out["direction"] = "bisync" if core.is_bisync(j) else "mirror"
@@ -293,7 +296,8 @@ def public_job(jid, j, history=False):
 
 
 BOOL_FIELDS = ("enabled", "dry_run", "versioning", "checksum", "delete_excluded", "no_delete", "include_source_dir", "paused",
-               "notify_webhook", "notify_smtp", "notify_telegram", "notify_apprise", "nosync", "snapshot_sudo", "wol_sleep")
+               "notify_webhook", "notify_smtp", "notify_telegram", "notify_apprise", "nosync", "snapshot_sudo", "wol_sleep",
+               "encrypt", "encrypt_dirnames", "encrypt_ack")
 TEXT_FIELDS = ("name", "source", "dest", "schedule", "max_delete", "extra_flags", "excludes", "selection", "trigger",
                "after_job", "after_when", "paused_until", "pause_chain", "live_interval", "live_full", "live_mode", "direction", "bisync_conflict", "bisync_max_delete", "bw_mode", "versions_keep", "versions_days",
                "notify_mode", "notify_when", "notify_webhook_url", "notify_smtp_to", "notify_telegram_chat_id",
@@ -301,7 +305,8 @@ TEXT_FIELDS = ("name", "source", "dest", "schedule", "max_delete", "extra_flags"
                "verify", "verify_method", "delete_guard", "delete_guard_min", "space_check", "space_min_gb", "retry", "retry_on",
                "health_max_age", "script_pre", "script_post", "script_host", "script_timeout", "script_pre_fail", "script_post_when",
                "snapshot", "snapshot_host", "snapshot_target", "snapshot_dir", "snapshot_cmd", "snapshot_keep",
-               "wol_mac", "wol_broadcast", "wol_port", "wol_wait", "wol_check", "wol_sleep_cmd", "wol_sleep_host")
+               "wol_mac", "wol_broadcast", "wol_port", "wol_wait", "wol_check", "wol_sleep_cmd", "wol_sleep_host",
+               "encrypt_names", "encrypt_password", "encrypt_password_confirm", "encrypt_password2")
 SCRIPT_TEXT = ("script_pre", "script_post", "snapshot_cmd")
 
 
@@ -333,7 +338,8 @@ def _fields(base, data):
                 raise ApiError(400, core.i18n.t("msg_tpl: nur die Ereignisse {0}.", ", ".join(core.msgtpl.JOB_EVENTS)))
             src[k] = v
         elif k not in ("id", "history", "running", "next_run", "next_start", "next_start_kind", "effective_dest", "is_paused", "owner",
-                       "bisync_ready", "bisync_need_resync", "delete_hold", "retry_pending", "last_verify", "dest_space", "nosync_dirs"):
+                       "bisync_ready", "bisync_need_resync", "delete_hold", "retry_pending", "last_verify", "dest_space", "nosync_dirs",
+                       "encrypt_remote", "encrypted"):
             raise ApiError(400, f"Unbekanntes Feld: {k}")
     for k, allowed in (("compare", core.COMPARE_MODES), ("speed", core.SPEEDS)):
         if k in data and data[k] not in allowed:
@@ -385,7 +391,9 @@ def _fields(base, data):
 
 
 def _base_fields(j):
-    b = {k: j.get(k) for k in BOOL_FIELDS + TEXT_FIELDS if k not in ("notify_telegram_token", "notify_apprise_urls")}
+    b = {k: j.get(k) for k in BOOL_FIELDS + TEXT_FIELDS if k not in ("notify_telegram_token", "notify_apprise_urls") + ENC_WRITE_ONLY}
+    if "encrypt_dirnames" not in j:
+        b["encrypt_dirnames"] = True
     b["trigger"] = core.trigger_of(j)
     b["bw"] = j.get("bw")
     b["window"] = j.get("window")
@@ -431,11 +439,9 @@ def _save_job(jid, data):
     err = core.apply_job_form(_fields(base, data), job, old, jid, jobs, api=True)
     if err:
         raise ApiError(400, err)
-    with core._lock:
-        jobs = core.load_jobs()
-        jid = jid or __import__("uuid").uuid4().hex[:8]
-        jobs[jid] = job
-        core.save_jobs(jobs)
+    jid, err = core.save_job_with_crypt(jid, job)
+    if err:
+        raise ApiError(400, err)
     core.schedule_all()
     return public_job(jid, job)
 
@@ -616,7 +622,8 @@ JOB_FIELDS = {"type": "object", "description": "Felder der Aufgabe, z. B. name, 
               "verify_method (auto|size|download), delete_guard (Prozent, Löschwarnung), space_check (off|warn|stop), space_min_gb, retry "
               "(Minuten, z. B. \"5, 15, 60\"), retry_on (network|any), nosync, health_max_age (Stunden), script_pre, script_post, script_host, "
               "snapshot (off|zfs|btrfs|command), snapshot_target, snapshot_dir, snapshot_cmd, snapshot_keep, wol_mac, wol_broadcast, wol_wait, "
-              "wol_check, wol_sleep, wol_sleep_cmd, wol_sleep_host (vollständig in der OpenAPI-Beschreibung)", "additionalProperties": True}
+              "wol_check, wol_sleep, wol_sleep_cmd, wol_sleep_host, encrypt, encrypt_password, encrypt_password_confirm, encrypt_ack, "
+              "encrypt_names (standard|obfuscate|off), encrypt_dirnames, encrypt_password2 (vollständig in der OpenAPI-Beschreibung)", "additionalProperties": True}
 TOOLS = [
     ("status", "Überblick: Version, laufende, fehlgeschlagene und pausierte Aufgaben, Rechte des Keys.", None,
      _schema(), lambda a: op_status(), True),
@@ -826,6 +833,14 @@ def openapi():
                 "snapshot_cmd": {"type": "string", "description": "Eigener Befehl, Platzhalter {name}, {date}, {job}, {job_id}, {dest}"},
                 "snapshot_keep": {"type": "string", "description": "so viele MirrorSync-Snapshots behalten (leer = alle)"},
                 "snapshot_sudo": {"type": "boolean", "description": "Befehle mit sudo -n ausführen"},
+                "encrypt": {"type": "boolean", "description": "Ziel verschlüsseln (rclone crypt über dem Ziel, darin Ordner data). Braucht Recht jobs.encrypt; nicht mit Zwei-Wege-Sync"},
+                "encrypt_password": {"type": "string", "writeOnly": True, "description": "Passwort beim ersten Einschalten (mind. 8 Zeichen). Wird nie ausgegeben und lässt sich später nicht ändern. Ohne Passwort sind die Daten verloren"},
+                "encrypt_password_confirm": {"type": "string", "writeOnly": True, "description": "Passwort wiederholen"},
+                "encrypt_password2": {"type": "string", "writeOnly": True, "description": "Optional: zweites Passwort (Salt) für mehr Sicherheit, ebenfalls aufbewahren"},
+                "encrypt_ack": {"type": "boolean", "writeOnly": True, "description": "Bestätigung: Passwort ist sicher aufbewahrt (beim ersten Einschalten nötig)"},
+                "encrypt_names": {"type": "string", "enum": ["standard", "obfuscate", "off"], "description": "Dateinamen: standard = verschlüsselt, obfuscate = nur verschleiert, off = lesbar. Nur beim ersten Einschalten"},
+                "encrypt_dirnames": {"type": "boolean", "description": "Ordnernamen ebenfalls verschlüsseln (Standard true). Nur beim ersten Einschalten"},
+                "encrypted": {"type": "boolean", "readOnly": True, "description": "Verschlüsselung ist aktiv"},
                 "wol_mac": {"type": "string", "description": "Wake-on-LAN: MAC-Adresse des Zielservers (leer = aus)"},
                 "wol_broadcast": {"type": "string", "description": "Broadcast-Adresse (Standard 255.255.255.255, z. B. 192.168.1.255)"},
                 "wol_port": {"type": "string", "description": "UDP-Port (Standard 9)"},

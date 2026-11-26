@@ -4,7 +4,7 @@
 
 # MirrorSync – 1:1-Spiegelung mit Web-GUI und Zeitplänen
 
-Version **1.52.0** · Änderungen siehe [CHANGELOG.md](CHANGELOG.md) (englisch) · [English version](README.md)
+Version **1.53.0** · Änderungen siehe [CHANGELOG.md](CHANGELOG.md) (englisch) · [English version](README.md)
 
 Ein Docker-Container, der Ordner **einweg 1:1 spiegelt** (wie FreeFileSync „Spiegeln"):
 Das Ziel wird exakt wie die Quelle, inklusive Löschungen. Als Sync-Motor dient
@@ -57,6 +57,7 @@ Dann `http://<docker-host>:8080` öffnen und den ersten Admin anlegen.
 - **Versionierung**: gelöschte/überschriebene Dateien landen in `<ziel>.versions/<datum>`, optional nur die
   letzten N Versionen bzw. höchstens X Tage behalten (Ältere werden nach jedem Lauf entfernt)
 - **Lösch-Schutz**: Lauf bricht ab, wenn mehr als N Dateien gelöscht würden
+- **Ziel verschlüsseln** (seit 1.53.0): Daten liegen auf Server B nur verschlüsselt (rclone crypt), Dateinamen wahlweise auch
 - **Prüflauf nach dem Sync** (seit 1.52.0): vergleicht Quelle und Ziel Datei für Datei und zeigt „1:1 gleich“ oder die Abweichungen
 - **Löschwarnung** (seit 1.52.0): würde ein Lauf mehr als X % der Dateien löschen, pausiert er und fragt nach (Schutz vor Ransomware oder leerer Quelle)
 - **Papierkorb durchsuchen und wiederherstellen**, **Speicherprüfung am Ziel**, **automatisch neu versuchen**, **`.nosync`-Ordner überspringen**
@@ -75,7 +76,7 @@ Geänderte Dateien werden komplett neu übertragen (kein Delta wie bei rsync).
 
 ## Installation
 Das fertige Image liegt in der GitHub Container Registry: `ghcr.io/dermilderjoghurt/mirrorsync`
-(für amd64 und arm64, z. B. Raspberry Pi). Tags: `latest` (neueste Version), `1.52.0` (feste Version),
+(für amd64 und arm64, z. B. Raspberry Pi). Tags: `latest` (neueste Version), `1.53.0` (feste Version),
 `1.40` (neuester Patch dieser Version). Das Image wird nur veröffentlicht, wenn sich die Versionsnummer ändert.
 Update-Prüfer wie Dockhand oder Watchtower melden deshalb nur dann ein Update, wenn es wirklich eine neue Version gibt.
 
@@ -301,6 +302,24 @@ In der Aufgabe unter **Prüfen und schützen**:
   erst, wenn auch der letzte Versuch scheitert.
 - **`.nosync`**: Liegt in einem Ordner der Quelle eine Datei `.nosync`, wird er übersprungen; im Ziel bleibt er
   unberührt (bei neuen Aufgaben an).
+
+## Ziel verschlüsseln (seit 1.53.0)
+In der Aufgabe unter **🔒 Ziel verschlüsseln** den Haken setzen, ein Passwort (mind. 8 Zeichen) zweimal eingeben und
+bestätigen, dass es sicher aufbewahrt ist. MirrorSync legt dann selbst einen verschlüsselten Speicherort
+`msenc_<Aufgabe>` (rclone crypt) über das Ziel. Darin liegen die Dateien im Ordner `data`, der Papierkorb in
+`data.versions`; im Ziel selbst sieht man nur verschlüsselte Namen und Inhalte. Dateinamen: verschlüsseln (Standard), nur verschleiern oder lesbar lassen; Ordnernamen
+optional; zusätzlich ein zweites Passwort (Salt) möglich.
+
+**Ohne Passwort sind die Daten verloren.** Passwort und Art der Namen lassen sich nach dem Einrichten nicht mehr ändern.
+Papierkorb, Wiederherstellen, Vorschau und Platzbedarf funktionieren entschlüsselt. Der Prüflauf nutzt
+`rclone cryptcheck`, wenn der Speicher Prüfsummen kann. Unverschlüsselte Dateien, die vorher schon im Ziel lagen,
+bleiben liegen. Ausschalten behält den Speicherort `msenc_…` (sichtbar unter Speicherorte), der nächste Lauf spiegelt
+dann wieder unverschlüsselt. Nicht zusammen mit dem Zwei-Wege-Sync. Recht `jobs.encrypt`. API/MCP: Felder `encrypt`,
+`encrypt_password`, `encrypt_password_confirm`, `encrypt_ack`, `encrypt_names`, `encrypt_dirnames`,
+`encrypt_password2`.
+
+Entschlüsselt lesen geht auch ohne MirrorSync: in rclone ein crypt-Remote mit demselben Passwort (und Salt) und
+denselben Namenseinstellungen auf das Ziel anlegen, die Dateien liegen dann unter `<remote>:data`.
 
 ## Papierkorb und Wiederherstellen (seit 1.52.0)
 Mit eingeschalteter Versionierung landen gelöschte und überschriebene Dateien in `<ziel>.versions/<datum>`. Im Log
@@ -1046,7 +1065,7 @@ MirrorSync kann sich selbst aktualisieren, wenn du den Docker-Socket in den Cont
   sie entfernt und die bisherige läuft wieder. Ergebnis und Ablauf stehen in der GUI, im Audit-Log
   („Update gestartet / abgeschlossen / fehlgeschlagen“) und in `config/selfupdate.json`.
 - **Voraussetzungen:** Das Image muss aus einem Registry kommen (`image: ghcr.io/dermilderjoghurt/mirrorsync:latest`).
-  Mit `build: .` gebaute Images kann MirrorSync nicht neu holen. Mit festem Versions-Tag (`:1.52.0`) wird nur dieser
+  Mit `build: .` gebaute Images kann MirrorSync nicht neu holen. Mit festem Versions-Tag (`:1.53.0`) wird nur dieser
   Tag neu geholt. `/config` muss als Volume oder Ordner eingebunden sein (ist es in der Beispiel-Compose).
 - **Recht:** `system.update` („MirrorSync aktualisieren“, Admins haben es automatisch). Automatik und Uhrzeit
   ändern braucht `system.settings`.

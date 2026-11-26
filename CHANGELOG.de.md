@@ -3,6 +3,27 @@
 Versionsnummern nach [SemVer](https://semver.org/lang/de/): MAJOR.MINOR.PATCH
 (MAJOR = inkompatible Änderung, MINOR = neue Funktion, PATCH = Fehlerbehebung).
 
+## 1.53.0 – 2026-11-26
+**Ziel verschlüsseln**
+- Pro Aufgabe lässt sich das **Ziel verschlüsseln** (Karte „🔒 Ziel verschlüsseln“): MirrorSync legt dafür selbst einen
+  verschlüsselten Speicherort (rclone crypt) über das Ziel. Dateiinhalte sind immer verschlüsselt, Datei- und
+  Ordnernamen wahlweise verschlüsselt, nur verschleiert oder lesbar; optional mit zweitem Passwort (Salt). Wer Zugriff
+  auf Server B hat, sieht nur Zeichensalat.
+- Im verschlüsselten Speicherort liegen die Daten im Ordner `data`, der Papierkorb in `data.versions`; im Ziel selbst
+  sind Namen und Inhalte nur verschlüsselt zu sehen.
+  Papierkorb, Wiederherstellen, Vorschau und Platzbedarf arbeiten entschlüsselt wie gewohnt.
+- **Prüflauf** über die Verschlüsselung hinweg: Kann der Speicher Prüfsummen, vergleicht MirrorSync per
+  `rclone cryptcheck` echte Prüfsummen, sonst Größe und Anzahl.
+- Deutliche Warnung beim Einschalten: Ohne Passwort sind die Daten verloren. Das Passwort muss zweimal eingegeben und
+  die Aufbewahrung bestätigt werden. Es wird nie angezeigt oder per API ausgegeben und lässt sich danach nicht ändern
+  (beim Speichern kann es optional geprüft werden).
+- Ausschalten lässt den verschlüsselten Speicherort bestehen (er erscheint dann unter Speicherorte), sodass die Daten
+  lesbar bleiben. Duplizieren übernimmt den Schlüssel. Nicht kombinierbar mit dem Zwei-Wege-Sync.
+- In der Übersicht zeigt „🔒 verschlüsselt“ betroffene Aufgaben.
+- Neues Recht `jobs.encrypt` („Verschlüsselung des Ziels einrichten oder ausschalten“), nur für Admin vorgegeben.
+- API und MCP: Felder `encrypt`, `encrypt_password`, `encrypt_password_confirm`, `encrypt_ack`, `encrypt_names`,
+  `encrypt_dirnames`, `encrypt_password2` (Passwörter nur schreibbar), Anzeige `encrypted`. Alle Texte in fünf Sprachen.
+
 ## 1.52.0 – 2026-11-25
 **Sicher spiegeln**
 - **Prüflauf nach dem Sync** (pro Aufgabe: aus, nach jedem Lauf, täglich oder wöchentlich): `rclone check` vergleicht

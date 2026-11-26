@@ -288,6 +288,75 @@ def effective_dest(job):
     return dest + name if dest.endswith((":", "/")) else dest + "/" + name
 
 
+
+# ---------------------------------------------------------------- Ziel verschluesseln (rclone crypt)
+CRYPT_PREFIX = "msenc_"
+CRYPT_DATA = "data"          # Unterordner im Ziel: daneben liegt data.versions (Papierkorb), beides verschluesselt
+CRYPT_NAMES = ("standard", "obfuscate", "off")
+
+
+def is_encrypted(job):
+    return bool(job.get("encrypt")) and not is_bisync(job)
+
+
+def crypt_remote_name(job_id):
+    return CRYPT_PREFIX + re.sub(r"[^A-Za-z0-9_-]", "", job_id or "")
+
+
+def data_dest(job):
+    """Wohin tatsaechlich gespiegelt wird: das Ziel selbst oder, verschluesselt, der crypt-Speicherort darueber."""
+    if is_encrypted(job) and job.get("encrypt_remote"):
+        return f"{job['encrypt_remote']}:{CRYPT_DATA}"
+    return effective_dest(job)
+
+
+def crypt_section(name):
+    cfg = remote_config(name)
+    return cfg if cfg and cfg.get("type") == "crypt" else None
+
+
+def crypt_password_matches(name, password):
+    sec = crypt_section(name) or {}
+    if not sec.get("password"):
+        return False
+    rc, out = rclone("reveal", sec["password"], timeout=15)
+    return rc == 0 and out.strip() == password
+
+
+def crypt_apply(job_id, job, pending):
+    """crypt-Speicherort fuer die Aufgabe anlegen bzw. auf das aktuelle Ziel ausrichten. Liefert Fehlertext oder None."""
+    if not is_encrypted(job):
+        return None
+    name = crypt_remote_name(job_id)
+    sec = crypt_section(name)
+    remote = effective_dest(job)
+    if sec is None:
+        if not pending.get("password"):
+            return i18n.t("Verschlüsselung: bitte ein Passwort angeben.")
+        args = ["config", "create", name, "crypt", f"remote={remote}", f"password={pending['password']}",
+                f"filename_encryption={job.get('encrypt_names') or 'standard'}",
+                f"directory_name_encryption={'true' if job.get('encrypt_dirnames', True) else 'false'}"]
+        if pending.get("password2"):
+            args.append(f"password2={pending['password2']}")
+        rc, out = rclone(*args, "--non-interactive", "--obscure", timeout=30)
+        if rc != 0:
+            return i18n.t("Verschlüsselung konnte nicht eingerichtet werden: {0}", out[-300:])
+        audit_add("remote", "Verschlüsselung eingerichtet", name, detail=remote)
+    elif sec.get("remote") != remote:
+        rc, out = rclone("config", "update", name, f"remote={remote}", "--non-interactive", timeout=30)
+        if rc != 0:
+            return i18n.t("Verschlüsselung konnte nicht angepasst werden: {0}", out[-300:])
+    job["encrypt_remote"] = name
+    return None
+
+
+def crypt_hidden():
+    """crypt-Speicherorte, die zu einer Aufgabe mit eingeschalteter Verschluesselung gehoeren (nicht in Listen zeigen)."""
+    try:
+        return {j.get("encrypt_remote") for j in load_jobs().values() if is_encrypted(j) and j.get("encrypt_remote")}
+    except Exception:  # noqa: BLE001
+        return set()
+
 BISYNC_DIR = os.path.join(CONFIG_DIR, "bisync")
 BISYNC_CONFLICTS = ("newer", "path1", "path2", "none")
 BISYNC_RESET_KEYS = ("source", "dest", "excludes", "direction", "checksum", "compare", "selection", "include_source_dir")
@@ -451,7 +520,7 @@ def build_sync_cmd(job, dry_run, mode="full", max_age=None):
     stamp = datetime.datetime.now().strftime("%Y-%m-%d_%H%M%S")
     delta = mode == "delta"
     cmd = [
-        "rclone", "copy" if (delta or job.get("no_delete")) else "sync", job["source"], effective_dest(job),
+        "rclone", "copy" if (delta or job.get("no_delete")) else "sync", job["source"], data_dest(job),
         "--config", RCLONE_CONF,
         "--create-empty-src-dirs",
         "--log-level", "INFO",
@@ -466,7 +535,7 @@ def build_sync_cmd(job, dry_run, mode="full", max_age=None):
     if str(job.get("max_delete", "")).strip() and not delta:
         cmd += ["--max-delete", str(job["max_delete"]).strip()]
     if job.get("versioning"):
-        cmd += ["--backup-dir", effective_dest(job).rstrip("/") + ".versions/" + stamp]
+        cmd += ["--backup-dir", data_dest(job).rstrip("/") + ".versions/" + stamp]
     cmd += compare_flags(job)
     cmd += filter_args(job)   # mit Auswahl nur die ausgewaehlten Dateien/Ordner; im Ziel bleibt alles andere unberuehrt
     if job.get("delete_excluded") and not delta and not selection_list(job):
@@ -873,7 +942,7 @@ def prune_versions(job):
     days = int(job.get("versions_days") or 0)
     if not job.get("versioning") or (not keep and not days):
         return []
-    base = effective_dest(job).rstrip("/") + ".versions"
+    base = data_dest(job).rstrip("/") + ".versions"
     rc, out = rclone("lsjson", base, "--dirs-only", timeout=120)
     if rc != 0:
         return [] if "not found" in out.lower() or "doesn't exist" in out.lower() else [i18n.t("Versionen aufräumen: {0} nicht lesbar: {1}", base, out[-300:])]
@@ -1141,7 +1210,7 @@ def _parse_dry(path):
 
 
 def _dest_count(job):
-    rc, out = rclone("size", "--json", *filter_args(job), effective_dest(job), timeout=3600)
+    rc, out = rclone("size", "--json", *filter_args(job), data_dest(job), timeout=3600)
     try:
         return int(json.loads(out).get("count") or 0) if rc == 0 else None
     except ValueError:
@@ -1219,12 +1288,22 @@ def _precheck(job, job_id, w, handle, mode, max_age, info):
     return None
 
 
+def crypt_hashes(job):
+    """Kann der Speicher unter dem verschluesselten Ziel Pruefsummen? Nur dann geht rclone cryptcheck."""
+    rc, out = rclone("backend", "features", effective_dest(job), timeout=30)
+    try:
+        return rc == 0 and bool(json.loads(out).get("Hashes"))
+    except ValueError:
+        return False
+
+
 def _verify(job, job_id, w, handle):
     """Pruefung nach dem Lauf (rclone check): Sind Quelle und Ziel 1:1 gleich?"""
     method = job.get("verify_method") if job.get("verify_method") in VERIFY_METHODS else "auto"
     comb = os.path.join(LOG_DIR, job_id, f".verify-{uuid.uuid4().hex[:8]}.txt")
     tmp = comb + ".log"
-    cmd = ["rclone", "check", job["source"], effective_dest(job), "--config", RCLONE_CONF, "--combined", comb,
+    crypt = is_encrypted(job) and method == "auto" and crypt_hashes(job)   # verschluesselt: Pruefsummen ueber cryptcheck
+    cmd = ["rclone", "cryptcheck" if crypt else "check", job["source"], data_dest(job), "--config", RCLONE_CONF, "--combined", comb,
            "--log-level", "NOTICE"]
     if method == "download":
         cmd.append("--download")
@@ -1237,6 +1316,8 @@ def _verify(job, job_id, w, handle):
     if tt and method == "download":
         cmd += ["--bwlimit", tt]
     label = {"auto": i18n.t("Prüfsumme, sonst Größe"), "size": i18n.t("nur Größe"), "download": i18n.t("Inhalt Byte für Byte")}[method]
+    if crypt:
+        label = i18n.t("Prüfsumme durch die Verschlüsselung (cryptcheck)")
     w("")
     w(i18n.t("=== Prüflauf: Ist das Ziel 1:1 wie die Quelle? (Vergleich: {0}) ===", label))
     w("$ " + " ".join(shlex.quote(c) for c in cmd))
@@ -3469,7 +3550,8 @@ EMPTY_JOB = dict(name="", source="", dest="", schedule="0 3 * * *", enabled=True
                  dry_run=False, versioning=False, versions_keep="", versions_days="", checksum=False, compare="standard", compare_window="2", speed="normal", max_delete="500", extra_flags="",
                  excludes="", delete_excluded=False, notify_mode="global", notify_when="fail",
                  notify_webhook=False, notify_webhook_url="", notify_smtp=False, notify_smtp_to="",
-                 notify_telegram=False, notify_telegram_chat_id="", notify_telegram_token="")
+                 notify_telegram=False, notify_telegram_chat_id="", notify_telegram_token="",
+                 encrypt=False, encrypt_names="standard", encrypt_dirnames=True)
 
 
 def job_notify_from_form(f, old=None):
@@ -3571,6 +3653,75 @@ def apply_extras(f, job, old):
     return None
 
 
+ENC_PW_MIN = 8
+
+
+def apply_encrypt(f, job, old, job_id):
+    """Ziel verschluesseln (Haekchen, Passwort, Dateinamen). Liefert Fehlertext oder None.
+    Das Passwort wird nie in der Aufgabe gespeichert, sondern nur fuer crypt_apply in job["_enc"] gemerkt."""
+    t = i18n.t
+    job.pop("_enc", None)
+    if not g.access.has("jobs.encrypt"):
+        for k in ("encrypt", "encrypt_names", "encrypt_dirnames", "encrypt_remote"):
+            if k in old:
+                job[k] = old[k]
+        return None
+    on = "encrypt" in f
+    job["encrypt"] = on
+    if not on:
+        return None   # crypt-Speicherort bleibt erhalten (Daten bleiben lesbar, Wiedereinschalten nutzt ihn erneut)
+    if job.get("direction") == "bisync":
+        return t("Verschlüsselung geht nicht zusammen mit dem Zwei-Wege-Sync.")
+    pw = str(f.get("encrypt_password", "") or "")
+    sec = crypt_section(crypt_remote_name(job_id)) if job_id else None
+    if sec:   # Schluessel steht fest: Passwort und Art der Namen lassen sich nicht mehr aendern
+        job["encrypt_names"] = sec.get("filename_encryption") or "standard"
+        job["encrypt_dirnames"] = str(sec.get("directory_name_encryption", "true")).lower() != "false"
+        if pw and not crypt_password_matches(crypt_remote_name(job_id), pw):
+            return t("Verschlüsselung: Das Passwort passt nicht zum eingerichteten Schlüssel. "
+                     "Ändern lässt es sich nicht, sonst wären die vorhandenen Daten nicht mehr lesbar.")
+        return None
+    names = f.get("encrypt_names")
+    job["encrypt_names"] = names if names in CRYPT_NAMES else "standard"
+    job["encrypt_dirnames"] = "encrypt_dirnames" in f
+    if not pw:
+        return t("Verschlüsselung: bitte ein Passwort angeben.")
+    if len(pw) < ENC_PW_MIN:
+        return t("Verschlüsselung: Das Passwort muss mindestens {0} Zeichen lang sein.", ENC_PW_MIN)
+    if pw != str(f.get("encrypt_password_confirm", "") or ""):
+        return t("Verschlüsselung: Die beiden Passwörter stimmen nicht überein.")
+    if "encrypt_ack" not in f:
+        return t("Verschlüsselung: Bitte bestätige, dass du das Passwort sicher aufbewahrst. Ohne Passwort sind die Daten verloren.")
+    job["_enc"] = {"password": pw, "password2": str(f.get("encrypt_password2", "") or "")}
+    return None
+
+
+def save_job_with_crypt(job_id, job):
+    """Aufgabe speichern; vorher (falls eingeschaltet) den crypt-Speicherort anlegen bzw. anpassen.
+    Liefert (job_id, fehler)."""
+    pending = job.pop("_enc", None) or {}
+    job_id = job_id or uuid.uuid4().hex[:8]
+    err = crypt_apply(job_id, job, pending)
+    if err:
+        return job_id, err
+    with _lock:
+        jobs = load_jobs()
+        jobs[job_id] = job
+        save_jobs(jobs)
+    return job_id, None
+
+
+def crypt_copy(name, new_id):
+    """crypt-Speicherort fuer eine duplizierte Aufgabe kopieren (gleicher Schluessel). Liefert neuen Namen oder None."""
+    sec = crypt_section(name) if name else None
+    if not sec:
+        return None
+    nn = crypt_remote_name(new_id)
+    rc, _ = rclone("config", "create", nn, "crypt", *[f"{k}={v}" for k, v in sec.items() if k != "type"],
+                   "--non-interactive", "--no-obscure", timeout=30)
+    return nn if rc == 0 else None
+
+
 def apply_job_form(f, job, old, job_id, jobs, api=False):
     """Formularfelder (GUI) bzw. API-Felder pruefen und in job uebernehmen. Liefert Fehlertext oder None."""
     error = None
@@ -3654,7 +3805,7 @@ def apply_job_form(f, job, old, job_id, jobs, api=False):
             job["visible_to"] = vis
     if not g.access.has("jobs.advanced"):
         job["extra_flags"] = old.get("extra_flags", "")
-    ext_err = apply_extras(f, job, old)
+    ext_err = apply_extras(f, job, old) or apply_encrypt(f, job, old, job_id)
     if not job_id:
         job["owner"] = g.user
     if job["source"] and not job["selection"] and job["source"] != old.get("source") and g.access.path_ok(job["source"]):
@@ -3730,11 +3881,8 @@ def edit_job(job_id=None):
     if request.method == "POST":
         error = apply_job_form(request.form, job, old, job_id, jobs)
         if not error:
-            with _lock:
-                jobs = load_jobs()
-                job_id = job_id or uuid.uuid4().hex[:8]
-                jobs[job_id] = job
-                save_jobs(jobs)
+            new_id, error = save_job_with_crypt(job_id, job)
+        if not error:
             schedule_all()
             return redirect(url_for("index"))
     remotes = [r for r in list_remotes() if g.access.remote_ok(r["name"])]
@@ -3768,7 +3916,9 @@ def edit_job(job_id=None):
     jtpl = msgtpl.editor_data(msgtpl.JOB_EVENTS, job.get("msg_tpl"), settings.get("msg_templates"))
     return render_template("job.html", job=job, job_id=job_id, error=error, msg=session.pop("flash", None) if request.method == "GET" else None, remotes=remotes, tz=TZ, jtpl=jtpl, vis_opts=vis_options(),
                            glob=glob, has_token=has_token, others=others, followers=followers, bw_cfg=job.get("bw") or settings.get("bw") or bwlimit.EMPTY,
-                           ssh_remotes=[r for r in remote_exec.ssh_remotes() if g.access.remote_ok(r)])
+                           ssh_remotes=[r for r in remote_exec.ssh_remotes() if g.access.remote_ok(r)],
+                           enc_locked=bool(job_id and crypt_section(crypt_remote_name(job_id))), enc_remote=crypt_remote_name(job_id or ""),
+                           enc_min=ENC_PW_MIN)
 
 
 def parse_bw(raw):
@@ -3779,7 +3929,7 @@ def parse_bw(raw):
     return data if isinstance(data, dict) else {}
 
 
-PREVIEW_KEYS = ("source", "dest", "selection", "excludes", "include_source_dir", "direction", "delete_excluded", "no_delete", "compare", "compare_window", "checksum", "nosync", "nosync_dirs")
+PREVIEW_KEYS = ("source", "dest", "selection", "excludes", "include_source_dir", "direction", "delete_excluded", "no_delete", "compare", "compare_window", "checksum", "nosync", "nosync_dirs", "encrypt", "encrypt_remote")
 
 
 def preview_job_from(f, saved=None):
@@ -3816,6 +3966,8 @@ def preview_job(job):
             job["source"], job["selection"] = fs[0], fs[1]
     flt = filter_args(job)
     dest = effective_dest(job)
+    if is_encrypted(job) and job.get("encrypt_remote") and (crypt_section(job["encrypt_remote"]) or {}).get("remote") == dest:
+        dest = data_dest(job)   # verschluesseltes Ziel: entschluesselt ansehen
     bis = is_bisync(job)
     nodel = bool(job.get("no_delete")) and not bis
     dst_flt = [] if (job.get("delete_excluded") and not bis and not nodel and not selection_list(job)) else flt
@@ -3944,6 +4096,13 @@ def duplicate_job_data(job_id, name=None, user=None):
         if trigger_of(src) == "live":
             new["enabled"] = False
         nid = uuid.uuid4().hex[:8]
+        if new.get("encrypt_remote"):   # eigener crypt-Speicherort mit demselben Schluessel
+            nn = crypt_copy(new["encrypt_remote"], nid)
+            if nn:
+                new["encrypt_remote"] = nn
+            else:
+                new.pop("encrypt_remote", None)
+                new["encrypt"] = False
         jobs[nid] = new
         save_jobs(jobs)
     schedule_all()
@@ -4188,9 +4347,12 @@ def list_remotes():
     if rc != 0:
         return []
     res = []
+    hidden = crypt_hidden()   # Verschluesselung einer Aufgabe: wird ueber die Aufgabe verwaltet
     for line in out.splitlines():
         if ":" in line:
             name, typ = line.split(":", 1)
+            if name.strip() in hidden:
+                continue
             res.append({"name": name.strip(), "type": typ.strip()})
     return res
 
@@ -5902,7 +6064,7 @@ VERSIONS_MAX = 500
 
 def versions_base(job, side="b"):
     """Ordner mit den Versionen: <ziel>.versions (beim Zwei-Wege-Sync side a = <quelle>.versions)."""
-    root = job["source"] if side == "a" and is_bisync(job) else effective_dest(job)
+    root = job["source"] if side == "a" and is_bisync(job) else data_dest(job)
     return root.rstrip("/") + ".versions"
 
 
@@ -5964,7 +6126,7 @@ def versions_restore(job, items, target="source", overwrite=False, side="b"):
     if target not in ("source", "dest"):
         return None, "target: nur source oder dest.", 400
     base = versions_base(job, side)
-    root = job["source"] if target == "source" else effective_dest(job)
+    root = job["source"] if target == "source" else data_dest(job)
     if not g.access.path_ok(root):
         return None, i18n.t("Keine Berechtigung für {0}.", root), 403
     todo = []
@@ -6100,7 +6262,7 @@ def _usage_scan(key, path, flt):
 
 
 def usage_start(job_id, job, side):
-    path = job["source"] if side == "source" else effective_dest(job)
+    path = job["source"] if side == "source" else data_dest(job)
     key = (job_id, side)
     with _usage_lock:
         if (_usage.get(key) or {}).get("state") == "läuft":

@@ -21,6 +21,7 @@ PERM_GROUPS = [
         ("jobs.approve", "Lauf nach einer Löschwarnung freigeben oder die Warnung verwerfen"),
         ("jobs.restore", "Papierkorb/Versionen durchsuchen, Dateien herunterladen und wiederherstellen"),
         ("jobs.scripts", "Skripte vor/nach dem Lauf, Snapshots und Wake-on-LAN einrichten (führt Befehle im Container oder per SSH aus)"),
+        ("jobs.encrypt", "Verschlüsselung des Ziels einrichten oder ausschalten"),
     ]),
     ("Speicherorte", [
         ("remotes.view", "ansehen"),
@@ -63,7 +64,7 @@ IMPLIES = {
     "jobs.create": ["jobs.view"], "jobs.edit": ["jobs.view"], "jobs.delete": ["jobs.view"],
     "jobs.run": ["jobs.view"], "jobs.dryrun": ["jobs.view"], "jobs.logs": ["jobs.view"],
     "jobs.notify": ["jobs.view"], "jobs.preview": ["jobs.view"], "jobs.advanced": ["jobs.view"], "jobs.twoway": ["jobs.view"],
-    "jobs.approve": ["jobs.view", "jobs.logs"], "jobs.restore": ["jobs.view"], "jobs.scripts": ["jobs.view"],
+    "jobs.approve": ["jobs.view", "jobs.logs"], "jobs.restore": ["jobs.view"], "jobs.scripts": ["jobs.view"], "jobs.encrypt": ["jobs.view"],
     "remotes.test": ["remotes.view"], "remotes.browse": ["remotes.view"], "remotes.create": ["remotes.view"],
     "remotes.edit": ["remotes.view"], "remotes.delete": ["remotes.view"],
     "files.edit": ["files.view"], "files.delete": ["files.view"],
