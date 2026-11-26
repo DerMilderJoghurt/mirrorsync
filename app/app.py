@@ -8,12 +8,14 @@ import hmac
 import ipaddress
 import json
 import os
+import random
 import re
 import secrets
 import shlex
 import shutil
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 import uuid
@@ -1073,6 +1075,139 @@ def verify_due(job):
     return not last or time.time() - last > (20 * 3600 if when == "daily" else int(6.5 * 86400))
 
 
+RESTORE_WHEN = ("off", "always", "weekly", "monthly")
+
+
+def restore_of(job):
+    v = (job or {}).get("restore_test")
+    return v if v in RESTORE_WHEN and not is_bisync(job or {}) else "off"
+
+
+def restore_due(job):
+    when = restore_of(job)
+    if when == "always":
+        return True
+    if when == "off":
+        return False
+    last = monitor._ts((job.get("last_restore") or {}).get("at") or "")
+    return not last or time.time() - last > (int(6.5 * 86400) if when == "weekly" else 29 * 86400)
+
+
+def _rjoin(base, path):
+    base = (base or "").rstrip("/")
+    return (base + path) if base.endswith(":") else f"{base}/{path}"
+
+
+def _same_file(a, b):
+    try:
+        if os.path.getsize(a) != os.path.getsize(b):
+            return False
+        with open(a, "rb") as fa, open(b, "rb") as fb:
+            while True:
+                x, y = fa.read(1 << 20), fb.read(1 << 20)
+                if x != y:
+                    return False
+                if not x:
+                    return True
+    except OSError:
+        return False
+
+
+def _restore_test(job, job_id, w, handle):
+    """Wiederherstellungs-Test: zufaellige Dateien aus dem Ziel zurueckholen und Byte fuer Byte mit der Quelle vergleichen."""
+    count = _int(job.get("restore_files"), 5, 1, 50)
+    max_b = _int(job.get("restore_max_mb"), 100, 1, 10240) * 1024 * 1024
+    dst, src = data_dest(job), job["source"]
+    t0 = time.time()
+    res = {"at": time.strftime("%Y-%m-%d %H:%M:%S"), "checked": 0, "ok": 0, "bad": 0, "skipped": 0, "bytes": 0, "files": []}
+    w("")
+    w(i18n.t("=== Wiederherstellungs-Test: bis zu {0} zufällige Dateien aus dem Ziel zurückholen und mit der Quelle vergleichen ===", count))
+    work = tempfile.mkdtemp(prefix="restoretest-", dir=os.path.join(LOG_DIR, job_id))
+    try:
+        lst = os.path.join(work, "list.txt")
+        cmd = ["rclone", "lsf", "-R", "--files-only", "--format", "sp", "--separator", "\t", dst, "--config", RCLONE_CONF] + filter_args(job)
+        with open(lst, "w", encoding="utf-8") as out:
+            rc = handle.run(cmd, out)
+        cands = []
+        try:
+            with open(lst, encoding="utf-8", errors="replace") as f:
+                for line in f:
+                    size, _, path = line.rstrip("\n").partition("\t")
+                    if size.isdigit() and path and int(size) <= max_b and not path.startswith(".") and "/." not in path:
+                        cands.append((path, int(size)))
+        except OSError:
+            pass
+        if handle.stopped:
+            res["result"] = "stopped"
+            return res
+        if rc != 0:
+            res["result"] = "error"
+            w(i18n.t("=== Wiederherstellungs-Test fehlgeschlagen: Das Ziel ließ sich nicht auflisten (Code {0}). ===", rc))
+            return res
+        if not cands:
+            res["result"] = "empty"
+            w(i18n.t("=== Wiederherstellungs-Test: Im Ziel gibt es keine passende Datei zum Testen. ==="))
+            return res
+        for n, (path, size) in enumerate(random.sample(cands, min(count, len(cands)))):
+            if handle.stopped:
+                res["result"] = "stopped"
+                return res
+            a, b = os.path.join(work, f"{n}.dst"), os.path.join(work, f"{n}.src")
+            with open(os.path.join(work, "copy.log"), "a", encoding="utf-8") as out:
+                rc1 = handle.run(["rclone", "copyto", _rjoin(dst, path), a, "--config", RCLONE_CONF], out)
+                rc2 = handle.run(["rclone", "copyto", _rjoin(src, path), b, "--config", RCLONE_CONF], out) if rc1 == 0 else 1
+            res["checked"] += 1
+            if rc1 != 0:
+                res["bad"] += 1
+                res["files"].append(path)
+                w(f"  ✗ {path}  ({i18n.t('ließ sich nicht aus dem Ziel holen')})")
+            elif rc2 != 0 or not os.path.exists(b):
+                res["skipped"] += 1
+                w(f"  – {path}  ({i18n.t('nicht mehr in der Quelle, übersprungen')})")
+            elif _same_file(a, b):
+                res["ok"] += 1
+                res["bytes"] += size
+                w(f"  ✓ {path}  ({human_bytes(size)})")
+            else:
+                res["bad"] += 1
+                res["files"].append(path)
+                w(f"  ✗ {path}  ({i18n.t('Inhalt weicht von der Quelle ab')})")
+            for x in (a, b):
+                try:
+                    os.remove(x)
+                except OSError:
+                    pass
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+    res["duration"] = int(time.time() - t0)
+    res["files"] = res["files"][:20]
+    if res["bad"]:
+        res["result"] = "fail"
+        w(i18n.t("=== Wiederherstellungs-Test: {0} von {1} Dateien ließen sich NICHT korrekt wiederherstellen. ===", res["bad"], res["checked"]))
+    elif not res["ok"]:
+        res["result"] = "empty"
+        w(i18n.t("=== Wiederherstellungs-Test: Keine Datei verglichen (alle übersprungen). ==="))
+    else:
+        res["result"] = "ok"
+        w(i18n.t("=== Wiederherstellungs-Test bestanden: {0} Dateien zurückgeholt, Inhalt 1:1 wie in der Quelle. ===", res["ok"]))
+    return res
+
+
+def restore_text(r):
+    if not r:
+        return ""
+    x = r.get("result")
+    if x == "ok":
+        return i18n.t("Wiederherstellung geprüft ({0} Dateien)", r.get("ok", 0))
+    if x == "fail":
+        return i18n.t("Wiederherstellung: {0} von {1} Dateien fehlerhaft", r.get("bad", 0), r.get("checked", 0))
+    if x == "error":
+        return i18n.t("Wiederherstellungs-Test fehlgeschlagen")
+    if x == "empty":
+        return i18n.t("Wiederherstellungs-Test: nichts zu testen")
+    return ""
+
+
 def _dest_root(job):
     d = effective_dest(job).strip()
     return d.split(":", 1)[0] + ":" if ":" in d and not d.startswith("/") else d
@@ -1430,7 +1565,13 @@ def _pipeline(job_id, job, handle, cmd_fn, logf, started, dry, by, run_id, log_p
                 w(i18n.t("=== .nosync: Suche fehlgeschlagen ({0}), es gelten die Ordner vom letzten Lauf. ===", err.strip()[-200:]))
         if rc is None and mode in ("full", "livesync") and not dry and not is_bisync(job) and not opts.get("guard_ok"):
             rc = _precheck(job, job_id, w, handle, mode, opts.get("max_age"), info)
-        if rc is None and mode == "verify":
+        if rc is None and mode == "verify" and opts.get("restore_only"):
+            r = _restore_test(job, job_id, w, handle)
+            if r["result"] != "stopped":
+                info["restore"] = r
+            rc = -15 if r["result"] == "stopped" else (1 if r["result"] in ("fail", "error") else 0)
+            info["no_retry"] = True
+        elif rc is None and mode == "verify":
             v = _verify(job, job_id, w, handle)
             info["verify"] = v
             rc = -15 if v["result"] == "stopped" else (0 if v["result"] == "ok" else 1)
@@ -1451,6 +1592,13 @@ def _pipeline(job_id, job, handle, cmd_fn, logf, started, dry, by, run_id, log_p
                     info["verify"] = v
                 if v["result"] in ("diff", "error"):
                     info["no_retry"] = True
+            if rc == 0 and full and not dry and restore_due(job) and not handle.stopped \
+                    and (info.get("verify") or {}).get("result") in (None, "ok"):
+                r = _restore_test(job, job_id, w, handle)
+                if r["result"] != "stopped":
+                    info["restore"] = r
+                if r["result"] in ("fail", "error"):
+                    info["no_retry"] = True
             if rc == 0 and full and not dry and job.get("snapshot") in SNAPSHOT_TYPES[1:] and not handle.stopped:
                 name = _snapshot(job, job_id, w)
                 info["snapshot"] = name or False
@@ -1462,7 +1610,8 @@ def _pipeline(job_id, job, handle, cmd_fn, logf, started, dry, by, run_id, log_p
     if rc is None:
         rc = 1
     if mode == "full" and not dry and (job.get("script_post") or "").strip() and not (rc == 3 or rc == 4):
-        okish = rc == 0 and (info.get("verify") or {}).get("result") in (None, "ok") and info.get("snapshot") is not False
+        okish = rc == 0 and (info.get("verify") or {}).get("result") in (None, "ok") and info.get("snapshot") is not False \
+            and (info.get("restore") or {}).get("result") not in ("fail", "error")
         when = job.get("script_post_when") or "always"
         if when == "always" or (when == "ok") == okish:
             if not _script(job, job_id, "post", w, run_id, "ok" if okish else "fehler"):
@@ -1600,6 +1749,7 @@ def _watch(job_id, job, rc, logf, started, dry, by, run_id, log_path, mode="full
     quiet = repeat = False
     notify_now = True
     verify = info.get("verify")
+    restore = info.get("restore")
     hold = info.get("hold")
     retry = info.get("retry")
     entry = None
@@ -1611,7 +1761,7 @@ def _watch(job_id, job, rc, logf, started, dry, by, run_id, log_path, mode="full
         elif rc in (-15, 143):
             status = "gestoppt"
         elif rc == 0 and not (verify and verify.get("result") in ("diff", "error")) and info.get("snapshot") is not False \
-                and not info.get("script_post_failed"):
+                and not info.get("script_post_failed") and not (restore and restore.get("result") in ("fail", "error")):
             status = "ok"
         else:
             status = "fehler"
@@ -1639,6 +1789,8 @@ def _watch(job_id, job, rc, logf, started, dry, by, run_id, log_path, mode="full
                 j["dest_space"] = info["space"]
             if verify:
                 j["last_verify"] = verify
+            if restore:
+                j["last_restore"] = restore
             if retry:
                 j["retry_pending"] = retry
             else:
@@ -1654,6 +1806,10 @@ def _watch(job_id, job, rc, logf, started, dry, by, run_id, log_path, mode="full
                     entry["mode"] = "live"
                 if mode == "verify":
                     entry.update(mode="verify", copied=0, deleted=0, bytes=0)
+                    if info.get("restore_only") or restore and not verify:
+                        entry["restore_only"] = True
+                if restore:
+                    entry["restore"] = {k: restore.get(k) for k in ("result", "checked", "ok", "bad", "skipped", "files")}
                 if verify:
                     entry["verify"] = {k: verify.get(k) for k in ("result", "matched", "missing", "extra", "differ", "errors", "method", "hash")}
                 if hold:
@@ -1715,6 +1871,11 @@ def _watch(job_id, job, rc, logf, started, dry, by, run_id, log_path, mode="full
     if verify:
         vt = verify_text(verify)
         extra.update(pruefung=vt, pruefung_block="\n" + i18n.t("Prüflauf: {0}", vt, lang=i18n.default_lang) if vt else "")
+    if restore:
+        rt = restore_text(restore)
+        if rt:
+            extra["pruefung"] = ((extra.get("pruefung") or "") + "; " + rt).lstrip("; ")
+            extra["pruefung_block"] = (extra.get("pruefung_block") or "") + "\n" + rt
     if info.get("attempt"):
         extra["versuch"] = f"{info['attempt']}/{len(retry_delays(job)) or info['attempt']}"
     if mode == "verify":
@@ -1739,7 +1900,7 @@ def _log_results(log_path, results):
 
 
 def start_job(job_id, dry_run=False, by="Zeitplan", mode="full", manual=False, resync=False, guard_ok=False, retry_attempt=0,
-              solo=False):
+              solo=False, restore_only=False):
     """Startet einen Job im Hintergrund. False, wenn er schon laeuft (Laeufe ueberlappen nie).
     mode=delta: Live-Lauf, kopiert nur seit dem letzten erfolgreichen Lauf geaenderte Dateien.
     mode=verify: nur pruefen, ob Quelle und Ziel 1:1 gleich sind.
@@ -1817,7 +1978,9 @@ def start_job(job_id, dry_run=False, by="Zeitplan", mode="full", manual=False, r
         dry = (dry_run or bool(job.get("dry_run"))) and mode != "verify"
         logf.write(f"=== Start: {datetime.datetime.now():%Y-%m-%d %H:%M:%S}, gestartet von {by}"
                    f"{'  (TESTLAUF, nichts wird verändert)' if dry else ''} ===\n")
-        if mode == "verify":
+        if mode == "verify" and restore_only:
+            logf.write("=== Nur Wiederherstellungs-Test: Stichproben aus dem Ziel werden zurückgeholt und mit der Quelle verglichen, verändert wird nichts. ===\n")
+        elif mode == "verify":
             logf.write("=== Nur Prüflauf: Quelle und Ziel werden verglichen, verändert wird nichts. ===\n")
         if guard_ok and job.get("delete_hold"):
             logf.write(f"=== Löschwarnung freigegeben von {by.split(' (')[0]}: Der Lauf darf löschen. ===\n")
@@ -1851,7 +2014,8 @@ def start_job(job_id, dry_run=False, by="Zeitplan", mode="full", manual=False, r
         update_job(job_id, **fields)
         if mode != "verify" and not retry_attempt:
             cancel_retry(job_id)   # neuer regulaerer Lauf ersetzt einen geplanten Wiederholungsversuch
-        opts = {"guard_ok": guard_ok, "retry_attempt": retry_attempt, "max_age": max_age, "solo": solo}
+        opts = {"guard_ok": guard_ok, "retry_attempt": retry_attempt, "max_age": max_age, "solo": solo,
+                "restore_only": bool(restore_only and mode == "verify")}
         if solo:
             logf.write("=== Nur diese Aufgabe: Folgeaufgaben werden danach nicht gestartet. ===\n")
     threading.Thread(target=_pipeline, args=(job_id, job, handle, cmd_fn, logf, time.time(), dry, by, run_id, log_path, mode, opts),
@@ -2344,7 +2508,7 @@ ENDPOINT_PERMS = {
     "restart_settings": "system.settings", "logs_settings": "system.settings", "monitoring_settings": "system.settings",
     "network_settings": "system.settings", "audit_page": "system.audit", "audit_export": "system.audit",
     "access_settings": "system.access", "access_block": "system.access", "access_unblock": "system.access",
-    "job_approve": "jobs.approve", "job_hold_dismiss": "jobs.approve", "job_verify": "jobs.run",
+    "job_approve": "jobs.approve", "job_hold_dismiss": "jobs.approve", "job_verify": "jobs.run", "job_restoretest": "jobs.run",
     "job_versions": "jobs.restore", "job_versions_restore": "jobs.restore", "job_versions_download": "jobs.restore",
     "job_usage": "jobs.preview", "stats_page": "jobs.view", "report_send": "notify.edit", "notify_test_all": "notify.edit",
     "changelog_page": None, "changelog_seen": None, "help_page": None,
@@ -2361,6 +2525,9 @@ def endpoint_perm():
         return "remotes.edit" if va.get("name") else "remotes.create"
     if ep == "remote_wizard":
         return "remotes.edit" if g.access.has("remotes.edit") else "remotes.create"
+    if ep == "updates_settings" and post and request.form.get("check_only") and request.form.get("section") == "update" and not g.access.has("system.settings") \
+            and g.access.has("system.update"):
+        return "system.update"   # "Jetzt pruefen" aendert nichts, darf daher auch, wer aktualisieren darf
     if ep == "updates_settings" and not post and not g.access.has("system.settings") and g.access.has("system.update"):
         return "system.update"   # Selbst-Update ansehen und starten geht auch ohne Recht auf die Einstellungen
     if ep == "restart_settings" and not post and not g.access.has("system.settings") and g.access.has("system.restart"):
@@ -3575,7 +3742,7 @@ def cron_text(expr):
     return ", ".join(parts) + f" {t}"
 
 
-EMPTY_JOB = dict(name="", source="", dest="", schedule="0 3 * * *", enabled=True, nosync=True, verify="off", verify_method="auto",
+EMPTY_JOB = dict(name="", source="", dest="", schedule="0 3 * * *", enabled=True, nosync=True, verify="off", verify_method="auto", restore_test="off", restore_files="", restore_max_mb="",
                  delete_guard="", delete_guard_min="10", space_check="off", space_min_gb="", retry="", retry_on="network",
                  dry_run=False, versioning=False, versions_keep="", versions_days="", checksum=False, compare="standard", compare_window="2", speed="normal", max_delete="500", extra_flags="",
                  excludes="", delete_excluded=False, notify_mode="global", notify_when="fail",
@@ -3607,7 +3774,7 @@ def job_notify_from_form(f, old=None):
 SCRIPT_FIELDS = ("script_pre", "script_post", "script_host", "script_timeout", "script_pre_fail", "script_post_when",
                  "snapshot", "snapshot_host", "snapshot_target", "snapshot_dir", "snapshot_cmd", "snapshot_keep", "snapshot_sudo",
                  "wol_mac", "wol_broadcast", "wol_port", "wol_wait", "wol_check", "wol_sleep", "wol_sleep_cmd", "wol_sleep_host")
-EXTRA_TEXT = ("verify", "verify_method", "delete_guard", "delete_guard_min", "space_check", "space_min_gb", "retry", "retry_on",
+EXTRA_TEXT = ("verify", "verify_method", "restore_test", "restore_files", "restore_max_mb", "delete_guard", "delete_guard_min", "space_check", "space_min_gb", "retry", "retry_on",
               "health_max_age") + tuple(x for x in SCRIPT_FIELDS if x not in ("snapshot_sudo", "wol_sleep"))
 EXTRA_BOOL = ("nosync", "snapshot_sudo", "wol_sleep")
 
@@ -3617,6 +3784,9 @@ def apply_extras(f, job, old):
     val = lambda k, d="": str(f.get(k, d) or "").strip()
     job["verify"] = val("verify") if val("verify") in VERIFY_WHEN else "off"
     job["verify_method"] = val("verify_method") if val("verify_method") in VERIFY_METHODS else "auto"
+    job["restore_test"] = val("restore_test") if val("restore_test") in RESTORE_WHEN else "off"
+    job["restore_files"] = str(_int(val("restore_files"), 5, 1, 50)) if val("restore_files") else ""
+    job["restore_max_mb"] = str(_int(val("restore_max_mb"), 100, 1, 10240)) if val("restore_max_mb") else ""
     job["delete_guard"] = val("delete_guard")
     job["delete_guard_min"] = val("delete_guard_min") or "10"
     job["space_check"] = val("space_check") if val("space_check") in SPACE_MODES else "off"
@@ -4610,12 +4780,84 @@ def _remote_saved(name, msg):
     return render_remotes(msg=msg)
 
 
+PROBE_NAME = "msprobe"
+
+
+def probe_remote(name, typ, params, existing=None):
+    """Verbindung testen, ohne zu speichern: Eintraege in eine Kopie der rclone.conf schreiben, dort auflisten, Kopie loeschen.
+    Liefert (ok, text)."""
+    fd, tmp = tempfile.mkstemp(prefix=".probe-", suffix=".conf", dir=CONFIG_DIR)
+    try:
+        os.chmod(tmp, 0o600)
+        try:
+            with open(RCLONE_CONF, "rb") as src:
+                os.write(fd, src.read())
+        except OSError:
+            pass
+        os.close(fd)
+        fd = None
+        run = lambda *a, timeout=60: subprocess.run(["rclone", "--config", tmp, *a], capture_output=True, text=True, timeout=timeout)
+        sec = name if existing and existing.get("type") == typ else (name or PROBE_NAME)
+        if not (existing and existing.get("type") == typ):
+            run("config", "delete", sec, timeout=15)
+            p = run("config", "create", sec, typ, *params, "--obscure", "--non-interactive")
+        else:
+            p = run("config", "update", sec, *params, "--obscure", "--non-interactive") if params else None
+        if p is not None and p.returncode != 0:
+            return False, (p.stdout + p.stderr).strip()[-1500:]
+        if p is not None and '"Error"' in p.stdout:
+            try:
+                e = json.loads(p.stdout[p.stdout.index("{"):]).get("Error")
+            except ValueError:
+                e = None
+            if e:
+                return False, e
+        path = f"{sec}:/" if typ in ABS_ROOT_TYPES else f"{sec}:"
+        q = run("lsf", path, "--max-depth", "1", "--dirs-only", timeout=30)
+        out = (q.stdout if q.returncode == 0 else q.stdout + q.stderr).strip()
+        if q.returncode == 0:
+            lines = out.splitlines()
+            return True, "\n".join(lines[:30]) + ("\n…" if len(lines) > 30 else "")
+        lines = [re.sub(r"^\d{4}/\d\d/\d\d \d\d:\d\d:\d\d (ERROR|CRITICAL|Failed to \w+)? ?:? ?", "", x).strip()
+                 for x in out.replace(f"{PROBE_NAME}:", "").splitlines() if " NOTICE:" not in x and x.strip()]
+        return False, "\n".join(lines)[-1500:] or out[-1500:]
+    except subprocess.TimeoutExpired:
+        return False, i18n.t("Zeitüberschreitung nach {0}s", 30)
+    finally:
+        if fd is not None:
+            os.close(fd)
+        try:
+            os.remove(tmp)
+        except OSError:
+            pass
+
+
+def _form_params(f, existing=None, name=None, type_changed=False):
+    return [f"{k[4:]}={v.strip()}" for k, v in f.items() if k.startswith("opt_") and v.strip() != ""]
+
+
 @app.route("/remotes/new", methods=["GET", "POST"])
 @app.route("/remotes/<name>/edit", methods=["GET", "POST"])
 def edit_remote(name=None):
     existing = remote_config(name) if name else None
     if name and existing is None:
         abort(404)
+    if request.method == "POST" and request.form.get("after") == "probe":
+        f = request.form
+        typ = f.get("type", "") if (not existing or f.get("type")) else existing["type"]
+        vis = remote_vis_map().get(name, "all") if name else "all"
+        kw = dict(name=name, existing=_safe(existing), providers=providers_tr(), form=f, vis=vis, vis_opts=vis_options(),
+                  raw=remote_raw_view(name) if name else "",
+                  secrets_set=sorted(k for k, v in (existing or {}).items() if v and k in remote_secret_keys(existing.get("type"))) if name else [])
+        if not can("remotes.test"):
+            abort(403)
+        if typ not in {p["name"] for p in providers()}:
+            return render_template("remote_edit.html", err=i18n.t("Unbekannter Typ."), **kw)
+        ok_, out = probe_remote(name, typ, _form_params(f), existing)
+        audit_add("remote", "Verbindung getestet (ungespeichert)", (f.get("name") or name or typ)[:80], detail="OK" if ok_ else "fehlgeschlagen")
+        if ok_:
+            return render_template("remote_edit.html", err=None, probe_ok=i18n.t("Verbindung OK (noch nicht gespeichert). Ordner:") + "\n" + (out or i18n.t("(leer)")), **kw)
+        return render_template("remote_edit.html", err=i18n.t("Verbindung fehlgeschlagen (nichts gespeichert):") + "\n" + out, **kw)
     if request.method == "POST":
         f = request.form
         new_name = (f.get("name") or name or "").strip() if name else f.get("name", "").strip()
@@ -5300,6 +5542,23 @@ def _pending_path():
     return p if os.path.exists(p) else None
 
 
+def _parts_now():
+    """Anzahl je Bereich im aktuellen Stand."""
+    try:
+        with open(RCLONE_CONF, "rb") as fh:
+            conf = fh.read()
+    except OSError:
+        conf = b""
+    data = backup.full_dump(DB)
+    data["_remotes"] = backup.count_remotes(conf)
+    logs = sum(len(fs) for _, _, fs in os.walk(LOG_DIR)) if os.path.isdir(LOG_DIR) else 0
+    return backup.part_counts(data, backup._config_files(CONFIG_DIR), logs)
+
+
+def _parts_from_form(f, prefix="part_"):
+    return [k for k in backup.PART_KEYS if f.get(prefix + k)]
+
+
 @app.route("/settings/backup")
 def backup_page(preview=None, err=None):
     deny = _admin_only()
@@ -5307,6 +5566,7 @@ def backup_page(preview=None, err=None):
         return deny
     _pending_cleanup()
     return render_template("backup.html", msg=session.pop("flash", None), err=err, preview=preview,
+                           parts=backup.PARTS, parts_off=backup.DEFAULT_OFF, now=_parts_now(),
                            counts=DB.counts(), labels=BACKUP_LABELS, backups=_backups(),
                            ab=_autobackup_view(), cron_presets=AB_PRESETS,
                            crypto=backup.CRYPTO, files=backup._config_files(CONFIG_DIR),
@@ -5327,11 +5587,18 @@ def backup_export():
         return backup_page(err="Das Passwort für den Export braucht mindestens 8 Zeichen.")
     if pw and not backup.CRYPTO:
         return backup_page(err="Verschlüsselung ist in diesem Image nicht verfügbar.")
-    raw, man = backup.build(DB, CONFIG_DIR, VERSION, LOG_DIR, include_logs=bool(f.get("logs")))
-    name = f"mirrorsync-export-{VERSION}-{time.strftime('%Y%m%d-%H%M')}.zip"
+    parts = _parts_from_form(f)
+    if f.get("parts_form") and not parts:
+        return backup_page(err="Bitte mindestens einen Bereich zum Exportieren anhaken.")
+    if not f.get("parts_form"):   # alte Formulare und API ohne Auswahl: alles (Lauf-Logs nur mit logs)
+        parts = [k for k in backup.PART_KEYS if k != "logs" or f.get("logs")]
+    full = set(parts) >= set(backup.PART_KEYS) - {"logs"}
+    raw, man = backup.build(DB, CONFIG_DIR, VERSION, LOG_DIR, parts=parts)
+    name = f"mirrorsync-export-{VERSION}-{time.strftime('%Y%m%d-%H%M')}{'' if full else '-teil'}.zip"
     if pw:
         raw, name = backup.encrypt(raw, pw), name + ".enc"
-    audit_add("system", "exportiert", "Gesamter Stand",
+    what = "Gesamter Stand" if full else "Teil-Export: " + ", ".join(backup.PART_INFO[k][1] for k in parts)
+    audit_add("system", "exportiert", what[:300],
               detail=("verschlüsselt" if pw else "UNVERSCHLÜSSELT") + (f", mit {man['logs']} Log-Dateien" if man["logs"] else ""))
     import io as _io
     return send_file(_io.BytesIO(raw), as_attachment=True, download_name=name,
@@ -5375,8 +5642,13 @@ def _stage_import(blob, filename, password=None):
             pass
     session["import"] = {"t": tok, "name": filename[:120], "enc": backup.is_encrypted(blob)}
     ok, notes = backup.check(parsed, VERSION)
+    pdata = dict(parsed["data"])
+    if backup.RCLONE_CONF in parsed["files"]:
+        pdata["_remotes"] = backup.count_remotes(parsed["files"][backup.RCLONE_CONF])
     return backup_page(preview={"m": parsed["manifest"], "counts": {k: len(v) for k, v in parsed["data"].items()
                                                                      if k in BACKUP_LABELS},
+                                "have": backup.file_parts(parsed),
+                                "pcounts": backup.part_counts(pdata, parsed["files"], len(parsed["logs"])),
                                 "files": sorted(parsed["files"]), "logs": len(parsed["logs"]), "ok": ok,
                                 "notes": notes, "name": filename, "enc": backup.is_encrypted(blob)})
 
@@ -5396,33 +5668,58 @@ def backup_apply():
         else:
             _flash_err("Keine Importdatei mehr vorhanden, bitte erneut hochladen.")
         return redirect(url_for("backup_page"))
-    if not request.form.get("confirm"):
-        return backup_page(err="Bitte bestätigen, dass der aktuelle Stand ersetzt werden soll.")
     with open(path, "rb") as fh:
         parsed = backup.read(fh.read())
-    ok, notes = backup.check(parsed, VERSION)
+    f = request.form
+    have = backup.file_parts(parsed)
+    if f.get("parts_form"):
+        parts = [k for k in _parts_from_form(f) if k in have]
+    else:   # alte Formulare und API: alles aus der Datei, Dateien und Logs wie bisher einzeln
+        parts = [k for k in have if (k not in ("remotes", "files") or f.get("files")) and (k != "logs" or f.get("logs"))]
+    merge = f.get("mode") == "merge"
+    if not parts:
+        return _restage(parsed, "Bitte mindestens einen Bereich zum Übernehmen anhaken.")
+    if not f.get("confirm"):
+        return _restage(parsed, "Bitte bestätigen, dass die angehakten Bereiche übernommen werden sollen.")
+    ok, notes = backup.check(parsed, VERSION, parts)
     if not ok:
-        return backup_page(err=" ".join(notes))
+        return _restage(parsed, " ".join(notes))
     me, imp = g.user, session.get("import") or {}
     if _running:
         return backup_page(err="Während Aufgaben laufen, ist kein Import möglich. Bitte warten oder stoppen.")
     try:
         bk = backup.auto_backup(DB, CONFIG_DIR, VERSION)
         with _lock:
-            n_files = backup.apply(DB, CONFIG_DIR, LOG_DIR, parsed, with_files=bool(request.form.get("files")),
-                                   with_logs=bool(request.form.get("logs")))
+            n_files = backup.apply(DB, CONFIG_DIR, LOG_DIR, parsed, parts=parts, merge=merge)
     except Exception as e:
         return backup_page(err=f"Import fehlgeschlagen, der bisherige Stand ist unverändert: {e}")
     os.remove(path)
     session.pop("import", None)
     m = parsed["manifest"]
+    full = set(parts) >= set(have) and not merge
     audit_add("system", "importiert", imp.get("name", "Exportdatei"), user=me,
-              detail=f"aus Version {m.get('version')} vom {m.get('created')}, {n_files} Dateien, "
-                     f"vorher gesichert: config/backups/{os.path.basename(bk)}")
+              detail=f"aus Version {m.get('version')} vom {m.get('created')}, "
+                     + ("alles ersetzt" if full else ("ergänzt: " if merge else "ersetzt: ") + ", ".join(backup.PART_INFO[k][1] for k in parts))
+                     + f", {n_files} Dateien, vorher gesichert: config/backups/{os.path.basename(bk)}")
     schedule_all()
-    session["flash"] = (f"Import abgeschlossen. Der vorherige Stand liegt als Sicherung in config/backups/{os.path.basename(bk)}. "
-                        "Falls du jetzt abgemeldet wirst: mit einem Benutzer aus der importierten Datei anmelden.")
+    session["flash"] = i18n.t("Import abgeschlossen ({0}): {1}. Der vorherige Stand liegt als Sicherung in config/backups/{2}.",
+                              i18n.t("ergänzt") if merge else i18n.t("ersetzt"),
+                              ", ".join(i18n.translate(backup.PART_INFO[k][1]) for k in parts), os.path.basename(bk)) \
+        + (" " + i18n.t("Falls du jetzt abgemeldet wirst: mit einem Benutzer aus der importierten Datei anmelden.") if "users" in parts else "")
     return redirect(url_for("backup_page"))
+
+
+def _restage(parsed, err):
+    """Fehler bei der Uebernahme: Vorschau mit Hinweis erneut zeigen (Datei bleibt zwischengespeichert)."""
+    ok, notes = backup.check(parsed, VERSION)
+    pdata = dict(parsed["data"])
+    if backup.RCLONE_CONF in parsed["files"]:
+        pdata["_remotes"] = backup.count_remotes(parsed["files"][backup.RCLONE_CONF])
+    imp = session.get("import") or {}
+    return backup_page(err=err, preview={"m": parsed["manifest"], "have": backup.file_parts(parsed),
+                                         "pcounts": backup.part_counts(pdata, parsed["files"], len(parsed["logs"])),
+                                         "files": sorted(parsed["files"]), "logs": len(parsed["logs"]), "ok": ok,
+                                         "notes": notes, "name": imp.get("name", ""), "enc": imp.get("enc")})
 
 
 def _backups():
@@ -5595,6 +5892,11 @@ def backup_settings():
               autobackup_notify=f.get("autobackup_notify") if f.get("autobackup_notify") in ("never", "fail", "always") else "fail",
               autobackup_notify_skip=bool(f.get("autobackup_notify_skip")),
               autobackup_channels=[c for c in notify.CHANNELS if f.get(f"autobackup_ch_{c}")])
+    if f.get("ab_parts_form"):
+        sel = [k for k in backup.PART_KEYS if k != "logs" and f.get("ab_part_" + k)]
+        if not sel:
+            return backup_page(err="Bitte mindestens einen Bereich für die automatische Sicherung anhaken.")
+        st["autobackup_parts"] = [] if len(sel) == len(backup.PART_KEYS) - 1 else sel
     if st["autobackup_keep"] == "0" and st["autobackup_days"] == "0":
         st["autobackup_keep"] = "14"
     save_settings(st)
@@ -6475,6 +6777,16 @@ def job_verify(job_id):
     return _json_or_back({"ok": True, "message": i18n.t("Prüflauf gestartet.")}, 200, job_id)
 
 
+@app.post("/job/<job_id>/restoretest")
+def job_restoretest(job_id):
+    """Wiederherstellungs-Test von Hand: Stichprobe aus dem Ziel zurueckholen und mit der Quelle vergleichen."""
+    load_jobs().get(job_id) or abort(404)
+    if not start_job(job_id, by=g.user or "Web", mode="verify", manual=True, restore_only=True):
+        return _json_or_back({"ok": False, "error": i18n.t("Die Aufgabe läuft schon.")}, 409, job_id)
+    audit_add("run", "Wiederherstellungs-Test gestartet", load_jobs().get(job_id, {}).get("name", job_id))
+    return _json_or_back({"ok": True, "message": i18n.t("Wiederherstellungs-Test gestartet.")}, 200, job_id)
+
+
 def _json_or_back(data, status, job_id):
     if request.headers.get("Accept", "").startswith("application/json") or g.get("bridge"):
         return data, status
@@ -6861,6 +7173,8 @@ def build_report(days=7, now=None):
                 msg = e[-1][:200] if e else ""
             if not msg and (bad.get("verify") or {}).get("result") in ("diff", "error"):
                 msg = t("Prüflauf: {0}", verify_text(bad["verify"]))
+            if not msg and (bad.get("restore") or {}).get("result") in ("fail", "error"):
+                msg = restore_text(bad["restore"])
             errs.append("• " + f"{j['name']} ({bad['start'][8:10]}.{bad['start'][5:7]}. {bad['start'][11:16]})" + (f": {msg}" if msg else ""))
         if j.get("delete_hold"):
             hints.append("🛑 " + t("{0}: wartet auf Freigabe ({1} % würden gelöscht)", j["name"], int(j["delete_hold"].get("pct") or 0)))
@@ -6868,6 +7182,10 @@ def build_report(days=7, now=None):
         if v:
             good = sum(1 for x in v if x.get("result") == "ok")
             hints.append("🔎 " + t("{0}: {1} von {2} Prüfläufen 1:1 gleich", j["name"], good, len(v)))
+        rts = [h["restore"] for h in j.get("history", []) if h.get("start", "") >= cut and h.get("restore")]
+        if rts:
+            good = sum(1 for x in rts if x.get("result") == "ok")
+            hints.append("♻ " + t("{0}: {1} von {2} Wiederherstellungs-Tests bestanden", j["name"], good, len(rts)))
         sp = j.get("dest_space") or {}
         if sp.get("free") is not None and sp.get("total"):
             pct = sp["free"] * 100 / sp["total"]

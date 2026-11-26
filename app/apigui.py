@@ -344,6 +344,29 @@ def a_reauth_remote(a):
     return _remote_result(gui("POST", f"/remotes/{a['name']}/auth", form={}), a["name"])
 
 
+@action("probe_remote", "POST", "/remotes/probe", "remotes.test", "Speicherorte",
+        "Verbindung mit Zugangsdaten testen, ohne etwas zu speichern (z. B. vor create_remote). type wie bei create_remote, "
+        "options = Felder des Typs (Passwörter im Klartext). Mit name eines vorhandenen Speicherorts: dessen gespeicherte Werte "
+        "gelten, options überschreiben sie nur für den Test.",
+        {"type": S(STR), "options": {"type": "object", "additionalProperties": True}, "name": S(STR, "optional: vorhandener Speicherort")},
+        ["type"])
+def a_probe_remote(a):
+    _check_keys(a, ("type", "options", "name"))
+    existing = None
+    if a.get("name"):
+        _remote_view(a["name"])
+        existing = core.remote_config(a["name"])
+    if a["type"] not in {p["name"] for p in core.providers()}:
+        raise ApiError(400, _t("Unbekannter Typ."))
+    opts = a.get("options") or {}
+    if not isinstance(opts, dict):
+        raise ApiError(400, _t("options muss ein Objekt sein."))
+    params = [f"{k}={v}" for k, v in opts.items() if str(v).strip() != "" and re.fullmatch(r"[A-Za-z0-9_]+", str(k))]
+    ok_, out = core.probe_remote(a.get("name") or None, a["type"], params, existing)
+    core.audit_add("remote", "Verbindung getestet (ungespeichert)", (a.get("name") or a["type"])[:80], detail="OK (API)" if ok_ else "fehlgeschlagen (API)")
+    return {"ok": ok_, "message": out if ok_ else out, "saved": False}
+
+
 @action("test_remote", "POST", "/remotes/{name}/test", "remotes.test", "Speicherorte",
         "Verbindung eines Speicherorts testen (listet die Ordner der obersten Ebene, bei SFTP und FTP das "
         "Stammverzeichnis /).", {"name": S(STR)}, ["name"])
@@ -744,12 +767,14 @@ def a_get_update(a):
     return core.update_status()
 
 
-@action("check_update", "POST", "/update/check", "system.settings", "System",
+@action("check_update", "POST", "/update/check", None, "System",
         "Jetzt bei GitHub nach einer neueren Version fragen und das Ergebnis zurückgeben (wie „Jetzt prüfen“ in den "
         "Einstellungen, ändert keine Einstellungen). Ist die Benachrichtigung bei neuen Versionen eingeschaltet, wird "
-        "sie für eine neue Version einmal verschickt.")
+        "sie für eine neue Version einmal verschickt. Recht system.settings oder system.update.")
 def a_check_update(a):
-    r = gui("POST", "/settings/general", form={"section": "update", "check_only": "1"})
+    if not (g.access.has("system.settings") or g.access.has("system.update")):
+        raise ApiError(403, _t("Keine Berechtigung") + " (system.settings / system.update)")
+    r = gui("POST", "/settings/updates", form={"section": "update", "check_only": "1"})
     return dict(core.update_status(), message=done(r))
 
 
@@ -1551,7 +1576,22 @@ def a_delete_key(a):
 
 
 # ================================================================= Sicherung, Export, Import
-AUTO_KEYS = ("enabled", "schedule", "dir", "keep", "days", "logs", "password", "notify", "notify_skip", "channels")
+import backup as _bk   # noqa: E402  (Bereichs-Schluessel fuer die Beschreibung, ohne core)
+PARTS_PROP = {"type": "array", "items": {"type": "string", "enum": list(_bk.PART_KEYS)},
+              "description": "Bereiche zum Anhaken, z. B. [\"jobs\", \"remotes\"]. Leer = alle (Lauf-Logs nur mit logs=true). "
+                             "Liste mit Beschreibung in backup_overview.parts"}
+
+
+def _parts_form(parts, logs=False):
+    form = {"parts_form": True}
+    for k in parts or [x for x in _bk.PART_KEYS if x != "logs" or logs]:
+        if k not in _bk.PART_INFO:
+            raise ApiError(400, core.i18n.t("Unbekannter Bereich: {0}", k))
+        form["part_" + k] = True
+    return form
+
+
+AUTO_KEYS = ("enabled", "schedule", "dir", "keep", "days", "logs", "password", "notify", "notify_skip", "channels", "parts")
 
 
 def _backup_list():
@@ -1564,22 +1604,25 @@ def _auto_view():
             "effective_dir": v.get("dir"), "keep": v.get("autobackup_keep"), "days": v.get("autobackup_days"),
             "logs": v.get("autobackup_logs"), "notify": v.get("autobackup_notify"), "notify_skip": v.get("autobackup_notify_skip"),
             "channels": v.get("autobackup_channels") or [], "password_set": v.get("has_password"), "next_run": v.get("next"),
-            "last": v.get("status")}
+            "parts": v.get("autobackup_parts") or [], "last": v.get("status")}
 
 
 @action("backup_overview", "GET", "/backup", ADMIN, "Sicherung",
         "Gespeicherte Sicherungen und Einstellungen der automatischen Sicherung.", ro=True)
 def a_backup(a):
     need_any(ADMIN)
-    return {"backups": _backup_list(), "auto": _auto_view(), "encryption": core.backup.CRYPTO}
+    return {"backups": _backup_list(), "auto": _auto_view(), "encryption": core.backup.CRYPTO,
+            "parts": [{"key": k, "label": _t(label), "count": core._parts_now().get(k, 0)} for k, label, _, _ in core.backup.PARTS]}
 
 
 @action("update_autobackup", "PATCH", "/backup/auto", ADMIN, "Sicherung",
         "Automatische Sicherung einstellen (nur angegebene Felder): enabled, schedule (Cron), dir (absoluter Pfad, leer = config/backups), "
-        "keep, days, logs, password (≥ 8 Zeichen, leer = entfernen), notify never|fail|always, notify_skip, channels.",
+        "keep, days, logs, password (≥ 8 Zeichen, leer = entfernen), notify never|fail|always, notify_skip, channels, "
+        "parts (Bereiche wie bei export_backup, leer = alles).",
         {"enabled": S(BOOL), "schedule": S(STR), "dir": S(STR), "keep": S(INT), "days": S(INT), "logs": S(BOOL),
          "password": S(STR), "notify": S(STR, enum=["never", "fail", "always"]), "notify_skip": S(BOOL),
-         "channels": {"type": "array", "items": {"type": "string", "enum": ["webhook", "smtp", "telegram", "apprise"]}}})
+         "channels": {"type": "array", "items": {"type": "string", "enum": ["webhook", "smtp", "telegram", "apprise"]}},
+         "parts": PARTS_PROP})
 def a_update_auto(a):
     need_any(ADMIN)
     _check_keys(a, AUTO_KEYS)
@@ -1592,6 +1635,11 @@ def a_update_auto(a):
             "autobackup_notify_skip": _bool(v["notify_skip"])}
     for c in v["channels"] or []:
         form[f"autobackup_ch_{c}"] = True
+    form["ab_parts_form"] = True
+    for k in v.get("parts") or [x for x in _bk.PART_KEYS if x != "logs"]:
+        if k not in _bk.PART_INFO:
+            raise ApiError(400, core.i18n.t("Unbekannter Bereich: {0}", k))
+        form["ab_part_" + k] = True
     if "password" in a:
         if a["password"]:
             form.update(autobackup_password=a["password"], autobackup_password2=a["password"])
@@ -1621,12 +1669,13 @@ def _file_response(r, mcp):
 
 
 @action("export_backup", "POST", "/backup/export", ADMIN, "Sicherung",
-        "Gesamten Stand exportieren (REST: Datei, MCP: data_base64). Enthält Geheimnisse, daher password empfohlen (≥ 8 Zeichen).",
-        {"password": S(STR), "logs": S(BOOL)})
+        "Stand exportieren (REST: Datei, MCP: data_base64), alles oder nur einzelne Bereiche (parts). Enthält Geheimnisse, "
+        "daher password empfohlen (≥ 8 Zeichen).",
+        {"password": S(STR), "logs": S(BOOL), "parts": PARTS_PROP})
 def a_export(a):
     need_any(ADMIN)
     pw = a.get("password") or ""
-    r = gui("POST", "/settings/backup/export", form={"password": pw, "password2": pw, "logs": _bool(a.get("logs", False))})
+    r = gui("POST", "/settings/backup/export", form=dict(_parts_form(a.get("parts"), _bool(a.get("logs", False))), password=pw, password2=pw))
     return _file_response(r, a.get("_mcp"))
 
 
@@ -1651,7 +1700,8 @@ def _stage_and_apply(c, r, a):
     done(r)
     p = r["out"].get("preview") or {}
     preview = {"ok": p.get("ok"), "notes": [_t(n) for n in p.get("notes", [])], "manifest": p.get("m"),
-               "counts": p.get("counts"), "files": p.get("files"), "logs": p.get("logs"), "encrypted": p.get("enc")}
+               "counts": p.get("counts"), "files": p.get("files"), "logs": p.get("logs"), "encrypted": p.get("enc"),
+               "parts": p.get("have"), "part_counts": {k: v for k, v in (p.get("pcounts") or {}).items() if k in (p.get("have") or [])}}
     if not _bool(a.get("confirm", False)):
         gui("POST", "/settings/backup/apply", form={"cancel": True}, client=c)
         return {"ok": True, "applied": False, "preview": preview,
@@ -1659,15 +1709,29 @@ def _stage_and_apply(c, r, a):
     if not p.get("ok"):
         gui("POST", "/settings/backup/apply", form={"cancel": True}, client=c)
         raise ApiError(400, " ".join(preview["notes"]) or _t("Fehler"))
-    r2 = gui("POST", "/settings/backup/apply", form={"confirm": True, "files": _bool(a.get("files", True)),
-                                                       "logs": _bool(a.get("logs", False))}, client=c)
+    if a.get("parts"):
+        have = p.get("have") or []
+        miss = [k for k in a["parts"] if k not in have]
+        if miss:
+            gui("POST", "/settings/backup/apply", form={"cancel": True}, client=c)
+            raise ApiError(400, core.i18n.t("Nicht in der Datei: {0}", ", ".join(miss)))
+        form = _parts_form(a["parts"])
+    else:
+        form = {"files": _bool(a.get("files", True)), "logs": _bool(a.get("logs", False))}
+    if a.get("mode") not in (None, "", "replace", "merge"):
+        gui("POST", "/settings/backup/apply", form={"cancel": True}, client=c)
+        raise ApiError(400, _t("mode: nur replace oder merge."))
+    form.update(confirm=True, mode=a.get("mode") or "replace")
+    r2 = gui("POST", "/settings/backup/apply", form=form, client=c)
     return {"ok": True, "applied": True, "preview": preview, "message": done(r2)}
 
 
 @action("import_backup", "POST", "/backup/import", ADMIN, "Sicherung",
         "Exportdatei prüfen und mit confirm=true übernehmen (vorher automatische Sicherung). REST: multipart 'file' oder JSON "
-        "data_base64 + filename. files (Standard true): Dateien aus config übernehmen; logs: Lauf-Logs übernehmen.",
-        {"data_base64": S(STR), "filename": S(STR), "password": S(STR), "confirm": S(BOOL), "files": S(BOOL), "logs": S(BOOL)},
+        "data_base64 + filename. parts: nur diese Bereiche übernehmen (sonst alle aus der Datei; dann gelten files, Standard true, "
+        "und logs). mode: replace (Bereiche ersetzen, Standard) oder merge (nur Neues hinzufügen).",
+        {"data_base64": S(STR), "filename": S(STR), "password": S(STR), "confirm": S(BOOL), "files": S(BOOL), "logs": S(BOOL),
+         "parts": PARTS_PROP, "mode": S(STR, enum=["replace", "merge"])},
         files=True)
 def a_import(a):
     need_any(ADMIN)
@@ -1688,8 +1752,10 @@ def a_import(a):
 
 
 @action("restore_backup", "POST", "/backup/files/{name}/restore", ADMIN, "Sicherung",
-        "Gespeicherte Sicherung prüfen und mit confirm=true wiederherstellen (Passwort der automatischen Sicherung wird genutzt).",
-        {"name": S(STR), "password": S(STR), "confirm": S(BOOL), "files": S(BOOL), "logs": S(BOOL)}, ["name"])
+        "Gespeicherte Sicherung prüfen und mit confirm=true wiederherstellen (Passwort der automatischen Sicherung wird genutzt). "
+        "parts: nur diese Bereiche; mode: replace oder merge (wie import_backup).",
+        {"name": S(STR), "password": S(STR), "confirm": S(BOOL), "files": S(BOOL), "logs": S(BOOL), "parts": PARTS_PROP,
+         "mode": S(STR, enum=["replace", "merge"])}, ["name"])
 def a_restore(a):
     need_any(ADMIN)
     if not core._backup_by_name(a["name"]):
@@ -1936,6 +2002,16 @@ def _body(r):
         {"job_id": S(STR)}, ["job_id"])
 def a_verify_job(a):
     b = _body(gui("POST", f"/job/{a['job_id']}/verify", headers=JSON_H))
+    return {"ok": True, "message": _t(b.get("message") or "")}
+
+
+@action("restore_test_job", "POST", "/jobs/{job_id}/restore-test", "jobs.run", "Aufgaben",
+        "Wiederherstellungs-Test von Hand: holt ein paar zufällige Dateien aus dem Ziel zurück (bei Verschlüsselung entschlüsselt) "
+        "und vergleicht sie Byte für Byte mit der Quelle. Läuft im Hintergrund; das Ergebnis steht danach in get_job (last_restore) "
+        "und job_history (restore: ok/fail/error/empty, checked, ok, bad, files).",
+        {"job_id": S(STR)}, ["job_id"])
+def a_restore_test_job(a):
+    b = _body(gui("POST", f"/job/{a['job_id']}/restoretest", headers=JSON_H))
     return {"ok": True, "message": _t(b.get("message") or "")}
 
 

@@ -140,6 +140,12 @@ SECTIONS = [
          "Vergleicht Quelle und Ziel Datei für Datei (aus, nach jedem Lauf, täglich, wöchentlich). Abweichungen machen "
          "den Lauf zum Fehler und stehen im Log. **Vergleich**: automatisch (Prüfsumme, wenn beide Seiten sie können), "
          "nur Größe oder Herunterladen (liest alles, sehr gründlich). Im Log startet **🔎 Jetzt prüfen** einen Prüflauf."),
+        ("Wiederherstellungs-Test",
+         "Holt nach einem erfolgreichen Lauf ein paar zufällige Dateien aus dem Ziel zurück (bei Verschlüsselung "
+         "entschlüsselt) und vergleicht sie Byte für Byte mit der Quelle (aus, nach jedem Lauf, wöchentlich, monatlich). "
+         "Einstellbar: Anzahl Dateien und größte Datei in MB. Ein Fehler macht den Lauf zum Fehler und löst die "
+         "Benachrichtigung aus; das Ergebnis steht im Verlauf (♻), in Health, Metriken und Wochenbericht. Im Log startet "
+         "**♻ Wiederherstellung testen** den Test von Hand (Recht `jobs.run`)."),
         ("Löschwarnung",
          "Würde ein Lauf mehr als X % der Dateien im Ziel löschen (ab einer Mindestanzahl), hält er an und wartet auf "
          "**Freigabe** (Recht `jobs.approve`). Schutz vor Ransomware oder einer leeren Quelle. Leer = aus."),
@@ -216,6 +222,9 @@ SECTIONS = [
         ("Mehrere Speicherorte auf einmal",
          "Mit **☑ Auswahl** mehrere Speicherorte markieren und gemeinsam **testen**, **duplizieren** (als `<name>-kopie`, mit denselben Zugangsdaten) oder **entfernen**."),
         ("Testen", "Prüft die Verbindung und listet die oberste Ebene."),
+        ("Nur testen, nicht speichern",
+         "Beim Anlegen oder Bearbeiten prüft **🔍 Nur testen, nicht speichern** die Verbindung mit den eingegebenen Daten, "
+         "bevor etwas gespeichert wird (Recht `remotes.test`). Bei Clouds mit Browser-Anmeldung geht das erst nach der Anmeldung."),
         ("Bearbeiten und neu anmelden",
          "Beim Bearbeiten ist alles änderbar, aufgeteilt in **Verbindung**, **Anmeldedaten**, **Erweiterte Optionen** und "
          "**Sichtbar für**. Bei abgelaufener Cloud-Anmeldung über **Anmelden** neu anmelden. Passwörter werden nie "
@@ -358,14 +367,17 @@ SECTIONS = [
     ]),
     ("backup", "💾", "Einstellungen: Sicherung", "/settings/backup", [
         ("Exportieren",
-         "Alle Einstellungen, Aufgaben, Benutzer und Speicherorte als ZIP, mit Passwort verschlüsselt (empfohlen), "
-         "optional mit Lauf-Logs."),
-        ("Importieren",
-         "Zeigt zuerst, was die Datei enthält. Danach Teile übernehmen oder den Stand komplett ersetzen. Verschlüsselte "
-         "Dateien brauchen das Passwort."),
+         "Als ZIP, mit Passwort verschlüsselt (empfohlen). Jeder Bereich hat einen eigenen Haken: Aufgaben, Speicherorte, "
+         "SSH-Schlüssel, Benutzer, Gruppen, Rollen, API-Keys, IP-Regeln, Dashboards, die einzelnen Einstellungs-Gruppen, "
+         "Statistik, Anmeldeverlauf, Audit-Log und Lauf-Logs. Alles angehakt = komplette Sicherung."),
+        ("Importieren und wiederherstellen",
+         "Zeigt zuerst, welche Bereiche die Datei enthält, mit Anzahl in der Datei und jetzt. Dann anhaken, was übernommen "
+         "wird. **Ersetzen** tauscht die angehakten Bereiche aus, alles andere bleibt. **Ergänzen** fügt nur Neues hinzu "
+         "(gleiche ID bzw. gleicher Name bleibt), z. B. um Aufgaben und Speicherorte auf eine zweite Instanz zu übernehmen. "
+         "Vorher wird automatisch gesichert. Verschlüsselte Dateien brauchen das Passwort."),
         ("Automatische Sicherung",
-         "Nach Zeitplan (Cron) in einen Ordner im Container, nur wenn sich etwas geändert hat. Anzahl und Alter "
-         "begrenzen, Passwort, Benachrichtigung."),
+         "Nach Zeitplan (Cron) in einen Ordner im Container, nur wenn sich etwas geändert hat. Wie beim Export lässt sich "
+         "anhaken, was gesichert wird. Anzahl und Alter begrenzen, Passwort, Benachrichtigung."),
         ("Gespeicherte Sicherungen", "Herunterladen, wiederherstellen oder löschen. Nur für Admins."),
     ]),
     ("misc", "✨", "Oberfläche, App und Versionen", "/changelog", [

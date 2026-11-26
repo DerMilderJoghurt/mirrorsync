@@ -3,6 +3,42 @@
 Versionsnummern nach [SemVer](https://semver.org/lang/de/): MAJOR.MINOR.PATCH
 (MAJOR = inkompatible Änderung, MINOR = neue Funktion, PATCH = Fehlerbehebung).
 
+## 1.57.0 – 2026-11-26
+**Wiederherstellungs-Test**
+- Neu unter **Aufgabe → Prüfen & schützen**: Nach einem erfolgreichen Lauf holt MirrorSync ein paar zufällige Dateien
+  aus dem Ziel zurück (bei verschlüsseltem Ziel entschlüsselt) und vergleicht sie Byte für Byte mit der Quelle. So
+  ist sicher, dass sich das Backup im Ernstfall wirklich zurückspielen lässt. Einstellbar: aus, nach jedem Lauf,
+  höchstens einmal in der Woche oder im Monat, Anzahl Dateien (Standard 5) und größte Datei (Standard 100 MB).
+- Schlägt der Test fehl, wird der Lauf zum Fehler und die Benachrichtigung geht raus. Das Ergebnis steht im Verlauf
+  (♻), in Health (`restore_test`), in den Metriken (`mirrorsync_job_restore_test_ok`) und im Wochenbericht.
+- Im Log startet **♻ Wiederherstellung testen** den Test jederzeit von Hand (Recht `jobs.run`, API/MCP
+  `restore_test_job`).
+
+**Sicherung: jeden Bereich einzeln anhaken**
+- Beim **Exportieren**, bei der **automatischen Sicherung** und beim **Importieren/Wiederherstellen** hat jeder Bereich
+  einen eigenen Haken: Aufgaben, Speicherorte (rclone.conf), Sichtbarkeit der Speicherorte, SSH-Schlüssel und weitere
+  Dateien, Benutzer, Gruppen, Rollen, API-Keys, IP- und Länderregeln, Dashboards, die Einstellungs-Gruppen
+  (Benachrichtigungen, Wochenbericht, Anmeldung und Sicherheit, Updates und Neustart, automatische Sicherung,
+  Bandbreite und Datenvolumen, Aufbewahrung der Logs, Monitoring, Allgemein), Statistik, Anmeldeverlauf, Audit-Log und
+  Lauf-Logs. So lassen sich z. B. nur Aufgaben und Speicherorte auf eine zweite Instanz übernehmen.
+- Beim Import zeigt die Vorschau je Bereich die Anzahl in der Datei und jetzt. **Ersetzen** tauscht nur die
+  angehakten Bereiche aus, **Ergänzen** fügt nur Neues hinzu (gleiche ID bzw. gleicher Name bleibt, rclone.conf wird
+  um neue Speicherorte erweitert). Vorher wird wie bisher automatisch gesichert.
+- Dashboards und Statistik sind jetzt Teil der Sicherung; ein Import löscht sie nicht mehr mit.
+- API/MCP: `export_backup`, `import_backup`, `restore_backup` und `update_autobackup` kennen `parts`, Import und
+  Wiederherstellung zusätzlich `mode` (replace oder merge); `backup_overview` listet die Bereiche.
+
+**Speicherorte**
+- **🔍 Nur testen, nicht speichern** beim Anlegen und Bearbeiten: prüft die Verbindung mit den eingegebenen Daten,
+  bevor etwas gespeichert wird (Recht `remotes.test`, API/MCP `probe_remote`).
+
+**Updates**
+- **Jetzt aktualisieren** ist ausgegraut, bis **Jetzt prüfen** eine neue Version findet. „Jetzt prüfen“ darf auch,
+  wer nur `system.update` hat.
+
+**Repo**
+- Vorlagen für Fehlermeldungen und Funktionswünsche auf GitHub (mit Version, Installationsart und Logs).
+
 ## 1.56.0 – 2026-11-26
 **Einstellungen neu sortiert**
 - Neue Gruppen in der Leiste: **Wartung** (Updates, Neustart, Logs), **Monitoring** (Überwachung) und **Netzwerk**

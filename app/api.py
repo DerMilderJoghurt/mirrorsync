@@ -302,7 +302,7 @@ TEXT_FIELDS = ("name", "source", "dest", "schedule", "max_delete", "extra_flags"
                "after_job", "after_when", "paused_until", "pause_chain", "live_interval", "live_full", "live_mode", "direction", "bisync_conflict", "bisync_max_delete", "bw_mode", "versions_keep", "versions_days",
                "notify_mode", "notify_when", "notify_webhook_url", "notify_smtp_to", "notify_telegram_chat_id",
                "notify_telegram_token", "notify_apprise_urls", "notify_apprise_tag", "compare", "compare_window", "speed",
-               "verify", "verify_method", "delete_guard", "delete_guard_min", "space_check", "space_min_gb", "retry", "retry_on",
+               "verify", "verify_method", "restore_test", "restore_files", "restore_max_mb", "delete_guard", "delete_guard_min", "space_check", "space_min_gb", "retry", "retry_on",
                "health_max_age", "script_pre", "script_post", "script_host", "script_timeout", "script_pre_fail", "script_post_when",
                "snapshot", "snapshot_host", "snapshot_target", "snapshot_dir", "snapshot_cmd", "snapshot_keep",
                "wol_mac", "wol_broadcast", "wol_port", "wol_wait", "wol_check", "wol_sleep_cmd", "wol_sleep_host",
@@ -338,7 +338,7 @@ def _fields(base, data):
                 raise ApiError(400, core.i18n.t("msg_tpl: nur die Ereignisse {0}.", ", ".join(core.msgtpl.JOB_EVENTS)))
             src[k] = v
         elif k not in ("id", "history", "running", "next_run", "next_start", "next_start_kind", "effective_dest", "is_paused", "owner",
-                       "bisync_ready", "bisync_need_resync", "delete_hold", "retry_pending", "last_verify", "dest_space", "nosync_dirs",
+                       "bisync_ready", "bisync_need_resync", "delete_hold", "retry_pending", "last_verify", "last_restore", "dest_space", "nosync_dirs",
                        "encrypt_remote", "encrypted"):
             raise ApiError(400, f"Unbekanntes Feld: {k}")
     for k, allowed in (("compare", core.COMPARE_MODES), ("speed", core.SPEEDS)):
@@ -815,6 +815,9 @@ def openapi():
                 "visible_to": {"description": "\"all\" (alle mit Recht) oder Liste aus user:<Name> und group:<Gruppen-ID>; Admins und Besitzer sehen die Aufgabe immer"},
                 "verify": {"type": "string", "enum": ["off", "always", "daily", "weekly"], "description": "Prüflauf nach dem Lauf (rclone check): off, always = nach jedem Lauf, daily/weekly = höchstens einmal am Tag bzw. in der Woche. Abweichungen machen den Lauf zum Fehler"},
                 "verify_method": {"type": "string", "enum": ["auto", "size", "download"], "description": "auto = Prüfsumme, wenn beide Seiten eine gemeinsame haben, sonst Größe; size = nur Größe; download = Inhalt Byte für Byte (liest alles)"},
+                "restore_test": {"type": "string", "enum": ["off", "always", "weekly", "monthly"], "description": "Wiederherstellungs-Test nach einem erfolgreichen Lauf: zufällige Dateien aus dem Ziel zurückholen und Byte für Byte mit der Quelle vergleichen (off, always, weekly, monthly). Fehler machen den Lauf zum Fehler"},
+                "restore_files": {"type": "string", "description": "Wiederherstellungs-Test: so viele Dateien pro Test (1–50, Standard 5)"},
+                "restore_max_mb": {"type": "string", "description": "Wiederherstellungs-Test: nur Dateien bis zu dieser Größe in MB (Standard 100)"},
                 "delete_guard": {"type": "string", "description": "Löschwarnung: Lauf anhalten und Freigabe verlangen, wenn mindestens so viel Prozent der Dateien im Ziel gelöscht würden (1–100, leer = aus)"},
                 "delete_guard_min": {"type": "string", "description": "Löschwarnung erst ab so vielen Löschungen (Standard 10)"},
                 "space_check": {"type": "string", "enum": ["off", "warn", "stop"], "description": "Speicher am Ziel vor dem Lauf prüfen: warn = melden und trotzdem laufen, stop = abbrechen"},

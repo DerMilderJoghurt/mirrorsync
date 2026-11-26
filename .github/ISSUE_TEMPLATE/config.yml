@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Documentation (README)
+    url: https://github.com/DerMilderJoghurt/mirrorsync#readme
+    about: Setup, settings, API, MCP and troubleshooting.
+  - name: Help inside MirrorSync
+    url: https://github.com/DerMilderJoghurt/mirrorsync/blob/main/README.md#help-since-1540
+    about: The web GUI has a searchable help page (sidebar → Hilfe / Help).

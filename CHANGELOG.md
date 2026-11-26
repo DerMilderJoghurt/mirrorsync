@@ -3,6 +3,41 @@
 Version numbers follow [SemVer](https://semver.org/): MAJOR.MINOR.PATCH
 (MAJOR = incompatible change, MINOR = new feature, PATCH = bug fix).
 
+## 1.57.0 – 2026-11-26
+**Restore test**
+- New under **Job → Check & protect**: after a successful run MirrorSync brings back a few random files from the
+  destination (decrypted if the destination is encrypted) and compares them byte by byte with the source. That way you
+  know the backup can really be restored in an emergency. Options: off, after every run, at most once a week or a
+  month, number of files (default 5) and largest file (default 100 MB).
+- If the test fails, the run becomes a failure and the notification is sent. The result shows in the history (♻), in
+  health (`restore_test`), in the metrics (`mirrorsync_job_restore_test_ok`) and in the weekly report.
+- In the log, **♻ Test restore** starts the test by hand at any time (permission `jobs.run`, API/MCP
+  `restore_test_job`).
+
+**Backup: tick every area separately**
+- **Export**, **automatic backup** and **import/restore** have a checkbox per area: jobs, storages (rclone.conf),
+  storage visibility, SSH keys and other files, users, groups, roles, API keys, IP and country rules, dashboards, the
+  settings groups (notifications, weekly report, sign-in and security, updates and restart, automatic backup,
+  bandwidth and data volume, log retention, monitoring, general), statistics, sign-in history, audit log and run logs.
+  For example, take over only jobs and storages on a second instance.
+- On import the preview shows the count per area in the file and now. **Replace** swaps only the ticked areas,
+  **Add** only adds what is new (same ID or name stays, rclone.conf gets the new storages). A backup is still made
+  automatically beforehand.
+- Dashboards and statistics are now part of the backup; an import no longer wipes them.
+- API/MCP: `export_backup`, `import_backup`, `restore_backup` and `update_autobackup` accept `parts`, import and
+  restore also `mode` (replace or merge); `backup_overview` lists the areas.
+
+**Storages**
+- **🔍 Test only, do not save** when creating and editing: checks the connection with the entered data before
+  anything is saved (permission `remotes.test`, API/MCP `probe_remote`).
+
+**Updates**
+- **Update now** is greyed out until **Check now** finds a new version. Users with only `system.update` may use
+  “Check now”.
+
+**Repo**
+- GitHub templates for bug reports and feature requests (with version, install type and logs).
+
 ## 1.56.0 – 2026-11-26
 **Settings re-sorted**
 - New groups in the bar: **Maintenance** (updates, restart, logs), **Monitoring** and **Network** (bandwidth).

@@ -1,0 +1,37 @@
+name: Feature request
+description: Suggest an idea or an improvement
+title: "[Feature] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the idea! Please check the [changelog](https://github.com/DerMilderJoghurt/mirrorsync/blob/main/CHANGELOG.md)
+        and open issues first, maybe it already exists. Deutsch ist auch in Ordnung.
+  - type: input
+    id: version
+    attributes:
+      label: MirrorSync version you use
+      placeholder: "1.57.0"
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would it solve?
+      description: Describe the situation, e.g. "When I back up to a cloud I never know if …"
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: How should it work?
+      description: Where in the GUI, which settings, API/MCP?
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives or workarounds you tried
+  - type: textarea
+    id: extra
+    attributes:
+      label: Screenshots, mock-ups or anything else

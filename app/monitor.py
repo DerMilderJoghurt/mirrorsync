@@ -178,7 +178,9 @@ def job_health(jid, j, now=None):
                    and not j.get("window_wait"))
     last_status = (last or {}).get("status")
     v = j.get("last_verify") or {}
+    rt = j.get("last_restore") or {}
     mismatch = v.get("result") == "diff" and (not last or (v.get("at") or "") >= (last.get("start") or ""))
+    mismatch = mismatch or (rt.get("result") == "fail" and (not last or (rt.get("at") or "") >= (last.get("start") or "")))
     status = "ok"
     if running:
         status = "running"
@@ -199,7 +201,7 @@ def job_health(jid, j, now=None):
             "minutes_ago": minutes, "ago": _ago_text(minutes), "max_age_minutes": max_age or None, "overdue": overdue,
             "delete_hold": bool(j.get("delete_hold")), "retry_pending": bool(j.get("retry_pending")),
             "last_bytes": (last or {}).get("bytes"), "last_duration": (last or {}).get("duration"),
-            "verify": v.get("result"), "verify_at": v.get("at")}
+            "verify": v.get("result"), "verify_at": v.get("at"), "restore_test": rt.get("result"), "restore_test_at": rt.get("at")}
 
 
 STATUS_TEXT = {"ok": "letzter Sync ok", "running": "läuft gerade", "error": "letzter Sync fehlgeschlagen",
@@ -274,6 +276,8 @@ def metrics(visible=None):
       [(L(j), int(h["last_bytes"] or 0)) for j, h in hl.items() if h["last_run"]])
     m("mirrorsync_job_verify_ok", "1 if the last verification found source and destination identical", "gauge",
       [(L(j), int(h["verify"] == "ok")) for j, h in hl.items() if h["verify"]])
+    m("mirrorsync_job_restore_test_ok", "1 if the last restore test brought back files identical to the source", "gauge",
+      [(L(j), int(h["restore_test"] == "ok")) for j, h in hl.items() if h.get("restore_test") in ("ok", "fail", "error")])
     free = []
     for jid, j in jobs.items():
         d = j.get("dest_space") or {}

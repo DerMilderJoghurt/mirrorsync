@@ -4,7 +4,7 @@
 
 # MirrorSync – 1:1 mirroring with a web GUI and schedules
 
-Version **1.56.0** · Changes: [CHANGELOG.md](CHANGELOG.md) · [Deutsche Version](README.de.md)
+Version **1.57.0** · Changes: [CHANGELOG.md](CHANGELOG.md) · [Deutsche Version](README.de.md)
 
 A Docker container that **mirrors folders one-way, 1:1** (like FreeFileSync "Mirror"):
 the destination becomes an exact copy of the source, including deletions. The sync engine is
@@ -56,6 +56,8 @@ Then open `http://<docker-host>:8080` and create the first admin.
 - **Versioning**: deleted/overwritten files go to `<destination>.versions/<date>`, optionally keep only the
   last N versions or at most X days (older ones are removed after each run)
 - **Deletion protection**: the run aborts if more than N files would be deleted
+- **Restore test** (since 1.57.0): brings back sample files from the destination and compares them byte by byte with the source
+- **Backup with a checkbox per area** (since 1.57.0): export and restore jobs, storages, users, single settings groups etc. separately, replace or add
 - **Multi-select** (since 1.56.0): tick several jobs or storages and start, test, duplicate or delete them together; **▶ Only this** starts a job without its follow-up jobs
 - **Clearer settings** (since 1.55.0): bar on the left with groups and a search field, groups for security, maintenance, monitoring and network, jobs with tabs and a summary, storage fully editable (including rename)
 - **Help with search** (since 1.54.0): explains every setting, with guides for API, MCP, Uptime Kuma and Home Assistant
@@ -78,7 +80,7 @@ Changed files are transferred completely (no delta transfer like rsync).
 
 ## Installation
 The ready-made image is in the GitHub Container Registry: `ghcr.io/dermilderjoghurt/mirrorsync`
-(for amd64 and arm64, e.g. Raspberry Pi). Tags: `latest` (newest version), `1.56.0` (fixed version),
+(for amd64 and arm64, e.g. Raspberry Pi). Tags: `latest` (newest version), `1.57.0` (fixed version),
 `1.40` (newest patch of this version). The image is only published when the version number changes, so
 update checkers such as Dockhand or Watchtower only report an update when there really is a new version.
 
@@ -299,6 +301,16 @@ In the job under **Verify and protect**:
   the last attempt fails as well.
 - **`.nosync`**: if a source folder contains a file `.nosync`, it is skipped; it stays untouched in the destination
   (on for new jobs).
+
+## Restore test, backup by area (since 1.57.0)
+- **Restore test** (Job → Check & protect): after a successful run, bring back a few random files from the destination
+  and compare them byte by byte with the source (after every run, weekly or monthly). Failures turn the run into a
+  failure. By hand: **♻ Test restore** in the log (API/MCP: `restore_test_job`).
+- **Backup**: export, automatic backup and import have a checkbox per area. On import **Replace** (only the ticked
+  areas) or **Add** (only add what is new, e.g. for a second instance). API/MCP: `parts` and `mode`.
+- **New storage**: **🔍 Test only, do not save** checks the connection before saving (API/MCP: `probe_remote`).
+- **Updates**: “Update now” only becomes clickable once “Check now” has found a new version.
+- **Quiet hours** (since 1.52.0, Settings → Notifications): only report errors and warnings at night.
 
 ## Settings, multi-select and chains (since 1.56.0)
 - Settings bar: **Users & permissions**, **Security** (sign-in and security, access, API), **System** (general,
@@ -1032,10 +1044,14 @@ history and audit log are stored in an SQLite file `config/mirrorsync.db`. `rclo
 - **Export** (Settings → Backup, admins only): downloads everything as a ZIP, i.e. database content,
   `rclone.conf`, SSH keys and other own files from `config/`, optionally the run logs. The file contains
   secrets, so optionally encrypt it with a password (AES-256-GCM, file `.zip.enc`).
+  Since 1.57.0 every area has its own checkbox (jobs, storages, users, roles, API keys, single settings groups,
+  statistics, logs …), so you can also export only parts.
 - **Import:** upload the file, MirrorSync checks it and shows version, date and content compared to the current
   state. Files from a newer version are rejected. Only after confirmation is anything replaced; before that
   MirrorSync automatically creates a backup in `config/backups/` (the last 10 are kept and can be downloaded
   there). No import is possible while jobs are running.
+  Since 1.57.0 you tick which areas to take over and choose **Replace** (swap only those areas) or **Add** (only add
+  what does not exist yet, e.g. jobs and storages for a second instance).
 - Export, import and backup downloads are recorded in the audit log.
 
 ### Automatic backup
@@ -1121,7 +1137,7 @@ MirrorSync can update itself if you mount the Docker socket into the container:
   previous one runs again. Result and steps are shown in the GUI, in the audit log ("Update started / completed /
   failed") and in `config/selfupdate.json`.
 - **Requirements:** the image has to come from a registry (`image: ghcr.io/dermilderjoghurt/mirrorsync:latest`).
-  MirrorSync cannot pull images built with `build: .`. With a fixed version tag (`:1.56.0`) only that tag is pulled
+  MirrorSync cannot pull images built with `build: .`. With a fixed version tag (`:1.57.0`) only that tag is pulled
   again. `/config` has to be a volume or bind mount (it is in the example compose file).
 - **Permission:** `system.update` ("Update MirrorSync", admins have it automatically). Changing the automatic
   update and its time needs `system.settings`.

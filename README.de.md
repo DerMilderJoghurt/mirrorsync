@@ -4,7 +4,7 @@
 
 # MirrorSync – 1:1-Spiegelung mit Web-GUI und Zeitplänen
 
-Version **1.56.0** · Änderungen siehe [CHANGELOG.md](CHANGELOG.md) (englisch) · [English version](README.md)
+Version **1.57.0** · Änderungen siehe [CHANGELOG.md](CHANGELOG.md) (englisch) · [English version](README.md)
 
 Ein Docker-Container, der Ordner **einweg 1:1 spiegelt** (wie FreeFileSync „Spiegeln"):
 Das Ziel wird exakt wie die Quelle, inklusive Löschungen. Als Sync-Motor dient
@@ -57,6 +57,8 @@ Dann `http://<docker-host>:8080` öffnen und den ersten Admin anlegen.
 - **Versionierung**: gelöschte/überschriebene Dateien landen in `<ziel>.versions/<datum>`, optional nur die
   letzten N Versionen bzw. höchstens X Tage behalten (Ältere werden nach jedem Lauf entfernt)
 - **Lösch-Schutz**: Lauf bricht ab, wenn mehr als N Dateien gelöscht würden
+- **Wiederherstellungs-Test** (seit 1.57.0): holt stichprobenartig Dateien aus dem Ziel zurück und vergleicht sie Byte für Byte mit der Quelle
+- **Sicherung mit Haken pro Bereich** (seit 1.57.0): Aufgaben, Speicherorte, Benutzer, einzelne Einstellungs-Gruppen usw. einzeln exportieren und wiederherstellen, ersetzen oder ergänzen
 - **Mehrfachauswahl** (seit 1.56.0): mehrere Aufgaben oder Speicherorte markieren und gemeinsam starten, testen, duplizieren oder löschen; **▶ Nur diese** startet eine Aufgabe ohne Folgeaufgaben
 - **Übersichtliche Einstellungen** (seit 1.55.0): Leiste links mit Gruppen und Suchfeld, Gruppen für Sicherheit, Wartung, Monitoring und Netzwerk, Aufgaben mit Reitern und Zusammenfassung, Speicherorte komplett bearbeitbar (auch umbenennen)
 - **Hilfe mit Suche** (seit 1.54.0): erklärt jede Einstellung, mit Anleitungen für API, MCP, Uptime Kuma und Home Assistant
@@ -79,7 +81,7 @@ Geänderte Dateien werden komplett neu übertragen (kein Delta wie bei rsync).
 
 ## Installation
 Das fertige Image liegt in der GitHub Container Registry: `ghcr.io/dermilderjoghurt/mirrorsync`
-(für amd64 und arm64, z. B. Raspberry Pi). Tags: `latest` (neueste Version), `1.56.0` (feste Version),
+(für amd64 und arm64, z. B. Raspberry Pi). Tags: `latest` (neueste Version), `1.57.0` (feste Version),
 `1.40` (neuester Patch dieser Version). Das Image wird nur veröffentlicht, wenn sich die Versionsnummer ändert.
 Update-Prüfer wie Dockhand oder Watchtower melden deshalb nur dann ein Update, wenn es wirklich eine neue Version gibt.
 
@@ -305,6 +307,18 @@ In der Aufgabe unter **Prüfen und schützen**:
   erst, wenn auch der letzte Versuch scheitert.
 - **`.nosync`**: Liegt in einem Ordner der Quelle eine Datei `.nosync`, wird er übersprungen; im Ziel bleibt er
   unberührt (bei neuen Aufgaben an).
+
+## Wiederherstellungs-Test, Sicherung nach Bereichen (seit 1.57.0)
+- **Wiederherstellungs-Test** (Aufgabe → Prüfen & schützen): nach einem erfolgreichen Lauf ein paar zufällige Dateien
+  aus dem Ziel zurückholen und Byte für Byte mit der Quelle vergleichen (nach jedem Lauf, wöchentlich oder monatlich).
+  Fehler machen den Lauf zum Fehler. Von Hand: **♻ Wiederherstellung testen** im Log (API/MCP: `restore_test_job`).
+- **Sicherung**: Export, automatische Sicherung und Import haben einen Haken pro Bereich. Beim Import **Ersetzen**
+  (nur die angehakten Bereiche) oder **Ergänzen** (nur Neues hinzufügen, z. B. für eine zweite Instanz). API/MCP:
+  `parts` und `mode`.
+- **Speicherort anlegen**: **🔍 Nur testen, nicht speichern** prüft die Verbindung vor dem Speichern (API/MCP:
+  `probe_remote`).
+- **Updates**: „Jetzt aktualisieren“ wird erst klickbar, wenn „Jetzt prüfen“ eine neue Version gefunden hat.
+- **Ruhezeiten** (seit 1.52.0, Einstellungen → Benachrichtigungen): nachts nur Fehler und Warnungen melden.
 
 ## Einstellungen, Mehrfachauswahl und Ketten (seit 1.56.0)
 - Leiste der Einstellungen: **Benutzer & Rechte**, **Sicherheit** (Anmeldung und Sicherheit, Zugriff, API), **System**
@@ -1055,10 +1069,15 @@ eine eigene Datei.
 - **Exportieren** (Einstellungen → Sicherung, nur Admins): lädt alles als ZIP herunter, also Datenbank-Inhalt,
   `rclone.conf`, SSH-Schlüssel und andere eigene Dateien aus `config/`, optional die Lauf-Logs. Die Datei
   enthält Geheimnisse, deshalb optional mit Passwort verschlüsseln (AES-256-GCM, Datei `.zip.enc`).
+  Seit 1.57.0 hat jeder Bereich einen eigenen Haken (Aufgaben, Speicherorte, Benutzer, Rollen, API-Keys,
+  einzelne Einstellungs-Gruppen, Statistik, Logs …), so lassen sich auch nur Teile exportieren.
 - **Importieren:** Datei hochladen, MirrorSync prüft sie und zeigt Version, Datum und Inhalt im Vergleich zum
   aktuellen Stand. Dateien aus einer neueren Version werden abgelehnt. Erst nach Bestätigung wird ersetzt,
   vorher legt MirrorSync automatisch eine Sicherung in `config/backups/` an (die letzten 10 bleiben, dort auch
   herunterladbar). Während Aufgaben laufen, ist kein Import möglich.
+  Seit 1.57.0 hakst du an, welche Bereiche übernommen werden, und wählst **Ersetzen** (nur diese Bereiche
+  austauschen) oder **Ergänzen** (nur hinzufügen, was es noch nicht gibt, z. B. Aufgaben und Speicherorte für eine
+  zweite Instanz).
 - Export, Import und Download von Sicherungen stehen im Audit-Log.
 
 ### Automatische Sicherung

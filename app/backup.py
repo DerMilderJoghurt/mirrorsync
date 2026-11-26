@@ -31,6 +31,89 @@ class BackupError(Exception):
     pass
 
 
+# ---------------------------------------------------------------- Bereiche zum Anhaken (seit 1.57.0)
+# (Schluessel, Beschriftung, Art, Inhalt). Art: ns = Datenbank-Bereich, settings = Einstellungen mit diesen Praefixen,
+# file = rclone.conf, files = alle anderen Dateien aus config/, table = Anmeldeverlauf/Audit, logs = Lauf-Logs
+RCLONE_CONF = "rclone.conf"
+PARTS = [
+    ("jobs", "Aufgaben (mit Zeitplänen und Verlauf)", "ns", "job"),
+    ("remotes", "Speicherorte (rclone.conf mit Zugangsdaten)", "file", RCLONE_CONF),
+    ("remote_meta", "Sichtbarkeit und Besitzer der Speicherorte", "ns", "remote_meta"),
+    ("files", "SSH-Schlüssel und weitere Dateien aus config", "files", None),
+    ("users", "Benutzer (mit Passwort-Hash, 2FA und Passkeys)", "ns", "user"),
+    ("groups", "Gruppen", "ns", "group"),
+    ("roles", "Rollen", "ns", "role"),
+    ("apikeys", "API-Keys", "ns", "apikey"),
+    ("ipguard", "IP- und Länderregeln", "ns", "ipguard"),
+    ("dashboard", "Dashboards", "ns", "dashboard"),
+    ("s_notify", "Benachrichtigungen (Kanäle, Ruhezeiten, Vorlagen)", "settings",
+     ("when", "webhook_", "smtp_", "telegram_", "apprise_", "quiet_", "msg_templates", "notify")),
+    ("s_report", "Wochenbericht", "settings", ("report_",)),
+    ("s_security", "Anmeldung und Sicherheit", "settings",
+     ("lock_", "require_2fa", "fail_notify", "geoip_", "trust_proxy", "session_", "passkey", "password_", "login_")),
+    ("s_update", "Updates und Neustart", "settings", ("update_", "selfupdate_", "restart_")),
+    ("s_autobackup", "Automatische Sicherung", "settings", ("autobackup_",)),
+    ("s_network", "Bandbreite und Datenvolumen", "settings", ("bw", "volume_")),
+    ("s_logs", "Aufbewahrung der Logs", "settings", ("log_keep_", "audit_keep")),
+    ("s_monitor", "Monitoring", "settings", ("monitor_", "health_", "metrics_")),
+    ("s_general", "Allgemeine Einstellungen (Sprache, Adresse, übrige)", "settings", ()),
+    ("stats", "Statistik", "ns", "stats"),
+    ("login_log", "Anmeldeverlauf", "table", "login_log"),
+    ("audit", "Audit-Log", "table", "audit"),
+    ("logs", "Lauf-Logs", "logs", None),
+]
+PART_KEYS = [p[0] for p in PARTS]
+PART_INFO = {p[0]: p for p in PARTS}
+DEFAULT_OFF = {"logs"}   # wird nicht vorausgewaehlt (kann gross werden)
+EXTRA_NS = ("dashboard", "stats")   # stehen nicht in db.NS, gehoeren aber zum Stand
+
+
+def settings_part(key):
+    """Zu welchem Bereich gehoert eine Einstellung?"""
+    for k, _, kind, pre in PARTS:
+        if kind == "settings" and pre and any(key == x or key.startswith(x) for x in pre):
+            return k
+    return "s_general"
+
+
+def parse_parts(values):
+    """Liste aus der GUI/API pruefen. None oder leer = alles."""
+    vals = [v for v in (values or []) if v in PART_INFO]
+    return vals or None
+
+
+def _file_part(rel):
+    return "remotes" if rel == RCLONE_CONF else "files"
+
+
+def part_counts(data, files=(), logs=0):
+    """Anzahl je Bereich (fuer Vorschau und Anzeige)."""
+    out = {k: 0 for k in PART_KEYS}
+    for k, _, kind, what in PARTS:
+        if kind == "ns":
+            out[k] = len(data.get(what) or {})
+        elif kind == "table":
+            out[k] = len(data.get(what) or [])
+    for key in (data.get("settings") or {}):
+        out[settings_part(key)] += 1
+    for f in files:
+        out[_file_part(f)] += 1
+    if isinstance(data.get("_remotes"), int):
+        out["remotes"] = data["_remotes"]
+    out["logs"] = logs
+    return out
+
+
+def count_remotes(conf_bytes):
+    import configparser
+    cp = configparser.RawConfigParser()
+    try:
+        cp.read_string(conf_bytes.decode("utf-8", "replace"))
+    except Exception:
+        return 0
+    return len(cp.sections())
+
+
 # Felder, die sich bei jedem Lauf oder jeder Anmeldung aendern: zaehlen nicht als Aenderung
 VOLATILE = {"job": {"history", "last_status", "last_run", "live_last", "live_checked", "live_failing", "live_fail_count",
                     "delete_hold", "retry_pending", "last_verify", "dest_space", "nosync_dirs"},
@@ -57,9 +140,33 @@ def _config_files(config_dir):
     return sorted(out)
 
 
-def build(db, config_dir, version, log_dir=None, include_logs=False, note=""):
+def full_dump(db):
     data = db.dump()
+    for ns in EXTRA_NS:
+        data[ns] = db.get_map(ns)
+    return data
+
+
+def filter_data(data, parts):
+    """Nur die angehakten Bereiche behalten."""
+    out = {}
+    for k in parts:
+        kind, what = PART_INFO[k][2], PART_INFO[k][3]
+        if kind in ("ns", "table") and what in data:
+            out[what] = data[what]
+    if any(PART_INFO[k][2] == "settings" for k in parts):
+        out["settings"] = {key: v for key, v in (data.get("settings") or {}).items() if settings_part(key) in parts}
+    return out
+
+
+def build(db, config_dir, version, log_dir=None, include_logs=False, note="", parts=None):
+    """Sicherung bauen. parts = Liste von Bereichen (PART_KEYS); None = alles (Lauf-Logs nur mit include_logs)."""
+    data = full_dump(db)
     files = _config_files(config_dir)
+    if parts is not None:
+        include_logs = "logs" in parts
+        data = filter_data(data, parts)
+        files = [f for f in files if _file_part(f) in parts]
     logs = []
     if include_logs and log_dir and os.path.isdir(log_dir):
         for root, _, fs in os.walk(log_dir):
@@ -69,7 +176,8 @@ def build(db, config_dir, version, log_dir=None, include_logs=False, note=""):
                     logs.append(os.path.relpath(p, log_dir))
     manifest = {"app": "MirrorSync", "format": FORMAT, "version": version, "schema": dbmod.SCHEMA_VERSION,
                 "created": time.strftime("%Y-%m-%d %H:%M:%S"), "note": note,
-                "counts": {k: len(v) for k, v in data.items()}, "files": files, "logs": len(logs)}
+                "counts": {k: len(v) for k, v in data.items()}, "files": files, "logs": len(logs),
+                "parts": [k for k in PART_KEYS if parts is None and (k != "logs" or logs) or parts and k in parts]}
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
         z.writestr("manifest.json", json.dumps(manifest, ensure_ascii=False, indent=2))
@@ -148,8 +256,27 @@ def read(blob, password=""):
     return {"manifest": manifest, "data": data, "files": files, "logs": logs, "encrypted": enc}
 
 
-def check(parsed, my_version):
-    """(ok, Liste von Hinweisen) zur Kompatibilitaet."""
+def file_parts(parsed):
+    """Welche Bereiche stecken in der Datei? Aeltere Dateien (ohne parts) enthalten alles, was darin vorkommt."""
+    m = parsed["manifest"]
+    if isinstance(m.get("parts"), list):
+        have = [k for k in m["parts"] if k in PART_INFO]
+    else:
+        d = parsed["data"]
+        have = [k for k, _, kind, what in PARTS if kind in ("ns", "table") and what in d]
+        if "settings" in d:
+            have += [k for k, _, kind, _ in PARTS if kind == "settings"]
+        if RCLONE_CONF in parsed["files"]:
+            have.append("remotes")
+        if any(f != RCLONE_CONF for f in parsed["files"]):
+            have.append("files")
+        if parsed["logs"]:
+            have.append("logs")
+    return [k for k in PART_KEYS if k in have]
+
+
+def check(parsed, my_version, parts=None):
+    """(ok, Liste von Hinweisen) zur Kompatibilitaet. parts: nur diese Bereiche sollen uebernommen werden."""
     m = parsed["manifest"]
     notes, ok = [], True
     if int(m.get("format") or 0) > FORMAT or int(m.get("schema") or 0) > dbmod.SCHEMA_VERSION:
@@ -165,6 +292,8 @@ def check(parsed, my_version):
         if ns in parsed["data"] and not isinstance(parsed["data"][ns], dict):
             ok = False
             notes.append(f"Bereich „{ns}“ hat ein ungültiges Format.")
+    if parts is not None and "users" not in parts or parts is None and "users" not in file_parts(parsed):
+        return ok, notes   # Benutzer bleiben, wie sie sind
     if not (parsed["data"].get("user") or {}):
         ok = False
         notes.append("Die Datei enthält keinen Benutzer. Nach dem Import könnte sich niemand anmelden.")
@@ -190,18 +319,84 @@ def _write(path, content):
     return tmp
 
 
-def apply(db, config_dir, log_dir, parsed, with_files=True, with_logs=False):
-    """Aktuellen Stand ersetzen. Dateien werden erst als .import-tmp geschrieben, dann die Datenbank in einer
-    Transaktion ersetzt und erst danach die Dateien an ihren Platz gelegt."""
-    staged = []
+def _merge_conf(cur_path, new_bytes):
+    """rclone.conf ergaenzen: Speicherorte aus der Datei hinzufuegen, vorhandene gleichen Namens behalten."""
+    import configparser
+    cur = configparser.RawConfigParser()
+    cur.optionxform = str
     try:
-        if with_files:
-            for rel, content in parsed["files"].items():
-                staged.append((_write(os.path.join(config_dir, rel), content), os.path.join(config_dir, rel)))
-        if with_logs:
+        cur.read(cur_path, encoding="utf-8")
+    except Exception:
+        pass
+    new = configparser.RawConfigParser()
+    new.optionxform = str
+    new.read_string(new_bytes.decode("utf-8", "replace"))
+    added = [sec for sec in new.sections() if not cur.has_section(sec)]
+    for sec in added:
+        cur.add_section(sec)
+        for k, v in new.items(sec):
+            cur.set(sec, k, v)
+    buf = io.StringIO()
+    cur.write(buf)
+    return buf.getvalue().encode("utf-8"), added
+
+
+def apply(db, config_dir, log_dir, parsed, with_files=True, with_logs=False, parts=None, merge=False):
+    """Stand uebernehmen. parts = Bereiche (None = alle in der Datei; with_files/with_logs wie bisher).
+    merge = False: angehakte Bereiche ersetzen. merge = True: nur Neues hinzufuegen, Vorhandenes (gleiche ID/Name) bleibt.
+    Dateien werden erst als .import-tmp geschrieben, dann die Datenbank in einer Transaktion geaendert und erst danach
+    die Dateien an ihren Platz gelegt. Liefert die Anzahl uebernommener Dateien."""
+    have = file_parts(parsed)
+    if parts is None:
+        parts = [k for k in have if (k not in ("remotes", "files") or with_files) and (k != "logs" or with_logs)]
+    parts = [k for k in parts if k in have]
+    staged = []
+    data = parsed["data"]
+    try:
+        for rel, content in parsed["files"].items():
+            if _file_part(rel) not in parts:
+                continue
+            dest = os.path.join(config_dir, rel)
+            if merge and rel == RCLONE_CONF and os.path.exists(dest):
+                content, _ = _merge_conf(dest, content)
+            elif merge and os.path.exists(dest):
+                continue
+            staged.append((_write(dest, content), dest))
+        if "logs" in parts:
             for rel, content in parsed["logs"].items():
-                staged.append((_write(os.path.join(log_dir, rel), content), os.path.join(log_dir, rel)))
-        db.restore(parsed["data"])
+                dest = os.path.join(log_dir, rel)
+                if merge and os.path.exists(dest):
+                    continue
+                staged.append((_write(dest, content), dest))
+        with db.tx() as c:
+            for k in parts:
+                kind, what = PART_INFO[k][2], PART_INFO[k][3]
+                if kind == "ns":
+                    src = data.get(what) or {}
+                    if not isinstance(src, dict):
+                        raise ValueError(f"Bereich {what} ist kein Objekt.")
+                    if not merge:
+                        c.execute("DELETE FROM docs WHERE ns=?", (what,))
+                    c.executemany("INSERT OR IGNORE INTO docs VALUES (?, ?, ?)" if merge else "INSERT INTO docs VALUES (?, ?, ?)",
+                                  [(what, str(key), dbmod._dumps(v)) for key, v in src.items()])
+                elif kind == "table" and not merge:
+                    rows = data.get(what) or []
+                    c.execute(f"DELETE FROM {what}")
+                    if what == "login_log":
+                        c.executemany("INSERT INTO login_log (id, data) VALUES (?, ?)",
+                                      [(e.get("id"), dbmod._dumps(e)) for e in reversed(rows) if isinstance(e, dict)])
+                    else:
+                        c.executemany("INSERT INTO audit (ts, cat, user, data) VALUES (?, ?, ?, ?)",
+                                      [(e.get("ts"), e.get("cat"), e.get("user"), dbmod._dumps(e)) for e in rows if isinstance(e, dict)])
+            sparts = [k for k in parts if PART_INFO[k][2] == "settings"]
+            if sparts:
+                cur = dict(c.execute("SELECT key, value FROM docs WHERE ns='settings'").fetchall())
+                for key in cur:
+                    if settings_part(key) in sparts and not merge:
+                        c.execute("DELETE FROM docs WHERE ns='settings' AND key=?", (key,))
+                for key, v in (data.get("settings") or {}).items():
+                    if settings_part(key) in sparts and not (merge and key in cur):
+                        c.execute("INSERT OR REPLACE INTO docs VALUES ('settings', ?, ?)", (key, dbmod._dumps(v)))
     except Exception:
         for tmp, _ in staged:
             try:
@@ -256,7 +451,8 @@ def list_backups(config_dir, extra_dir=None):
 # ---------------------------------------------------------------- automatische Sicherung nach Zeitplan
 AUTO_DEFAULTS = {"autobackup_enabled": False, "autobackup_schedule": "0 3 * * *", "autobackup_dir": "",
                  "autobackup_keep": "14", "autobackup_days": "0", "autobackup_logs": False, "autobackup_password": "",
-                 "autobackup_notify": "fail", "autobackup_notify_skip": False, "autobackup_channels": []}
+                 "autobackup_notify": "fail", "autobackup_notify_skip": False, "autobackup_channels": [],
+                 "autobackup_parts": []}   # leer = alle Bereiche
 
 
 def auto_dir(config_dir, settings):
@@ -267,7 +463,7 @@ def auto_dir(config_dir, settings):
 def state_hash(db, config_dir):
     """Pruefsumme ueber alles, was eine Sicherung ausmacht, ohne Verlauf, Zeitstempel und Zaehler.
     Gleiche Pruefsumme = nichts geaendert."""
-    data = db.dump()
+    data = full_dump(db)
     data.pop("login_log", None)
     data.pop("audit", None)
     data.pop("stats", None)   # Monatsstatistik aendert sich mit jedem Lauf
@@ -334,8 +530,11 @@ def run_auto(db, config_dir, version, settings, log_dir=None, force=False):
             res.update(result="skip", file=last["file"], last_time=last.get("time", ""))
             res["removed"] = prune_auto(target, _int(cfg["autobackup_keep"], 14), _int(cfg["autobackup_days"], 0))
             return res
+        parts = [k for k in (cfg.get("autobackup_parts") or []) if k in PART_INFO and k != "logs"]
+        if parts and cfg["autobackup_logs"]:
+            parts.append("logs")
         raw, man = build(db, config_dir, version, log_dir, include_logs=bool(cfg["autobackup_logs"]),
-                         note="automatische Sicherung (Zeitplan)")
+                         note="automatische Sicherung (Zeitplan)", parts=parts or None)
         name = f"{AUTO_PREFIX}{time.strftime('%Y%m%d-%H%M%S')}.zip"
         pw = cfg.get("autobackup_password") or ""
         if pw:

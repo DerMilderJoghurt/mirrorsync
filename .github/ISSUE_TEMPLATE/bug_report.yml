@@ -1,0 +1,66 @@
+name: Bug report
+description: Something does not work as expected
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! Please remove passwords, tokens, host names and IP addresses you do not want to share
+        before pasting logs. Deutsch ist auch in Ordnung.
+  - type: input
+    id: version
+    attributes:
+      label: MirrorSync version
+      description: Shown at the bottom left in the web GUI, or via `GET /api/v1/status`.
+      placeholder: "1.57.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: Installation
+      options:
+        - Docker image from ghcr.io (docker compose)
+        - Docker, built from source
+        - Unraid / Synology / other NAS app
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: arch
+    attributes:
+      label: Host and architecture
+      placeholder: "e.g. Debian 12 amd64, Raspberry Pi 5 arm64, Synology DS920+"
+  - type: input
+    id: storage
+    attributes:
+      label: Storage types involved
+      description: Source and destination, e.g. local → SFTP, SMB → S3, crypt.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, and what happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Go to …
+        2. Click …
+        3. See error …
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: |
+        The run log of the job (job → Log → download) and/or `docker logs mirrorsync --tail 200`.
+        Will be shown as code, no backticks needed.
+      render: text
+  - type: textarea
+    id: extra
+    attributes:
+      label: Screenshots or anything else
