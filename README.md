@@ -4,7 +4,7 @@
 
 # MirrorSync – 1:1 mirroring with a web GUI and schedules
 
-Version **1.53.0** · Changes: [CHANGELOG.md](CHANGELOG.md) · [Deutsche Version](README.de.md)
+Version **1.54.0** · Changes: [CHANGELOG.md](CHANGELOG.md) · [Deutsche Version](README.de.md)
 
 A Docker container that **mirrors folders one-way, 1:1** (like FreeFileSync "Mirror"):
 the destination becomes an exact copy of the source, including deletions. The sync engine is
@@ -56,6 +56,7 @@ Then open `http://<docker-host>:8080` and create the first admin.
 - **Versioning**: deleted/overwritten files go to `<destination>.versions/<date>`, optionally keep only the
   last N versions or at most X days (older ones are removed after each run)
 - **Deletion protection**: the run aborts if more than N files would be deleted
+- **Help with search** (since 1.54.0): explains every setting, with guides for API, MCP, Uptime Kuma and Home Assistant
 - **Encrypt the destination** (since 1.53.0): data on server B is stored only encrypted (rclone crypt), optionally file names too
 - **Verification after the sync** (since 1.52.0): compares source and destination file by file and shows "1:1 identical" or the differences
 - **Deletion warning** (since 1.52.0): if a run would delete more than X % of the files, it pauses and asks first (protects against ransomware or an empty source)
@@ -75,7 +76,7 @@ Changed files are transferred completely (no delta transfer like rsync).
 
 ## Installation
 The ready-made image is in the GitHub Container Registry: `ghcr.io/dermilderjoghurt/mirrorsync`
-(for amd64 and arm64, e.g. Raspberry Pi). Tags: `latest` (newest version), `1.53.0` (fixed version),
+(for amd64 and arm64, e.g. Raspberry Pi). Tags: `latest` (newest version), `1.54.0` (fixed version),
 `1.40` (newest patch of this version). The image is only published when the version number changes, so
 update checkers such as Dockhand or Watchtower only report an update when there really is a new version.
 
@@ -296,6 +297,48 @@ In the job under **Verify and protect**:
   the last attempt fails as well.
 - **`.nosync`**: if a source folder contains a file `.nosync`, it is skipped; it stays untouched in the destination
   (on for new jobs).
+
+## Help (since 1.54.0)
+Under **Settings → ❓ Help** (and via the **❓ Help** button in every job) MirrorSync explains everything you can set:
+jobs (type, source and destination, start, time window, options, verify and protect, encryption, scripts), storage
+locations, file manager, dashboard, notifications, general, access, users, roles and groups, my account and backup.
+The search field finds all entries containing the entered words and highlights them, e.g. `/help?q=deletion`. From a
+settings page the tab jumps straight to the matching section. Plus step-by-step guides for API, MCP (Claude, n8n …),
+Uptime Kuma, Home Assistant and Prometheus; the examples already contain your own address and can be copied.
+API/MCP: `GET /api/v1/help` and `get_help` with `q` and `section`.
+
+### Setting up Uptime Kuma
+1. Under Settings → Roles create a role "Monitoring" with only the permission `system.monitor`, under Settings → API a
+   key with this role.
+2. In Uptime Kuma **Add New Monitor**, type **HTTP(s)**, URL `https://sync.example.com/health/jobs` (one job:
+   `/health/jobs/<name>`), interval e.g. 300 seconds.
+3. Under **Headers** enter: `{"Authorization": "Bearer msk_…"}` (or use the URL with `?key=msk_…`).
+4. Save. On errors, overdue jobs or a deletion warning MirrorSync answers with 503 and Uptime Kuma reports "Down".
+   With type **HTTP(s) - Keyword**, URL `…/health/jobs?format=text` and keyword `OK:` the content is checked as well.
+
+### Setting up Home Assistant
+Add this to `configuration.yaml` and restart Home Assistant. `always200=1` makes sure the response is read even when
+there are problems; the binary sensor then turns "Problem".
+```yaml
+rest:
+  - resource: "https://sync.example.com/health/jobs?always200=1"
+    headers:
+      Authorization: "Bearer msk_…"
+    scan_interval: 300
+    sensor:
+      - name: "MirrorSync"
+        value_template: "{{ value_json.summary }}"
+    binary_sensor:
+      - name: "MirrorSync Problem"
+        device_class: problem
+        value_template: "{{ not value_json.ok }}"
+```
+To start a job from Home Assistant: `rest_command` with `url: "https://sync.example.com/api/v1/jobs/<id>/run"`,
+`method: post` and the same header.
+
+### n8n as MCP client
+In the **AI Agent** add the node **MCP Client Tool**: endpoint `https://sync.example.com/mcp`, server transport
+**HTTP Streamable**, authentication **Header Auth** (name `Authorization`, value `Bearer msk_…`).
 
 ## Encrypt the destination (since 1.53.0)
 In the job, under **🔒 Encrypt destination**, tick the box, enter a password (at least 8 characters) twice and confirm
@@ -1042,7 +1085,7 @@ MirrorSync can update itself if you mount the Docker socket into the container:
   previous one runs again. Result and steps are shown in the GUI, in the audit log ("Update started / completed /
   failed") and in `config/selfupdate.json`.
 - **Requirements:** the image has to come from a registry (`image: ghcr.io/dermilderjoghurt/mirrorsync:latest`).
-  MirrorSync cannot pull images built with `build: .`. With a fixed version tag (`:1.53.0`) only that tag is pulled
+  MirrorSync cannot pull images built with `build: .`. With a fixed version tag (`:1.54.0`) only that tag is pulled
   again. `/config` has to be a volume or bind mount (it is in the example compose file).
 - **Permission:** `system.update` ("Update MirrorSync", admins have it automatically). Changing the automatic
   update and its time needs `system.settings`.

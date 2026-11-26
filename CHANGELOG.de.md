@@ -3,6 +3,21 @@
 Versionsnummern nach [SemVer](https://semver.org/lang/de/): MAJOR.MINOR.PATCH
 (MAJOR = inkompatible Änderung, MINOR = neue Funktion, PATCH = Fehlerbehebung).
 
+## 1.54.0 – 2026-11-26
+**Hilfe**
+- Neue **Hilfe** (Tab „❓ Hilfe“ in den Einstellungen, Knopf „❓ Hilfe“ in jeder Aufgabe): erklärt alles, was man in
+  MirrorSync einstellen kann, in 20 Abschnitten von der Aufgabe (Art, Quelle und Ziel, Start und Zeitfenster,
+  Optionen, Prüfen und schützen, Verschlüsselung, Skripte) über Speicherorte, Dateimanager, Dashboard,
+  Benachrichtigungen, Allgemein, Zugriff, Benutzer, Rollen und Gruppen, Mein Konto und Sicherung bis zur Oberfläche.
+- **Suche** über alle Einträge mit Hervorhebung der Treffer; der Link `/help?q=…` merkt sich die Suche. Aus jeder
+  Einstellungsseite springt der Tab direkt zum passenden Abschnitt.
+- **Schritt-für-Schritt-Anleitungen** mit Beispielen zum Kopieren (mit der eigenen Adresse ausgefüllt): API anbinden
+  (Key, curl, Swagger, n8n, Home Assistant `rest_command`), MCP einrichten (Claude Desktop, Claude Code, Cursor und
+  VS Code, `mcp-remote`, n8n „MCP Client Tool“) und Überwachung mit Uptime Kuma, Home Assistant (RESTful-Sensor) und
+  Prometheus über `/health/jobs` und `/metrics`.
+- API und MCP: `GET /api/v1/help` bzw. Tool `get_help` mit `q` (Suche) und `section`, damit auch Assistenten die
+  Hilfe nutzen können. Alle Texte in fünf Sprachen.
+
 ## 1.53.0 – 2026-11-26
 **Ziel verschlüsseln**
 - Pro Aufgabe lässt sich das **Ziel verschlüsseln** (Karte „🔒 Ziel verschlüsseln“): MirrorSync legt dafür selbst einen

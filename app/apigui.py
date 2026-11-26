@@ -2048,6 +2048,16 @@ def a_get_changelog(a):
     return {"version": core.VERSION, "entries": [{"version": e["version"], "date": e["date"], "text": e["md"]} for e in rows]}
 
 
+@action("get_help", "GET", "/help", None, "System",
+        "Hilfe zu allen Einstellungen in MirrorSync (Aufgaben, Speicherorte, Zeitpläne, Benutzer, Einstellungen) sowie "
+        "Anleitungen für API, MCP, Uptime Kuma und Home Assistant. q = Suchbegriffe (alle müssen vorkommen), section = "
+        "nur ein Abschnitt (z. B. job, protect, api, mcp, monitor).",
+        {"q": S(STR, "Suchbegriffe, z. B. Löschwarnung"), "section": S(STR, "Abschnitt, z. B. monitor")}, ro=True)
+def a_get_help(a):
+    entries = core.helpdoc.search(core.i18n.t, a.get("q") or "", core.help_base(), a.get("section") or None)
+    return {"count": len(entries), "sections": [s[0] for s in core.helpdoc.SECTIONS], "entries": entries}
+
+
 @action("send_report", "POST", "/settings/report/send", "notify.edit", "Benachrichtigungen",
         "Wochenbericht jetzt senden (Läufe, übertragene Daten, Fehler im eingestellten Zeitraum) über die eingestellten Kanäle.")
 def a_send_report(a):

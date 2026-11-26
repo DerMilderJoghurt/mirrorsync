@@ -3,6 +3,21 @@
 Version numbers follow [SemVer](https://semver.org/): MAJOR.MINOR.PATCH
 (MAJOR = incompatible change, MINOR = new feature, PATCH = bug fix).
 
+## 1.54.0 – 2026-11-26
+**Help**
+- New **Help** (tab "❓ Help" in the settings, button "❓ Help" in every job): explains everything you can set in
+  MirrorSync, in 20 sections from the job (type, source and destination, start and time window, options, verify and
+  protect, encryption, scripts) through storage locations, file manager, dashboard, notifications, general, access,
+  users, roles and groups, my account and backup to the interface.
+- **Search** across all entries with highlighted matches; the link `/help?q=…` keeps the search. From every settings
+  page the tab jumps straight to the matching section.
+- **Step-by-step guides** with copyable examples (filled in with your own address): connecting the API (key, curl,
+  Swagger, n8n, Home Assistant `rest_command`), setting up MCP (Claude Desktop, Claude Code, Cursor and VS Code,
+  `mcp-remote`, n8n "MCP Client Tool") and monitoring with Uptime Kuma, Home Assistant (RESTful sensor) and Prometheus
+  via `/health/jobs` and `/metrics`.
+- API and MCP: `GET /api/v1/help` and tool `get_help` with `q` (search) and `section`, so assistants can use the help
+  too. All texts in five languages.
+
 ## 1.53.0 – 2026-11-26
 **Encrypt the destination**
 - Each job can now **encrypt its destination** (card "🔒 Encrypt destination"): MirrorSync sets up its own encrypted

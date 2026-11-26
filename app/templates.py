@@ -156,7 +156,7 @@ table,tbody,tr,td{display:block;width:100%}tr:first-child:has(th){display:none}t
 </style></head><body>
 {% set p = request.path %}
 
-<nav class="mobile-nav"><a href="/dashboard" class="{{ 'active' if p.startswith('/dashboard') }}">Dashboard</a><a href="/" class="{{ 'active' if p == '/' or p.startswith('/job') }}">Aufgaben</a><a href="/schedules" class="{{ 'active' if p.startswith('/schedules') }}">Zeitpläne</a><a href="/remotes" class="{{ 'active' if p.startswith('/remotes') }}">Speicherorte</a>{% if can('files.view') %}<a href="/files" class="{{ 'active' if p.startswith('/files') }}">Dateien</a>{% endif %}{% if can('jobs.view') %}<a href="/stats" class="{{ 'active' if p.startswith('/stats') }}">Statistik</a>{% endif %}{% if can('system.audit') %}<a href="/audit" class="{{ 'active' if p.startswith('/audit') }}">Audit-Log</a>{% endif %}<a href="{{ '/users' if can('users.view') else ('/settings' if can('notify.view') else ('/settings/general' if can('system.settings') else ('/settings/access' if can('system.access') else '/account'))) }}" class="{{ 'active' if p.startswith(('/settings','/users','/account','/roles')) }}">Einstellungen{% if fail_badge %} <span class="badge">{{ fail_badge }}</span>{% endif %}</a>{% if g.user %}<a href="/logout">Abmelden</a>{% endif %}</nav>
+<nav class="mobile-nav"><a href="/dashboard" class="{{ 'active' if p.startswith('/dashboard') }}">Dashboard</a><a href="/" class="{{ 'active' if p == '/' or p.startswith('/job') }}">Aufgaben</a><a href="/schedules" class="{{ 'active' if p.startswith('/schedules') }}">Zeitpläne</a><a href="/remotes" class="{{ 'active' if p.startswith('/remotes') }}">Speicherorte</a>{% if can('files.view') %}<a href="/files" class="{{ 'active' if p.startswith('/files') }}">Dateien</a>{% endif %}{% if can('jobs.view') %}<a href="/stats" class="{{ 'active' if p.startswith('/stats') }}">Statistik</a>{% endif %}{% if can('system.audit') %}<a href="/audit" class="{{ 'active' if p.startswith('/audit') }}">Audit-Log</a>{% endif %}<a href="{{ '/users' if can('users.view') else ('/settings' if can('notify.view') else ('/settings/general' if can('system.settings') else ('/settings/access' if can('system.access') else '/account'))) }}" class="{{ 'active' if p.startswith(('/settings','/users','/account','/roles','/groups','/help')) }}">Einstellungen{% if fail_badge %} <span class="badge">{{ fail_badge }}</span>{% endif %}</a>{% if g.user %}<a href="/logout">Abmelden</a>{% endif %}</nav>
 <div class="app">
 <aside>
 <div class="brand"><div class="logo">{{ ICON.jobs }}</div><span class="lbl">MirrorSync</span><button type="button" class="sidetog" id="sidetog" onclick="toggleSide()" title="{{ _('Seitenleiste ausklappen') if side_mini else _('Seitenleiste einklappen') }}" aria-label="{{ _('Seitenleiste ausklappen') if side_mini else _('Seitenleiste einklappen') }}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button></div>
@@ -168,7 +168,7 @@ table,tbody,tr,td{display:block;width:100%}tr:first-child:has(th){display:none}t
 {% if can('files.view') %}<a href="/files" class="{{ 'active' if p.startswith('/files') }}" title="Dateien">{{ ICON.folder }}<span class="lbl">Dateien</span></a>{% endif %}
 {% if can('jobs.view') %}<a href="/stats" class="{{ 'active' if p.startswith('/stats') }}" title="Statistik">{{ ICON.chart }}<span class="lbl">Statistik</span></a>{% endif %}
 {% if can('system.audit') %}<a href="/audit" class="{{ 'active' if p.startswith('/audit') }}" title="Audit-Log">{{ ICON.audit }}<span class="lbl">Audit-Log</span></a>{% endif %}
-<a href="{{ '/users' if can('users.view') else ('/settings' if can('notify.view') else ('/settings/general' if can('system.settings') else ('/settings/access' if can('system.access') else '/account'))) }}" class="{{ 'active' if p.startswith(('/settings','/users','/account','/roles')) }}" title="Einstellungen">{{ ICON.gear }}<span class="lbl">Einstellungen</span>{% if fail_badge %}<span class="badge" title="unbestätigte Fehlversuche">{{ fail_badge }}</span>{% endif %}</a>
+<a href="{{ '/users' if can('users.view') else ('/settings' if can('notify.view') else ('/settings/general' if can('system.settings') else ('/settings/access' if can('system.access') else '/account'))) }}" class="{{ 'active' if p.startswith(('/settings','/users','/account','/roles','/groups','/help')) }}" title="Einstellungen">{{ ICON.gear }}<span class="lbl">Einstellungen</span>{% if fail_badge %}<span class="badge" title="unbestätigte Fehlversuche">{{ fail_badge }}</span>{% endif %}</a>
 </nav>
 <div class="side-foot">
 <button type="button" onclick="toggleTheme()" title="Design wechseln">{{ ICON.theme }}<span id="themeLabel" class="lbl">Design wechseln</span></button>
@@ -316,7 +316,7 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){window.addEventLis
 
 "job.html": r"""{% extends "base.html" %}{% block title %}{{ job.name if job_id else "Neue Aufgabe" }}{% endblock %}
 {% block subtitle %}<p>{{ "Aufgabe bearbeiten" if job_id else "Neue Spiegel-Aufgabe anlegen" }}</p>{% endblock %}
-{% block actions %}{% if job_id %}{% if can("jobs.create") %}<form class="inline" method="post" action="/job/{{ job_id }}/duplicate"><button class="btn" title="Kopie dieser Aufgabe anlegen (ausgeschaltet)">⧉ Duplizieren</button></form> {% endif %}<a class="btn" href="/job/{{ job_id }}/log">Log</a>{% endif %}{% endblock %}
+{% block actions %}<a class="btn" href="/help#job" title="Hilfe: alle Einstellungen der Aufgabe erklärt">❓ Hilfe</a> {% if job_id %}{% if can("jobs.create") %}<form class="inline" method="post" action="/job/{{ job_id }}/duplicate"><button class="btn" title="Kopie dieser Aufgabe anlegen (ausgeschaltet)">⧉ Duplizieren</button></form> {% endif %}<a class="btn" href="/job/{{ job_id }}/log">Log</a>{% endif %}{% endblock %}
 {% block body %}
 {% if msg %}<div class="msg ok">{{ msg }}</div>{% endif %}
 {% if error %}<div class="msg err">{{ error }}</div>{% endif %}
@@ -1686,7 +1686,8 @@ if({% endraw %}{{ "false" if pk_off else "true" }}{% raw %}&&window.PublicKeyCre
 {% if can('system.access') %}<a href="/settings/access" class="{{ 'active' if request.path.startswith('/settings/access') }}">Zugriff</a>{% endif %}
 {% if can('system.api') %}<a href="/settings/api" class="{{ 'active' if request.path.startswith('/settings/api') }}">API</a>{% endif %}
 {% if g.role == 'admin' %}<a href="/settings/backup" class="{{ 'active' if request.path.startswith('/settings/backup') }}">Sicherung</a>{% endif %}
-<a href="/account" class="{{ 'active' if request.path.startswith('/account') }}">Mein Konto</a></div>
+<a href="/account" class="{{ 'active' if request.path.startswith('/account') }}">Mein Konto</a>
+<a href="/help{{ HELP_ANCHOR.get(request.path, '') }}" class="helptab{{ ' active' if request.path.startswith('/help') }}" style="margin-left:auto" title="Hilfe: alle Einstellungen erklärt, mit Suche">❓ Hilfe</a></div>
 """,
 "backup.html": r"""{% extends "base.html" %}{% block title %}Einstellungen{% endblock %}
 {% block body %}{% include "tabs.html" %}
@@ -1992,6 +1993,56 @@ window.ui=SwaggerUIBundle({url:'/api/v1/openapi.json',dom_id:'#ui',deepLinking:t
 @media (prefers-color-scheme:dark){body{background:#09090b;color:#ececf1}}img{width:72px;height:72px}button{margin-top:14px;padding:9px 16px;border-radius:8px;border:0;background:#4f46e5;color:#fff;font:inherit;cursor:pointer}</style></head>
 <body><div><img src="/static/favicon.svg" alt=""><h1 style="font-size:20px">MirrorSync ist gerade nicht erreichbar</h1><p>Keine Verbindung zum Server. Prüfe das Netzwerk oder ob der Container läuft.</p><button onclick="location.reload()">Neu laden</button></div></body></html>""",
 
+"help.html": r"""{% extends "base.html" %}{% block title %}Hilfe{% endblock %}{% block subtitle %}<p>Alles, was du in MirrorSync einstellen kannst, kurz erklärt. Mit Anleitungen für API, MCP, Uptime Kuma und Home Assistant.</p>{% endblock %}{% block body %}{% include "tabs.html" %}
+<style>
+.hsearch{position:sticky;top:0;z-index:5;background:var(--bg);padding:4px 0 10px}
+.hsearch input{font-size:16px;padding:11px 14px;width:100%;max-width:none;box-sizing:border-box}
+.hlayout{display:flex;gap:18px;align-items:flex-start}
+.htoc{flex:0 0 240px;position:sticky;top:70px;max-height:calc(100vh - 90px);overflow:auto;font-size:13.5px}
+.htoc a{display:block;padding:5px 8px;border-radius:7px;color:var(--fg);text-decoration:none}
+.htoc a:hover{background:var(--card2)}
+.hmain{flex:1;min-width:0}
+.hsec{scroll-margin-top:70px}
+.hsec h2{display:flex;align-items:center;gap:8px}
+.hsec h2 .go{margin-left:auto;font-size:13px;font-weight:400}
+.hent{padding:10px 0;border-top:1px solid var(--bd)}
+.hent:first-of-type{border-top:0}
+.hent h3{margin:0 0 4px;font-size:15px}
+.hent p{margin:0;line-height:1.55}
+.hent pre{position:relative;margin:8px 0 0;white-space:pre;overflow:auto}
+.hent pre button{position:absolute;top:6px;right:6px}
+mark{background:#fde68a;color:#111;border-radius:3px;padding:0 1px}
+@media (max-width:900px){.htoc{display:none}}
+</style>
+<div class="hsearch"><input type="search" id="hq" placeholder="Hilfe durchsuchen, z. B. Löschwarnung, Cron, Uptime Kuma, MCP" autocomplete="off" autofocus>
+<div class="hint" id="hcount" style="margin-top:6px"></div></div>
+<div class="hlayout"><nav class="htoc card" id="htoc">{% for s in sections %}<a href="#{{ s.id }}" data-s="{{ s.id }}">{{ s.icon }} {{ s.title }}</a>{% endfor %}</nav>
+<div class="hmain">{% for s in sections %}<div class="card hsec" id="{{ s.id }}"><h2>{{ s.icon }} {{ s.title }}{% if s.link %}<a class="go" href="{{ s.link }}">Zur Seite →</a>{% endif %}</h2>
+{% for e in s.entries %}<div class="hent" id="{{ e.id }}"><h3>{{ e.title }}</h3><p>{{ e.text }}</p>{% if e.code %}<pre><code>{{ e.code }}</code><button type="button" class="btn sm" onclick="hCopy(this)">Kopieren</button></pre>{% endif %}</div>{% endfor %}</div>{% endfor %}
+<div class="card" id="hnone" hidden><div class="empty">Nichts gefunden. Versuche einen anderen Begriff.</div></div></div></div>
+<script>
+(function(){
+const q=document.getElementById('hq'),cnt=document.getElementById('hcount'),none=document.getElementById('hnone');
+const ents=[...document.querySelectorAll('.hent')],secs=[...document.querySelectorAll('.hsec')];
+ents.forEach(e=>{e._h=[...e.querySelectorAll('h3,p')].map(x=>[x,x.innerHTML]);e._t=e.textContent.toLowerCase()+' '+e.closest('.hsec').querySelector('h2').textContent.toLowerCase()});
+const T_HITS={{ _("{0} Treffer")|tojson }};
+function esc(s){return s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}
+function mark(el,html,words){if(!words.length){el.innerHTML=html;return}
+ const re=new RegExp('('+words.map(esc).join('|')+')','gi');
+ el.innerHTML=html.split(/(<[^>]+>)/).map(p=>p.startsWith('<')?p:p.replace(re,'<mark>$1</mark>')).join('')}
+function run(){const words=q.value.toLowerCase().split(/\s+/).filter(Boolean);let n=0;
+ ents.forEach(e=>{const ok=words.every(w=>e._t.includes(w));e.hidden=!ok;if(ok)n++;e._h.forEach(([el,h])=>mark(el,h,ok?words:[]))});
+ secs.forEach(s=>{const vis=[...s.querySelectorAll('.hent')].some(e=>!e.hidden);s.hidden=!vis;const a=document.querySelector('.htoc a[data-s="'+s.id+'"]');if(a)a.hidden=!vis});
+ none.hidden=n>0;cnt.textContent=words.length?T_HITS.replace('{0}',n):'';
+ try{history.replaceState(null,'',words.length?'?q='+encodeURIComponent(q.value):location.pathname+location.hash)}catch(e){}}
+q.addEventListener('input',run);
+const p=new URLSearchParams(location.search).get('q');if(p){q.value=p;run()}
+if(location.hash){const t=document.getElementById(location.hash.slice(1));if(t)setTimeout(()=>t.scrollIntoView(),50)}
+window.hCopy=function(b){const t=b.parentElement.querySelector('code').textContent;const done=()=>{const o=b.textContent;b.textContent='✓';setTimeout(()=>b.textContent=o,1200)};
+ if(navigator.clipboard)navigator.clipboard.writeText(t).then(done).catch(()=>{});else{const a=document.createElement('textarea');a.value=t;document.body.appendChild(a);a.select();document.execCommand('copy');a.remove();done()}}
+})();
+</script>
+{% endblock %}""",
 "users.html": r"""{% extends "base.html" %}{% block title %}Einstellungen{% endblock %}
 {% block actions %}{% if can("users.manage") %}<a class="btn pri" href="/users/new">{{ ICON.plus }} Neuer Benutzer</a>{% endif %}{% endblock %}
 {% block body %}{% include "tabs.html" %}

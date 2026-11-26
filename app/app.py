@@ -35,6 +35,7 @@ import configparser
 import db as dbmod
 import files as filemgr
 import changelog
+import help as helpdoc
 import geoip
 import i18n
 import monitor
@@ -135,6 +136,10 @@ app.jinja_env.globals["UPDATE"] = lambda: update_status() if g.get("user") else 
 notify.VERSION = VERSION
 users.CURRENT_VERSION = VERSION
 app.jinja_env.globals["ICON"] = {k: Markup(v) for k, v in ICONS.items()}
+# Hilfe-Tab: passender Abschnitt zur gerade offenen Einstellungsseite
+app.jinja_env.globals["HELP_ANCHOR"] = {"/settings": "#notify", "/settings/general": "#general", "/settings/access": "#access",
+                                        "/settings/api": "#api", "/settings/backup": "#backup", "/users": "#users",
+                                        "/roles": "#users", "/groups": "#users", "/account": "#account", "/users/log": "#users"}
 app.jinja_env.globals["STATUS"] = {"ok": "OK", "fehler": "Fehler", "laeuft": "läuft",
                                     "gestoppt": "gestoppt", "abgebrochen": "abgebrochen", "freigabe": "Freigabe nötig"}
 
@@ -2327,7 +2332,7 @@ ENDPOINT_PERMS = {
     "job_approve": "jobs.approve", "job_hold_dismiss": "jobs.approve", "job_verify": "jobs.run",
     "job_versions": "jobs.restore", "job_versions_restore": "jobs.restore", "job_versions_download": "jobs.restore",
     "job_usage": "jobs.preview", "stats_page": "jobs.view", "report_send": "notify.edit", "notify_test_all": "notify.edit",
-    "changelog_page": None, "changelog_seen": None,
+    "changelog_page": None, "changelog_seen": None, "help_page": None,
 }
 
 
@@ -6521,6 +6526,28 @@ def changelog_page():
         return {"ok": True, "version": VERSION, "entries": [{"version": e["version"], "date": e["date"], "text": e["md"]} for e in rows]}
     return render_template("changelog.html", items=[dict(e, html=Markup(changelog.to_html(e["md"]))) for e in items],
                            release_url=f"https://github.com/{update.REPO}/releases")
+
+
+def help_base():
+    """Adresse von MirrorSync fuer Beispiele in der Hilfe: oeffentliche Adresse aus den Einstellungen, sonst die aufgerufene."""
+    u = (load_settings().get("public_url") or "").strip()
+    if not u:
+        try:
+            u = request.host_url
+        except RuntimeError:
+            u = ""
+    return u.rstrip("/")
+
+
+@app.get("/help")
+def help_page():
+    data = helpdoc.sections(i18n.t, help_base())
+    for s in data:
+        for e in s["entries"]:
+            e["text"] = Markup(e["text"])
+    if request.headers.get("Accept", "").startswith("application/json"):
+        return {"ok": True, "entries": helpdoc.search(i18n.t, request.args.get("q", ""), help_base(), request.args.get("section"))}
+    return render_template("help.html", sections=data)
 
 
 @app.post("/changelog/seen")
