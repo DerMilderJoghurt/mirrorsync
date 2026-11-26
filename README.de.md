@@ -4,7 +4,7 @@
 
 # MirrorSync – 1:1-Spiegelung mit Web-GUI und Zeitplänen
 
-Version **1.54.0** · Änderungen siehe [CHANGELOG.md](CHANGELOG.md) (englisch) · [English version](README.md)
+Version **1.55.0** · Änderungen siehe [CHANGELOG.md](CHANGELOG.md) (englisch) · [English version](README.md)
 
 Ein Docker-Container, der Ordner **einweg 1:1 spiegelt** (wie FreeFileSync „Spiegeln"):
 Das Ziel wird exakt wie die Quelle, inklusive Löschungen. Als Sync-Motor dient
@@ -57,6 +57,7 @@ Dann `http://<docker-host>:8080` öffnen und den ersten Admin anlegen.
 - **Versionierung**: gelöschte/überschriebene Dateien landen in `<ziel>.versions/<datum>`, optional nur die
   letzten N Versionen bzw. höchstens X Tage behalten (Ältere werden nach jedem Lauf entfernt)
 - **Lösch-Schutz**: Lauf bricht ab, wenn mehr als N Dateien gelöscht würden
+- **Übersichtliche Einstellungen** (seit 1.55.0): Leiste links mit Gruppen und Suchfeld, „Allgemein“ in Bereichen zum Aufklappen, Aufgaben mit Reitern und Zusammenfassung, Speicherorte komplett bearbeitbar (auch umbenennen)
 - **Hilfe mit Suche** (seit 1.54.0): erklärt jede Einstellung, mit Anleitungen für API, MCP, Uptime Kuma und Home Assistant
 - **Ziel verschlüsseln** (seit 1.53.0): Daten liegen auf Server B nur verschlüsselt (rclone crypt), Dateinamen wahlweise auch
 - **Prüflauf nach dem Sync** (seit 1.52.0): vergleicht Quelle und Ziel Datei für Datei und zeigt „1:1 gleich“ oder die Abweichungen
@@ -77,7 +78,7 @@ Geänderte Dateien werden komplett neu übertragen (kein Delta wie bei rsync).
 
 ## Installation
 Das fertige Image liegt in der GitHub Container Registry: `ghcr.io/dermilderjoghurt/mirrorsync`
-(für amd64 und arm64, z. B. Raspberry Pi). Tags: `latest` (neueste Version), `1.54.0` (feste Version),
+(für amd64 und arm64, z. B. Raspberry Pi). Tags: `latest` (neueste Version), `1.55.0` (feste Version),
 `1.40` (neuester Patch dieser Version). Das Image wird nur veröffentlicht, wenn sich die Versionsnummer ändert.
 Update-Prüfer wie Dockhand oder Watchtower melden deshalb nur dann ein Update, wenn es wirklich eine neue Version gibt.
 
@@ -303,6 +304,30 @@ In der Aufgabe unter **Prüfen und schützen**:
   erst, wenn auch der letzte Versuch scheitert.
 - **`.nosync`**: Liegt in einem Ordner der Quelle eine Datei `.nosync`, wird er übersprungen; im Ziel bleibt er
   unberührt (bei neuen Aufgaben an).
+
+## Übersichtliche Einstellungen (seit 1.55.0)
+- **Einstellungen** haben links eine Leiste mit Gruppen statt einer langen Tab-Reihe: **Benutzer & Rechte** (Benutzer,
+  Rollen, Gruppen), **Sicherheit** (Zugriff, API), **System** (Allgemein, Benachrichtigungen, Sicherung) und
+  **Persönlich** (Mein Konto, Hilfe). Es erscheinen nur Seiten, für die man das Recht hat. Am Handy stehen die Seiten
+  als Knöpfe zum Wischen über dem Inhalt.
+- **Suchfeld** über der Leiste: springt direkt zur passenden Einstellung (z. B. „2FA“, „Bandbreite“, „Passkeys“),
+  öffnet den Bereich und hebt ihn kurz hervor. `/` springt ins Suchfeld, Pfeiltasten und Enter wählen. Findet sie
+  nichts, geht es mit einem Klick in die Hilfe.
+- **Allgemein** in Bereichen zum Auf- und Zuklappen: Oberfläche, Updates und Neustart, Überwachung, Logs, Anmeldung und
+  Sicherheit, Leistung. Der Browser merkt sich, welche offen sind.
+- **Aufgabe bearbeiten** mit Reitern: Grundlagen, Filter, Verhalten, Prüfen & schützen, Benachrichtigungen, Erweitert.
+  Abzeichen zeigen, wo etwas eingestellt ist („3 Regeln“, „2 aktiv“), „Alle anzeigen“ zeigt alles untereinander.
+  Oben steht immer eine Zusammenfassung (Quelle → Ziel, Start, Papierkorb, Prüflauf, Löschwarnung …). Die Leiste mit
+  **Speichern** bleibt unten stehen; **Speichern und testen** startet danach gleich einen Testlauf.
+- **Speicherort bearbeiten**: alles änderbar, aufgeteilt in Verbindung, Anmeldedaten, Erweiterte Optionen (mit Suche
+  und „nur gesetzte anzeigen“) und Sichtbar für. Der **Name lässt sich ändern**, Aufgaben und darauf aufbauende
+  Speicherorte werden mit umgestellt. Geleerte Felder werden entfernt, ein gespeichertes Passwort lässt sich
+  entfernen. Unter **Alle Einträge (rclone.conf)** stehen alle gespeicherten Einträge als Text zum Bearbeiten
+  (Passwörter als `••••••`). **Speichern und Verbindung testen** prüft gleich danach.
+- **Meldungen** oben auf der Seite (z. B. „Aufgabe entfernt.“) lassen sich mit **×** wegklicken.
+- API/MCP: `GET /api/v1/settings/search?q=…` bzw. `find_setting` findet eine Einstellung mit Link;
+  `update_remote` kann mit `new_name` umbenennen, mit `clear` Optionen entfernen und mit `raw` alle Einträge setzen,
+  `get_remote` liefert `raw`.
 
 ## Hilfe (seit 1.54.0)
 Unter **Einstellungen → ❓ Hilfe** (und über den Knopf **❓ Hilfe** in jeder Aufgabe) erklärt MirrorSync alles, was

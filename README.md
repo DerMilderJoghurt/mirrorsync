@@ -4,7 +4,7 @@
 
 # MirrorSync – 1:1 mirroring with a web GUI and schedules
 
-Version **1.54.0** · Changes: [CHANGELOG.md](CHANGELOG.md) · [Deutsche Version](README.de.md)
+Version **1.55.0** · Changes: [CHANGELOG.md](CHANGELOG.md) · [Deutsche Version](README.de.md)
 
 A Docker container that **mirrors folders one-way, 1:1** (like FreeFileSync "Mirror"):
 the destination becomes an exact copy of the source, including deletions. The sync engine is
@@ -56,6 +56,7 @@ Then open `http://<docker-host>:8080` and create the first admin.
 - **Versioning**: deleted/overwritten files go to `<destination>.versions/<date>`, optionally keep only the
   last N versions or at most X days (older ones are removed after each run)
 - **Deletion protection**: the run aborts if more than N files would be deleted
+- **Clearer settings** (since 1.55.0): bar on the left with groups and a search field, "General" in expandable sections, jobs with tabs and a summary, storage fully editable (including rename)
 - **Help with search** (since 1.54.0): explains every setting, with guides for API, MCP, Uptime Kuma and Home Assistant
 - **Encrypt the destination** (since 1.53.0): data on server B is stored only encrypted (rclone crypt), optionally file names too
 - **Verification after the sync** (since 1.52.0): compares source and destination file by file and shows "1:1 identical" or the differences
@@ -76,7 +77,7 @@ Changed files are transferred completely (no delta transfer like rsync).
 
 ## Installation
 The ready-made image is in the GitHub Container Registry: `ghcr.io/dermilderjoghurt/mirrorsync`
-(for amd64 and arm64, e.g. Raspberry Pi). Tags: `latest` (newest version), `1.54.0` (fixed version),
+(for amd64 and arm64, e.g. Raspberry Pi). Tags: `latest` (newest version), `1.55.0` (fixed version),
 `1.40` (newest patch of this version). The image is only published when the version number changes, so
 update checkers such as Dockhand or Watchtower only report an update when there really is a new version.
 
@@ -297,6 +298,28 @@ In the job under **Verify and protect**:
   the last attempt fails as well.
 - **`.nosync`**: if a source folder contains a file `.nosync`, it is skipped; it stays untouched in the destination
   (on for new jobs).
+
+## Clearer settings (since 1.55.0)
+- **Settings** have a bar on the left with groups instead of a long row of tabs: **Users & permissions** (users, roles,
+  groups), **Security** (access, API), **System** (general, notifications, backup) and **Personal** (my account,
+  help). Only pages you have the permission for are shown. On phones the pages appear as swipeable buttons above the
+  content.
+- **Search field** above the bar: jumps straight to the matching setting (e.g. "2FA", "bandwidth", "passkeys"), opens
+  its section and highlights it briefly. `/` jumps into the search field, arrow keys and Enter pick a result. Without a
+  match, one click takes you to the help.
+- **General** in expandable sections: Interface, Updates and restart, Monitoring, Logs, Sign-in and security,
+  Performance. The browser remembers which ones are open.
+- **Editing a job** with tabs: Basics, Filter, Behaviour, Verify & protect, Notifications, Advanced. Badges show where
+  something is set ("3 rules", "2 active"), "Show all" shows everything one below the other. A summary at the top
+  always shows source → destination, start, recycle bin, verification, delete warning and more. The bar with **Save**
+  stays at the bottom; **Save and test** starts a dry run right after saving.
+- **Editing storage**: everything editable, split into Connection, Credentials, Advanced options (with search and "show
+  set only") and Visible to. The **name can be changed**; jobs and storages built on top of it are updated too.
+  Emptied fields are removed, a saved password can be removed. **All entries (rclone.conf)** shows every saved entry
+  as editable text (passwords as `••••••`). **Save and test connection** checks right after saving.
+- **Messages** at the top of the page (e.g. "Job removed.") can be dismissed with **×**.
+- API/MCP: `GET /api/v1/settings/search?q=…` / `find_setting` finds a setting with a link; `update_remote` can rename
+  with `new_name`, remove options with `clear` and set all entries with `raw`; `get_remote` returns `raw`.
 
 ## Help (since 1.54.0)
 Under **Settings → ❓ Help** (and via the **❓ Help** button in every job) MirrorSync explains everything you can set:
@@ -1085,7 +1108,7 @@ MirrorSync can update itself if you mount the Docker socket into the container:
   previous one runs again. Result and steps are shown in the GUI, in the audit log ("Update started / completed /
   failed") and in `config/selfupdate.json`.
 - **Requirements:** the image has to come from a registry (`image: ghcr.io/dermilderjoghurt/mirrorsync:latest`).
-  MirrorSync cannot pull images built with `build: .`. With a fixed version tag (`:1.54.0`) only that tag is pulled
+  MirrorSync cannot pull images built with `build: .`. With a fixed version tag (`:1.55.0`) only that tag is pulled
   again. `/config` has to be a volume or bind mount (it is in the example compose file).
 - **Permission:** `system.update` ("Update MirrorSync", admins have it automatically). Changing the automatic
   update and its time needs `system.settings`.

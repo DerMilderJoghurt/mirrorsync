@@ -3,6 +3,40 @@
 Version numbers follow [SemVer](https://semver.org/): MAJOR.MINOR.PATCH
 (MAJOR = incompatible change, MINOR = new feature, PATCH = bug fix).
 
+## 1.55.0 – 2026-11-26
+**Clearer settings**
+- **Settings** with a bar on the left instead of ten tabs side by side, in four groups: **Users & permissions** (users,
+  roles, groups), **Security** (access, API), **System** (general, notifications, backup) and **Personal** (my account,
+  help). As before, only pages you have the permission for are shown. On phones the pages appear as swipeable buttons
+  above the content.
+- **Search field** for the settings: jumps straight to the matching setting (e.g. "2FA", "bandwidth", "passkeys"),
+  expands its section and highlights it briefly; `/` jumps into the search field. Without a match it goes to the help.
+- **General** split into expandable sections: Interface, Updates and restart, Monitoring, Logs, Sign-in and security,
+  Performance. "Expand all" and "Collapse all"; the browser remembers which sections are open.
+
+**Editing a job**
+- **Tabs** instead of one long page: Basics, Filter, Behaviour, Verify & protect, Notifications, Advanced. Badges show
+  where something is set ("3 rules", "2 active"), "Show all" shows everything one below the other. If a required
+  field in another tab is missing, the form jumps there.
+- **Summary** at the top: source → destination, start, recycle bin, verification, delete warning, encryption, time
+  window.
+- The **save bar** stays at the bottom while scrolling. New: **Save and test** saves and immediately starts a dry run
+  (requires `jobs.run`).
+
+**Editing storage**
+- Split into **Connection**, **Credentials**, **Advanced options** and **Visible to**, fields in two columns.
+- **Everything editable**: the **name can be changed**; jobs (source, destination, SSH host) and storages built on top
+  of it (e.g. encryption) are updated too. Emptied fields are removed (the default then applies), a saved password
+  can be **removed**.
+- **All entries (rclone.conf)**: all saved entries as text, including those without their own field; passwords appear
+  as `••••••` and are kept, new ones are stored obscured.
+- Advanced options with **search** and "show set only"; **Save and test connection**.
+
+**Other**
+- **Messages** at the top of the page (e.g. "Job "rr" removed.") can be dismissed with **×**.
+- API and MCP: new `GET /api/v1/settings/search` / `find_setting` (find a setting, with link); `update_remote` with
+  `new_name`, `clear` and `raw`; `get_remote` returns `raw`. Help and all texts in five languages.
+
 ## 1.54.0 – 2026-11-26
 **Help**
 - New **Help** (tab "❓ Help" in the settings, button "❓ Help" in every job): explains everything you can set in

@@ -51,6 +51,7 @@ import msgtpl
 import notify
 import passkeys
 import roles
+import settingsnav
 import users
 from markupsafe import Markup
 
@@ -140,6 +141,9 @@ app.jinja_env.globals["ICON"] = {k: Markup(v) for k, v in ICONS.items()}
 app.jinja_env.globals["HELP_ANCHOR"] = {"/settings": "#notify", "/settings/general": "#general", "/settings/access": "#access",
                                         "/settings/api": "#api", "/settings/backup": "#backup", "/users": "#users",
                                         "/roles": "#users", "/groups": "#users", "/account": "#account", "/users/log": "#users"}
+# Einstellungen: Leiste links mit Gruppen und Suchindex (nur erlaubte Seiten)
+app.jinja_env.globals["SETTINGS_NAV"] = lambda: settingsnav.nav(request.path, can, g.get("role") == "admin")
+app.jinja_env.globals["SETTINGS_INDEX"] = lambda: settingsnav.index(can, g.get("role") == "admin")
 app.jinja_env.globals["STATUS"] = {"ok": "OK", "fehler": "Fehler", "laeuft": "läuft",
                                     "gestoppt": "gestoppt", "abgebrochen": "abgebrochen", "freigabe": "Freigabe nötig"}
 
@@ -3889,6 +3893,10 @@ def edit_job(job_id=None):
             new_id, error = save_job_with_crypt(job_id, job)
         if not error:
             schedule_all()
+            if request.form.get("after") == "dryrun" and can("jobs.run") and new_id:
+                # „Speichern und testen“: gleich einen Testlauf starten und das Log zeigen
+                start_job(new_id, dry_run=True, by=g.user or "Web", manual=True)
+                return redirect(url_for("show_log", job_id=new_id))
             return redirect(url_for("index"))
     remotes = [r for r in list_remotes() if g.access.remote_ok(r["name"])]
     settings = load_settings()
@@ -4436,6 +4444,13 @@ def remotes():
     return render_remotes()
 
 
+def _remote_saved(name, msg):
+    """Nach dem Speichern: Meldung zeigen oder bei „Speichern und Verbindung testen“ gleich testen."""
+    if request.form.get("after") == "test" and can("remotes.test"):
+        return test_remote(name)
+    return render_remotes(msg=msg)
+
+
 @app.route("/remotes/new", methods=["GET", "POST"])
 @app.route("/remotes/<name>/edit", methods=["GET", "POST"])
 def edit_remote(name=None):
@@ -4444,13 +4459,14 @@ def edit_remote(name=None):
         abort(404)
     if request.method == "POST":
         f = request.form
-        new_name = name or f.get("name", "").strip()
+        new_name = (f.get("name") or name or "").strip() if name else f.get("name", "").strip()
         typ = f.get("type", "") if (not existing or f.get("type")) else existing["type"]
+        rename_to = new_name if name and new_name and new_name != name else None
         type_changed = bool(existing) and typ != existing["type"]
         err = None
         if not new_name or not new_name.replace("-", "").replace("_", "").isalnum():
             err = "Name nur aus Buchstaben, Ziffern, - und _."
-        elif not name and any(r["name"] == new_name for r in list_remotes()):
+        elif (not name or rename_to) and (any(r["name"] == new_name for r in list_remotes()) or new_name in crypt_hidden()):
             err = f"Ein Speicherort '{new_name}' existiert schon."
         elif (not name or type_changed) and typ not in {p["name"] for p in providers()}:
             err = "Unbekannter Typ."
@@ -4461,17 +4477,40 @@ def edit_remote(name=None):
             err = "Mit dieser Auswahl unter „Sichtbar für“ würdest du den Speicherort selbst nicht mehr sehen."
         if err:
             return render_template("remote_edit.html", name=name, existing=_safe(existing), err=err,
-                                   providers=providers_tr(), form=f, vis=vis, vis_opts=vis_options())
+                                   providers=providers_tr(), form=f, vis=vis, vis_opts=vis_options(),
+                                   raw=remote_raw_view(name) if name else "")
+        if rename_to:
+            # Umbenennen: Aufgaben und Verweise ziehen mit, danach wie gewohnt unter dem neuen Namen speichern
+            err = rename_remote_data(name, rename_to)
+            if err:
+                return render_template("remote_edit.html", name=name, existing=_safe(existing), err=i18n.t(err),
+                                       providers=providers_tr(), form=f, vis=vis, vis_opts=vis_options(),
+                                       raw=remote_raw_view(name))
+            name = rename_to
+        renamed = i18n.t("Umbenannt in „{0}“, Aufgaben mit diesem Speicherort wurden umgestellt.", name) + " " if rename_to else ""
         meta = DB.get_map("remote_meta")
         if vis == "all":
             meta.pop(new_name, None)
         else:
             meta[new_name] = dict(meta.get(new_name) or {}, visible_to=vis)
         DB.put_map("remote_meta", meta)
-        params = []
+        raw = f.get("raw_conf")
+        if name and raw is not None and raw.replace("\r", "").strip() != (f.get("raw_orig") or "").replace("\r", "").strip():
+            # Rohansicht geaendert: dieser Text gilt, die Felder oben werden nicht verwendet
+            err = remote_apply_raw(name, raw)
+            if err:
+                return render_template("remote_edit.html", name=name, existing=_safe(remote_config(name)), err=i18n.t(err),
+                                       providers=providers_tr(), form=f, vis=vis, vis_opts=vis_options(), raw=raw)
+            return _remote_saved(name, renamed + i18n.t("Speicherort '{0}' gespeichert. Jetzt mit „Testen“ prüfen.", name))
+        params, cleared = [], []
         for key, val in f.items():
             if key.startswith("opt_") and val.strip() != "":
                 params.append(f"{key[4:]}={val.strip()}")
+            elif key.startswith("opt_") and name and not type_changed and existing and key[4:] in existing \
+                    and key[4:] not in remote_secret_keys(existing.get("type")):
+                cleared.append(key[4:])   # Feld geleert: Option entfernen (rclone nimmt dann den Standard)
+        if name and not type_changed:
+            cleared += [k for k in f.getlist("clear_opt") if existing and k in existing]
         if name and type_changed:
             # Protokoll gewechselt: Speicherort mit dem neuen Typ neu anlegen, alter Abschnitt als Sicherung
             with _conf_lock:
@@ -4488,13 +4527,20 @@ def edit_remote(name=None):
                                        err=i18n.t("Wechsel auf {0} fehlgeschlagen, der Speicherort bleibt wie er war: {1}", typ, err))
             return _after_step(name, q, err, i18n.t("Speicherort '{0}' auf {1} umgestellt. Jetzt mit „Testen“ prüfen.", name, typ))
         if name:
-            q, err = _config_step(["config", "update", name, *params, "--obscure"])
+            q, err = _config_step(["config", "update", name, *params, "--obscure"]) if params else (None, None)
+            if not err and cleared:
+                remote_remove_keys(name, cleared)
+            if not q and not err:
+                return _remote_saved(name, renamed + i18n.t("Speicherort '{0}' gespeichert. Jetzt mit „Testen“ prüfen.", name))
         else:
             q, err = _config_step(["config", "create", new_name, typ, *params, "--obscure"])
         return _after_step(new_name, q, err, f"Speicherort '{new_name}' gespeichert. Jetzt mit „Testen“ prüfen.")
     return render_template("remote_edit.html", name=name, existing=_safe(existing), err=None,
                            providers=providers_tr(), form={}, vis=remote_vis_map().get(name, "all") if name else "all",
-                           vis_opts=vis_options())
+                           vis_opts=vis_options(), raw=remote_raw_view(name) if name else "",
+                           secrets_set=sorted(k for k, v in (existing or {}).items() if v and k in remote_secret_keys(existing.get("type"))) if name else [],
+                           used_by=[j["name"] for j in load_jobs().values()
+                                    if name and any(str(j.get(k) or "").startswith(name + ":") for k in ("source", "dest"))])
 
 
 _conf_lock = threading.Lock()
@@ -4508,6 +4554,149 @@ def _conf_section(name):
         return None
     m = re.search(r"(?ms)^\[" + re.escape(name) + r"\][ \t]*\n(.*?)(?=^\[|\Z)", text)
     return m.group(1) if m else None
+
+
+SECRET_MASK = "••••••"   # steht in der Rohansicht statt gespeicherter Passwoerter und Tokens
+
+
+def _conf_pairs(body):
+    """Zeilen 'schluessel = wert' eines Abschnitts als Liste [(k, v)], Reihenfolge bleibt."""
+    out = []
+    for line in (body or "").splitlines():
+        if "=" in line and not line.lstrip().startswith(("#", ";")):
+            k, v = line.split("=", 1)
+            out.append((k.strip(), v.strip()))
+    return out
+
+
+def _conf_replace_section(name, body, new_name=None):
+    """Abschnitt [name] in rclone.conf durch body ersetzen (optional mit neuem Namen). Aufrufer haelt _conf_lock."""
+    text = open(RCLONE_CONF, encoding="utf-8").read()
+    rx = re.compile(r"(?ms)^\[" + re.escape(name) + r"\][ \t]*\n(.*?)(?=^\[|\Z)")
+    m = rx.search(text)
+    if not m:
+        return False
+    block = f"[{new_name or name}]\n{body.rstrip()}\n\n"
+    text = text[:m.start()] + block + text[m.end():]
+    tmp = RCLONE_CONF + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as fh:
+        fh.write(text.rstrip() + "\n")
+    os.replace(tmp, RCLONE_CONF)
+    return True
+
+
+def remote_secret_keys(typ):
+    prov = next((p for p in providers() if p["name"] == typ), {"options": []})
+    return {o["Name"] for o in prov["options"] if o["IsPassword"]} | {"token"}
+
+
+def remote_raw_view(name):
+    """Alle gespeicherten Eintraege eines Speicherorts als Text, Passwoerter und Tokens durch SECRET_MASK ersetzt."""
+    pairs = _conf_pairs(_conf_section(name))
+    typ = dict(pairs).get("type", "")
+    sec = remote_secret_keys(typ)
+    return "\n".join(f"{k} = {SECRET_MASK if k in sec and v else v}" for k, v in pairs)
+
+
+def remote_remove_keys(name, keys):
+    """Optionen ganz entfernen (z. B. geleerte Felder, Passwort entfernen). Liefert die entfernten Schluessel."""
+    keys = {k for k in keys if k and k != "type"}
+    if not keys:
+        return []
+    with _conf_lock:
+        pairs = _conf_pairs(_conf_section(name))
+        gone = [k for k, _ in pairs if k in keys]
+        if gone:
+            _conf_replace_section(name, "\n".join(f"{k} = {v}" for k, v in pairs if k not in keys))
+    return gone
+
+
+def remote_apply_raw(name, raw):
+    """Rohansicht uebernehmen. Passwoerter mit SECRET_MASK bleiben, neue werden verschleiert. Fehlertext oder None."""
+    pairs, seen = [], set()
+    for n, line in enumerate((raw or "").replace("\r", "").split("\n"), 1):
+        if not line.strip() or line.lstrip().startswith(("#", ";")):
+            continue
+        if "=" not in line:
+            return i18n.t("Zeile {0}: erwartet wird schluessel = wert.", n)
+        k, v = (x.strip() for x in line.split("=", 1))
+        if not re.fullmatch(r"[a-z0-9_]+", k):
+            return i18n.t("Zeile {0}: ungültiger Schlüssel „{1}“.", n, k)
+        if k in seen:
+            return i18n.t("Zeile {0}: „{1}“ steht doppelt.", n, k)
+        seen.add(k)
+        pairs.append((k, v))
+    d = dict(pairs)
+    if d.get("type") not in {p["name"] for p in providers()}:
+        return "Unbekannter Typ."
+    with _conf_lock:
+        old = dict(_conf_pairs(_conf_section(name)))
+        sec = remote_secret_keys(d["type"])
+        out = []
+        for k, v in pairs:
+            if k in sec and v == SECRET_MASK:
+                if k not in old:
+                    continue
+                v = old[k]
+            elif k in sec and v and k != "token":
+                rc, ob = rclone("obscure", v, timeout=15)
+                if rc != 0:
+                    return i18n.t("Passwort für {0} ließ sich nicht verschleiern.", k)
+                v = ob.strip()
+            out.append((k, v))
+        if not _conf_replace_section(name, "\n".join(f"{k} = {v}" for k, v in out)):
+            return i18n.t("Speicherort '{0}' nicht gefunden.", name)
+    return None
+
+
+_REMOTE_HOST_KEYS = ("script_host", "snapshot_host", "wol_sleep_host")
+
+
+def rename_remote_data(old, new):
+    """Speicherort umbenennen: Abschnitt in rclone.conf, Verweise anderer Speicherorte (crypt, alias, union),
+    Quelle/Ziel und SSH-Hosts aller Aufgaben sowie „Sichtbar für“. Fehlertext oder None."""
+    new = (new or "").strip()
+    if not valid_remote_name(new):
+        return "Name nur aus Buchstaben, Ziffern, - und _."
+    if any(r["name"] == new for r in list_remotes()) or new in crypt_hidden():
+        return i18n.t("Ein Speicherort '{0}' existiert schon.", new)
+    ref = re.compile(r"(?<![\w-])" + re.escape(old) + ":")
+    with _conf_lock:
+        body = _conf_section(old)
+        if body is None:
+            return i18n.t("Speicherort '{0}' nicht gefunden.", old)
+        _conf_replace_section(old, body, new_name=new)
+        # Verweise in anderen Abschnitten (remote = NAS:pfad, upstreams = NAS:a NAS:b)
+        text = open(RCLONE_CONF, encoding="utf-8").read()
+        lines = []
+        for line in text.split("\n"):
+            m = re.match(r"^(\s*(?:remote|upstreams)\s*=\s*)(.*)$", line)
+            lines.append(m.group(1) + ref.sub(new + ":", m.group(2)) if m else line)
+        with open(RCLONE_CONF + ".tmp", "w", encoding="utf-8") as fh:
+            fh.write("\n".join(lines))
+        os.replace(RCLONE_CONF + ".tmp", RCLONE_CONF)
+    with _lock:
+        jobs = load_jobs()
+        changed = False
+        for j in jobs.values():
+            for k in ("source", "dest"):
+                v = j.get(k)
+                if isinstance(v, str) and v.startswith(old + ":"):
+                    j[k] = new + v[len(old):]
+                    changed = True
+            for k in _REMOTE_HOST_KEYS:
+                if j.get(k) == old:
+                    j[k] = new
+                    changed = True
+        if changed:
+            save_jobs(jobs)
+    meta = DB.get_map("remote_meta")
+    if old in meta:
+        meta[new] = meta.pop(old)
+        DB.put_map("remote_meta", meta)
+    if old in _pending:
+        _pending[new] = _pending.pop(old)
+    return None
 
 
 def valid_remote_name(n):

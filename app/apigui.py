@@ -191,7 +191,8 @@ def _remote_view(name):
     q = core._pending.get(name)
     return {"name": name, "type": conf.get("type"),
             "options": {k: v for k, v in conf.items() if k not in sec and k != "type"},
-            "secrets_set": sorted(k for k in conf if k in sec),
+            "secrets_set": sorted(k for k in conf if k in sec and conf[k]),
+            "raw": core.remote_raw_view(name),
             "visible_to": core.remote_vis_map().get(name, "all"),
             "pending_question": _question(q)}
 
@@ -269,16 +270,35 @@ def a_create_remote(a):
         "Optionen eines Speicherorts ändern (nur die angegebenen; Passwörter nur setzen) und/oder visible_to. Mit type "
         "wird das Protokoll gewechselt (z. B. smb → sftp): Der Speicherort wird mit dem neuen Typ neu eingerichtet, dafür "
         "alle nötigen options inklusive Passwort angeben. Schlägt das fehl, bleibt der alte Stand erhalten.",
-        {"name": S(STR), "type": S(STR, "neues Protokoll (optional)"), "options": {"type": "object"}, "visible_to": VIS_PROP}, ["name"])
+        {"name": S(STR), "type": S(STR, "neues Protokoll (optional)"), "options": {"type": "object"}, "visible_to": VIS_PROP,
+         "new_name": S(STR, "umbenennen; Aufgaben, die den Speicherort verwenden, werden mit umgestellt"),
+         "clear": {"type": "array", "items": {"type": "string"}, "description": "Optionen ganz entfernen (auch Passwörter), dann gilt der Standard"},
+         "raw": S(STR, "alle Einträge als Text 'schluessel = wert' je Zeile (wie raw aus get_remote); ersetzt die Optionen komplett, •••••• behält ein gespeichertes Passwort")},
+        ["name"])
 def a_update_remote(a):
-    _check_keys(a, ("name", "type", "options", "visible_to"))
+    _check_keys(a, ("name", "type", "options", "visible_to", "new_name", "clear", "raw"))
     name = a["name"]
     _remote_view(name)
     form = {f"opt_{k}": ("true" if v is True else "false" if v is False else str(v)) for k, v in (a.get("options") or {}).items()}
     if a.get("type"):
         form["type"] = str(a["type"])
+    if a.get("new_name"):
+        form["name"] = str(a["new_name"]).strip()
+    if a.get("clear"):
+        if not isinstance(a["clear"], list):
+            raise ApiError(400, _t("clear muss eine Liste sein."))
+        form["clear_opt"] = [str(x) for x in a["clear"]]
+        for k in a["clear"]:
+            form.setdefault(f"opt_{k}", "")
+    if a.get("raw") is not None:
+        form["raw_conf"] = str(a["raw"])
+        form["raw_orig"] = core.remote_raw_view(name)
     _vis_form(form, a["visible_to"] if "visible_to" in a else core.remote_vis_map().get(name, "all"))
-    return _remote_result(gui("POST", f"/remotes/{name}/edit", form=form), name)
+    new = form.get("name") or name
+    res = _remote_result(gui("POST", f"/remotes/{name}/edit", form=form), new)
+    if new != name:
+        res["renamed_from"] = name
+    return res
 
 
 @action("duplicate_remote", "POST", "/remotes/{name}/duplicate", "remotes.create", "Speicherorte",
@@ -2056,6 +2076,22 @@ def a_get_changelog(a):
 def a_get_help(a):
     entries = core.helpdoc.search(core.i18n.t, a.get("q") or "", core.help_base(), a.get("section") or None)
     return {"count": len(entries), "sections": [s[0] for s in core.helpdoc.SECTIONS], "entries": entries}
+
+
+@action("find_setting", "GET", "/settings/search", None, "System",
+        "Einstellung finden: sagt, auf welcher Seite der Einstellungen etwas steht, mit direktem Link (z. B. "
+        "„Löschwarnung“, „2FA erzwingen“, „Bandbreite“). Zeigt nur Seiten, die der Key sehen darf. Ohne q alle Einträge.",
+        {"q": S(STR, "Suchbegriffe, z. B. Passkeys")}, ro=True)
+def a_find_setting(a):
+    base = core.help_base()
+    if (a.get("q") or "").strip():
+        res = core.settingsnav.search(a["q"], core.can, g.role == "admin")
+    else:
+        res = [{"label": e["label"], "page": e["page"], "url": e["url"]}
+               for e in core.settingsnav.index(core.can, g.role == "admin")]
+    for e in res:
+        e["link"] = base + e["url"]
+    return {"count": len(res), "results": res}
 
 
 @action("send_report", "POST", "/settings/report/send", "notify.edit", "Benachrichtigungen",

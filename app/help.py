@@ -23,8 +23,26 @@ SECTIONS = [
         ("Hilfe durchsuchen",
          "Gib oben einen Begriff ein, z. B. „Löschwarnung“, „Cron“ oder „Uptime Kuma“. Die Hilfe zeigt alle passenden "
          "Einträge. Über **❓ Hilfe** in den Einstellungen und in der Aufgabe kommst du jederzeit hierher."),
+        ("Einstellungen finden",
+         "Die Einstellungen haben links eine Leiste mit vier Gruppen: **Benutzer & Rechte** (Benutzer, Rollen, Gruppen), "
+         "**Sicherheit** (Zugriff, API), **System** (Allgemein, Benachrichtigungen, Sicherung) und **Persönlich** (Mein "
+         "Konto, Hilfe). Das **Suchfeld** darüber springt direkt zur passenden Einstellung, z. B. „2FA“, „Bandbreite“ "
+         "oder „Passkeys“; mit `/` springst du ins Suchfeld, mit den Pfeiltasten und Enter wählst du einen Treffer. Am "
+         "Handy stehen die Seiten als Knöpfe zum Wischen über dem Inhalt."),
+        ("Meldungen wegklicken",
+         "Meldungen wie „Aufgabe entfernt.“ oder „Gespeichert“ oben auf der Seite lassen sich mit dem **×** rechts "
+         "schließen."),
     ]),
     ("job", "📋", "Aufgabe: Art, Quelle und Ziel", "/job/new", [
+        ("Reiter und Zusammenfassung",
+         "Die Aufgabe ist in Reiter aufgeteilt: **Grundlagen** (Art, Quelle und Ziel, Start), **Filter** (Ausschlüsse), "
+         "**Verhalten** (Optionen, Bandbreite, Zeitfenster), **Prüfen & schützen** (mit Verschlüsselung), "
+         "**Benachrichtigungen** und **Erweitert** (Skripte, Snapshot, Wake-on-LAN, Sichtbar für). Ein Abzeichen am "
+         "Reiter zeigt, ob dort etwas eingestellt ist, z. B. „3 Regeln“ oder „2 aktiv“. „Alle anzeigen“ zeigt alles "
+         "untereinander. Oben steht immer eine Zusammenfassung mit Quelle, Ziel, Start und den wichtigsten Schutzfunktionen."),
+        ("Speichern und testen",
+         "Die Leiste mit **Speichern** bleibt beim Scrollen unten. **Speichern und testen** speichert und startet gleich "
+         "einen Testlauf (es wird nichts kopiert oder gelöscht); danach siehst du das Log. Braucht das Recht `jobs.run`."),
         ("Name", "Frei wählbarer Name der Aufgabe. Er erscheint in der Übersicht, in Benachrichtigungen und im Health-Check."),
         ("Spiegeln (Einweg)",
          "Das Ziel wird an die Quelle angeglichen: Neues und Geändertes wird kopiert, was in der Quelle fehlt, wird im "
@@ -193,7 +211,22 @@ SECTIONS = [
          "Der Name darf nur Buchstaben, Ziffern, - und _ enthalten."),
         ("Testen", "Prüft die Verbindung und listet die oberste Ebene."),
         ("Bearbeiten und neu anmelden",
-         "Zugangsdaten ändern oder bei abgelaufener Cloud-Anmeldung neu anmelden. Passwörter werden nie angezeigt."),
+         "Beim Bearbeiten ist alles änderbar, aufgeteilt in **Verbindung**, **Anmeldedaten**, **Erweiterte Optionen** und "
+         "**Sichtbar für**. Bei abgelaufener Cloud-Anmeldung über **Anmelden** neu anmelden. Passwörter werden nie "
+         "angezeigt: leer lassen behält sie, **gespeichertes Passwort entfernen** löscht sie. Ein geleertes Feld wird "
+         "entfernt, dann gilt der Standard von rclone."),
+        ("Umbenennen",
+         "Den Namen einfach im Feld ändern. Aufgaben, die den Speicherort als Quelle, Ziel oder SSH-Host verwenden, und "
+         "andere Speicherorte, die darauf aufbauen (z. B. Verschlüsselung), werden automatisch auf den neuen Namen "
+         "umgestellt."),
+        ("Erweiterte Optionen durchsuchen",
+         "Die Suche findet Optionen nach Name und Beschreibung (z. B. „timeout“), „nur gesetzte anzeigen“ blendet alles "
+         "aus, was auf dem Standard steht."),
+        ("Alle Einträge (rclone.conf)",
+         "Für Profis: alle gespeicherten Einträge des Speicherorts als Text `schluessel = wert`, auch solche ohne eigenes "
+         "Feld. Wird der Text geändert, gilt beim Speichern dieser Text statt der Felder. Gespeicherte Passwörter stehen "
+         "als `••••••` da und bleiben so erhalten; ein neu eingetipptes Passwort wird verschleiert gespeichert."),
+        ("Speichern und Verbindung testen", "Speichert und prüft gleich danach die Verbindung."),
         ("Duplizieren", "Kopie mit denselben Zugangsdaten unter neuem Namen, z. B. für ein anderes Protokoll."),
         ("Sichtbar für",
          "Wer den Speicherort sehen und in Aufgaben verwenden darf. Rollen können zusätzlich auf einzelne Speicherorte "
@@ -238,6 +271,11 @@ SECTIONS = [
         ("Sprache",
          "Standardsprache für neue Benutzer, die Anmeldeseite, Berichte und die API. Jeder Benutzer stellt seine eigene "
          "unter Mein Konto ein."),
+        ("Bereiche zum Aufklappen",
+         "Allgemein ist in Bereiche aufgeteilt, die sich auf- und zuklappen lassen: **Oberfläche** (Sprache, "
+         "Dateimanager), **Updates und Neustart**, **Überwachung** (Health, Prometheus, Datenvolumen), **Logs**, "
+         "**Anmeldung und Sicherheit** (Kontosperre, 2FA, Reverse-Proxy, Passkeys, Länder-Datenbank) und **Leistung** "
+         "(Bandbreite). MirrorSync merkt sich im Browser, welche Bereiche offen sind."),
         ("Dateimanager: Tempo", "Wie schnell Kopieren und Verschieben im Dateimanager laufen."),
         ("Updates",
          "Regelmäßig nach neuen Versionen suchen und optional benachrichtigen. Der Hinweis erscheint unten in der "
@@ -349,6 +387,11 @@ SECTIONS = [
         ("Sprache und Sicherheit",
          "Sprache der Antworten mit `?lang=de|en|es|fr|it` oder am Key. Geheimnisse (Passwörter, Tokens) lassen sich nur "
          "schreiben, nie lesen. Alles steht im Audit-Log als `API:<Name>`."),
+        ("Einstellung finden und Speicherort umbenennen",
+         "`GET /api/v1/settings/search?q=…` (MCP-Tool `find_setting`) sagt, auf welcher Seite eine Einstellung steht, "
+         "mit direktem Link. `PATCH /api/v1/remotes/<name>` (`update_remote`) kann mit `new_name` umbenennen, mit "
+         "`clear` Optionen entfernen und mit `raw` alle Einträge auf einmal setzen (wie `raw` aus `get_remote`).",
+         "curl -s -H \"Authorization: Bearer msk_…\" \"{base}/api/v1/settings/search?q=2fa\""),
     ]),
     ("mcp", "🤖", "MCP einrichten (Claude, n8n und andere)", "/settings/api", [
         ("MCP-Server",

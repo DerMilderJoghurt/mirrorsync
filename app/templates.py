@@ -129,7 +129,7 @@ body.fb-open .fbpanel{transform:none}.fbshade{display:none}
 .badge{display:inline-grid;place-items:center;min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--err);color:#fff;font-size:11px;font-weight:700;margin-left:auto}
 .tabs .badge{margin-left:6px}tr.new td{background:var(--err-soft)}
 .num{font-variant-numeric:tabular-nums}.num.err{color:var(--err);font-weight:600}
-.msg{padding:11px 14px;border-radius:10px;margin-bottom:14px;white-space:pre-wrap;border:1px solid}
+.msg{padding:11px 14px;border-radius:10px;margin-bottom:14px;white-space:pre-wrap;border:1px solid}.msg.flash{position:relative;padding-right:40px}.msgx{position:absolute;top:6px;right:6px;width:28px;height:28px;border:0;border-radius:7px;background:transparent;color:inherit;font-size:20px;line-height:1;cursor:pointer;opacity:.6}.msgx:hover{opacity:1;background:rgba(0,0,0,.07)}
 .msg.ok{border-color:var(--ok);background:var(--ok-soft);color:var(--fg)}.msg.err{border-color:var(--err);background:var(--err-soft);color:var(--fg)}
 .msg.info{border-color:var(--bd2);background:var(--acc-soft);color:var(--fg)}
 .browse{border:1px solid var(--bd);border-radius:8px;margin-top:6px;max-height:230px;overflow:auto;display:none;background:var(--card2)}
@@ -145,6 +145,35 @@ details summary{cursor:pointer;color:var(--mut);font-weight:500}
 .tabs{display:flex;gap:4px;border-bottom:1px solid var(--bd);margin:-4px 0 18px;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;-ms-overflow-style:none}.tabs::-webkit-scrollbar{display:none}
 .tabs a{padding:9px 14px;color:var(--mut);text-decoration:none;font-weight:500;border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap}
 .tabs a:hover{color:var(--fg)}.tabs a.active{color:var(--acc);border-bottom-color:var(--acc)}
+.setwrap{display:grid;grid-template-columns:224px minmax(0,1fr);gap:26px;align-items:start}.setmain{min-width:0}
+.setnav{position:sticky;top:14px;display:flex;flex-direction:column;gap:16px;z-index:20}
+.setgrps{display:flex;flex-direction:column;gap:16px}.setgrp{display:flex;flex-direction:column;gap:2px}
+.setgrp-t{font-size:11.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--mut);font-weight:600;margin:0 0 4px 10px}
+.setnav .setgrp a{display:flex;align-items:center;gap:9px;padding:7px 10px;border-radius:8px;color:var(--fg);text-decoration:none;font-weight:500}
+.setnav .setgrp a:hover{background:var(--acc-soft)}.setnav .setgrp a.active{background:var(--acc-soft);color:var(--acc)}
+.setnav .ico{width:20px;text-align:center;flex:0 0 20px}.setnav .badge{margin-left:auto}
+.setsearch{position:relative}.setsearch input{width:100%;box-sizing:border-box}
+.setres{position:absolute;left:0;top:calc(100% + 4px);width:max(100%,320px);z-index:40;background:var(--card);border:1px solid var(--bd);border-radius:10px;box-shadow:0 8px 28px rgba(0,0,0,.14);padding:4px;max-height:60vh;overflow:auto}
+.setres a{display:flex;gap:8px;align-items:flex-start;padding:7px 10px;border-radius:7px;color:var(--fg);text-decoration:none}.setres a small{display:block;color:var(--mut);font-size:12px}
+.setres a.sel,.setres a:hover{background:var(--acc-soft)}
+.setsec{margin:0 0 12px;border:1px solid var(--bd);border-radius:12px;background:var(--card)}.setsec>summary{list-style:none;cursor:pointer;color:var(--fg);font-weight:400;display:flex;align-items:center;gap:12px;padding:14px 18px;border-radius:12px}
+.setsec>summary::-webkit-details-marker{display:none}.setsec>summary::after{content:"›";margin-left:auto;font-size:22px;color:var(--mut);transition:transform .15s}.setsec[open]>summary::after{transform:rotate(90deg)}
+.setsec>summary:hover{background:var(--acc-soft)}.setsec .ic{font-size:20px;width:26px;text-align:center}.setsec .tt{display:flex;flex-direction:column}.setsec .tt b{font-size:15.5px}.setsec .tt small{color:var(--mut);font-size:12.5px;margin-top:2px}
+.setsec-b{padding:0 12px 2px}.setsec-b>.card,.setsec-b>form>.card,.setsec-b>form.card{box-shadow:none}.setsec-tools{display:flex;justify-content:flex-end;gap:6px;margin:0 0 10px}
+.jsum{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:12px 16px;border:1px solid var(--bd);border-radius:12px;background:var(--card);margin-bottom:14px}.jsum b{font-size:15px;margin-right:4px;word-break:break-all}
+.jsum .pill{padding:3px 10px;border-radius:12px;background:var(--bg);border:1px solid var(--bd);font-size:12.5px;white-space:nowrap}
+.jtabs{position:sticky;top:0;z-index:15;background:var(--bg);display:flex;gap:2px;border-bottom:1px solid var(--bd);margin:0 0 16px;padding-top:4px;overflow-x:auto;scrollbar-width:none}.jtabs::-webkit-scrollbar{display:none}
+.jtabs button{background:none;border:0;border-bottom:2px solid transparent;margin-bottom:-1px;padding:10px 13px;color:var(--mut);font:inherit;font-weight:500;white-space:nowrap;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.jtabs button:hover{color:var(--fg)}.jtabs button.on{color:var(--acc);border-bottom-color:var(--acc)}.jtabs .n{font-size:11px;padding:1px 7px;border-radius:10px;background:var(--acc-soft);color:var(--acc)}
+@media(max-width:700px){.savebar{position:static!important}}.jtabs .jall{margin-left:auto;font-size:12.5px}.savebar{position:sticky;bottom:0;z-index:15;display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:12px 16px;margin-top:10px;background:var(--card);border:1px solid var(--bd);border-radius:12px;box-shadow:0 -4px 16px rgba(0,0,0,.06)}
+.g2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px 18px}.g2>div{min-width:0}@media(max-width:760px){.g2{grid-template-columns:minmax(0,1fr)}}
+.rfield.nomatch{display:none!important}.advtools{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin:4px 0 12px}.advtools input{flex:1 1 260px}.advtools .check{white-space:nowrap;flex:0 0 auto}
+details.rsec>summary{list-style:none;cursor:pointer;display:flex;align-items:center;color:var(--fg)}details.rsec>summary::-webkit-details-marker{display:none}details.rsec>summary h2{margin:0;flex:1}
+details.rsec>summary::after{content:"›";font-size:22px;color:var(--mut);transition:transform .15s}details.rsec[open]>summary::after{transform:rotate(90deg)}details.rsec[open]>summary{margin-bottom:12px}
+.sethit{animation:sethit 1.6s ease}@keyframes sethit{0%,40%{box-shadow:0 0 0 3px var(--acc)}100%{box-shadow:0 0 0 0 transparent}}
+@media(max-width:900px){.setwrap{grid-template-columns:minmax(0,1fr);gap:14px}.setnav{position:static;max-height:none;overflow:visible;gap:10px}
+.setgrps{flex-direction:row;gap:6px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}.setgrps::-webkit-scrollbar{display:none}.setgrp{display:contents}.setgrp-t{display:none}
+.setnav .setgrp a{white-space:nowrap;border:1px solid var(--bd);padding:6px 11px;flex:0 0 auto}.setres{width:100%}}
 .codes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 18px;font:14px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;padding:14px;border:1px dashed var(--bd2);border-radius:10px;background:var(--card2)}
 .qr{background:#fff;border-radius:10px;padding:8px;display:inline-block;line-height:0}.qr svg{width:190px;height:190px}
 fieldset{border:0;padding:0;margin:0;min-width:0}
@@ -231,9 +260,12 @@ document.addEventListener('click',e=>{const p=document.getElementById('taskpop')
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!document.querySelector('dialog[open]')){const p=document.getElementById('taskpop');if(!p.hidden){p.hidden=true;open=false;tpKeep(false)}}});
 poll();})();
 </script>{% endif %}
-<main>{% set fl = session.pop('flash', None) %}{% if fl %}<div class="msg info">{{ fl }}</div>{% endif %}{% block body %}{% endblock %}</main>
+<main>{% set fl = session.pop('flash', None) %}{% if fl %}<div class="msg info flash" role="status">{{ fl }}</div>{% endif %}{% block body %}{% endblock %}</main>
 </div></div>
 <script>
+// Meldungen (gespeichert, gelöscht, Fehler) mit X wegklicken
+function msgClose(root){(root||document).querySelectorAll('.msg.flash:not(.hasx)').forEach(m=>{m.classList.add('hasx');const b=document.createElement('button');b.type='button';b.className='msgx';b.innerHTML='&times;';b.title='Meldung schließen';b.setAttribute('aria-label',b.title);b.onclick=()=>m.remove();m.prepend(b)})}
+msgClose();
 // Pause- und Ändern-Menüs schließen, sobald man daneben klickt oder Esc drückt; immer nur eins offen
 document.addEventListener('click',e=>{document.querySelectorAll('details.pausemenu[open]').forEach(d=>{if(!d.contains(e.target))d.removeAttribute('open')})});
 document.addEventListener('keydown',e=>{if(e.key==='Escape')document.querySelectorAll('details.pausemenu[open]').forEach(d=>d.removeAttribute('open'))});
@@ -318,8 +350,8 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){window.addEventLis
 {% block subtitle %}<p>{{ "Aufgabe bearbeiten" if job_id else "Neue Spiegel-Aufgabe anlegen" }}</p>{% endblock %}
 {% block actions %}<a class="btn" href="/help#job" title="Hilfe: alle Einstellungen der Aufgabe erklärt">❓ Hilfe</a> {% if job_id %}{% if can("jobs.create") %}<form class="inline" method="post" action="/job/{{ job_id }}/duplicate"><button class="btn" title="Kopie dieser Aufgabe anlegen (ausgeschaltet)">⧉ Duplizieren</button></form> {% endif %}<a class="btn" href="/job/{{ job_id }}/log">Log</a>{% endif %}{% endblock %}
 {% block body %}
-{% if msg %}<div class="msg ok">{{ msg }}</div>{% endif %}
-{% if error %}<div class="msg err">{{ error }}</div>{% endif %}
+{% if msg %}<div class="msg ok flash" role="status">{{ msg }}</div>{% endif %}
+{% if error %}<div class="msg err flash" role="status">{{ error }}</div>{% endif %}
 {% set editable = (can("jobs.edit") if job_id else can("jobs.create")) %}{% if not editable %}<div class="msg info">Nur ansehen: Deine Rolle darf diese Aufgabe nicht ändern.</div>{% endif %}
 <aside class="fbpanel" id="fbpanel" aria-hidden="true">
 <div class="fbtop"><b id="fbtitle">Durchsuchen</b><span style="flex:1"></span><input type="text" id="fbq" placeholder="Im Ordner suchen" autocomplete="off"><button type="button" class="btn sm" onclick="FB.path!==null&&fbLoad(FB.path)" title="Neu laden">↻</button><button type="button" class="btn sm" onclick="closeFB()" title="Schließen (Esc)">✕</button></div>
@@ -327,8 +359,17 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){window.addEventLis
 <div class="fbtable"><table id="fbt"><thead id="fbhead"><tr><th data-k="name">Name</th><th data-k="size" class="num hide-sm">Größe</th><th data-k="mod" class="hide-sm">Geändert</th></tr></thead><tbody id="fbbody"></tbody></table></div>
 <div class="fbfoot" id="fbfoot"><span class="hint" id="fbsum"></span><span style="flex:1"></span><button type="button" class="btn pri fbuse" onclick="fbUse()">Übernehmen</button></div>
 </aside><div class="fbshade" onclick="closeFB()"></div>
-<form method="post" id="jobform"><fieldset {{ "disabled" if not editable }}>
-<div class="card"><h2>Art der Aufgabe</h2>
+<form method="post" id="jobform"><div class="jsum" id="jsum" aria-live="polite"></div>
+<div class="jtabs" id="jtabs" role="tablist">
+<button type="button" role="tab" data-t="basic">Grundlagen<span class="n"></span></button>
+<button type="button" role="tab" data-t="filter">Filter<span class="n"></span></button>
+<button type="button" role="tab" data-t="behave">Verhalten<span class="n"></span></button>
+<button type="button" role="tab" data-t="protect">Prüfen &amp; schützen<span class="n"></span></button>
+<button type="button" role="tab" data-t="notify">Benachrichtigungen<span class="n"></span></button>
+<button type="button" role="tab" data-t="adv">Erweitert<span class="n"></span></button>
+<button type="button" class="jall" onclick="jtAll()" title="Alle Bereiche untereinander anzeigen">Alle anzeigen</button></div>
+<fieldset {{ "disabled" if not editable }}>
+<div class="card" data-tab="basic"><h2>Art der Aufgabe</h2>
 {% set tw_locked = not can("jobs.twoway") %}
 <div class="seg" id="dirseg" style="flex-wrap:wrap">
 <label><input type="radio" name="direction" value="mirror" {{ "checked" if job.direction != "bisync" }} onchange="dirShow()" {{ "disabled" if tw_locked and job.direction == "bisync" }}><span>➡ Spiegeln (Einweg): Quelle → Ziel</span></label>
@@ -337,7 +378,7 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){window.addEventLis
 <div class="hint tw-only">Änderungen auf beiden Seiten werden auf die jeweils andere übertragen, auch Löschungen. Beide Seiten werden also beschrieben.{% if tw_locked %} Zum Umstellen fehlt dir das Recht „Zwei-Wege-Sync einrichten“.{% endif %}</div>
 {% if tw_locked and job.direction == "bisync" %}<input type="hidden" name="direction" value="bisync">{% endif %}
 </div>
-<div class="card"><h2 id="h_sd">Quelle und Ziel</h2>
+<div class="card" data-tab="basic"><h2 id="h_sd">Quelle und Ziel</h2>
 <label>Name</label><input type="text" name="name" value="{{ job.name }}" required>
 <label id="lbl_src">Quelle</label>
 <div class="row" style="flex-direction:row"><input type="text" id="source" name="source" value="{{ job.source }}" placeholder="server-a:/var/www  oder  /data/daten/fotos" required>
@@ -460,7 +501,7 @@ function pvRender(){const v=document.getElementById('pvview');if(!v||!PV.data)re
 </div>
 </div>
 
-<div class="card"><h2>Start</h2>
+<div class="card" data-tab="basic"><h2>Start</h2>
 <label>Wann soll die Aufgabe starten?</label>
 <div class="seg" id="trig">
 <label><input type="radio" name="trigger" value="time" {{ "checked" if job.trigger == "time" }} onchange="trigShow()"><span>🕒 Zu einer Uhrzeit</span></label>
@@ -594,7 +635,7 @@ const TZN='{{ tz }}';
   SD.addEventListener('input',cronPrev);trigShow()})();
 </script>
 
-<div class="card"><h2>Ausschlüsse</h2>
+<div class="card" data-tab="filter"><h2>Ausschlüsse</h2>
 <textarea name="excludes" id="excludes" rows="5" placeholder="/Temp/&#10;/Projekte/alt/&#10;*.tmp&#10;**/node_modules/**">{{ job.excludes }}</textarea>
 <button type="button" class="btn sm" style="margin-top:8px{{ ';display:none' if not can('remotes.browse') }}" onclick="openFB('ex')">{{ ICON.plus }} Ordner oder Dateien aus der Quelle ausschließen</button>
 <div class="hint">Ein Eintrag pro Zeile, relativ zur Quelle. <code>/Temp/</code> = Ordner Temp direkt in der Quelle,
@@ -605,7 +646,7 @@ const TZN='{{ tz }}';
 <div class="hint tw-only">Beim Zwei-Wege-Sync gelten die Ausschlüsse für beide Seiten: Ausgeschlossenes wird auf keiner Seite angefasst.</div>
 </div>
 
-<div class="card"><h2>Benachrichtigungen</h2><fieldset {{ "disabled" if not can("jobs.notify") }}>{% if not can("jobs.notify") %}<div class="hint" style="margin-bottom:8px">Deine Rolle darf die Benachrichtigungen dieser Aufgabe nicht ändern.</div>{% endif %}
+<div class="card" data-tab="notify"><h2>Benachrichtigungen</h2><fieldset {{ "disabled" if not can("jobs.notify") }}>{% if not can("jobs.notify") %}<div class="hint" style="margin-bottom:8px">Deine Rolle darf die Benachrichtigungen dieser Aufgabe nicht ändern.</div>{% endif %}
 <div class="row"><div><label>Für diese Aufgabe</label>
 <select name="notify_mode" id="nmode" onchange="nshow()">
 <option value="global" {{ "selected" if job.notify_mode == "global" }}>Standard verwenden{% if glob.summary %} ({{ glob.summary }}){% endif %}</option>
@@ -645,7 +686,7 @@ const TZN='{{ tz }}';
 <p style="margin:16px 0 0"><button type="button" class="btn sm" onclick="ntest()">{{ ICON.bell }} Testnachricht senden</button> <span id="nres" class="hint"></span></p></fieldset>
 </div>
 
-<div class="card"><h2>Bandbreite</h2>
+<div class="card" data-tab="behave"><h2>Bandbreite</h2>
 <label>Für diese Aufgabe</label>
 <select name="bw_mode" id="bwmode" onchange="bwshow()">
 <option value="global" {{ "selected" if (job.bw_mode or "global") == "global" }}>Standard verwenden ({{ glob.bw }})</option>
@@ -656,9 +697,9 @@ const TZN='{{ tz }}';
 <script>function bwshow(){const c=document.getElementById('bwmode').value;document.getElementById('bwcustom').style.display=c==='custom'?'':'none';document.querySelector('.bwglobal').style.display=c==='global'?'':'none'}bwshow()</script>
 </div>
 
-{% with vis=job.get("visible_to"), vis_what="job" %}{% include "vis_picker.html" %}{% endwith %}
+{% with vis=job.get("visible_to"), vis_what="job", vis_tab="adv" %}{% include "vis_picker.html" %}{% endwith %}
 
-{% set W = job.window or {} %}<div class="card"><h2>Zeitfenster</h2>
+{% set W = job.window or {} %}<div class="card" data-tab="behave"><h2>Zeitfenster</h2>
 <label class="check"><input type="checkbox" name="window_on" id="win_on" {{ "checked" if job.window }} onchange="winShow()"> Nur in einem Zeitfenster laufen lassen</label>
 <div id="winbox" style="{{ '' if job.window else 'display:none' }}">
 <div class="row" style="margin-top:6px">
@@ -673,7 +714,7 @@ const TZN='{{ tz }}';
 </div></div>
 <script>function winShow(){document.getElementById('winbox').style.display=document.getElementById('win_on').checked?'':'none'}</script>
 
-<div class="card"><h2>Optionen</h2>
+<div class="card" data-tab="behave"><h2>Optionen</h2>
 <label class="check"><input type="checkbox" name="versioning" id="vers" {{ "checked" if job.versioning }} onchange="document.getElementById('versbox').style.display=this.checked?'':'none'"> Papierkorb/Versionierung: gelöschte und überschriebene Dateien nach <code>&lt;ziel&gt;.versions/&lt;datum&gt;</code> verschieben statt löschen{% if job_id and job.versioning and can("jobs.restore") %} · <a href="/job/{{ job_id }}/versions">Dateien suchen und wiederherstellen</a>{% endif %}</label>
 <div id="versbox" class="row" style="margin:0 0 8px 26px;{{ '' if job.versioning else 'display:none' }}">
 <div style="flex:0 0 220px"><label>Versionen behalten</label><input type="text" name="versions_keep" inputmode="numeric" value="{{ job.versions_keep or '' }}" placeholder="alle"><div class="hint">Anzahl Stände, z. B. 10. Leer = alle.</div></div>
@@ -710,7 +751,7 @@ document.getElementById('spdhint').textContent={gentle:'Schont Server, Platten u
 <div class="hint">z. B. parallele Übertragungen. Ein eigenes <code>--bwlimit</code> hier ersetzt die Einstellung „Bandbreite“.</div></div></div>
 </div>
 
-<div class="card" id="protect"><h2>Prüfen und schützen</h2>
+<div class="card" data-tab="protect" id="protect"><h2>Prüfen und schützen</h2>
 <div class="row"><div style="flex:1 1 300px"><label for="verify">Prüflauf nach dem Sync</label><select name="verify" id="verify">
 <option value="off" {{ "selected" if (job.verify or "off") == "off" }}>aus</option>
 <option value="always" {{ "selected" if job.verify == "always" }}>nach jedem Lauf</option>
@@ -741,7 +782,7 @@ document.getElementById('spdhint').textContent={gentle:'Schont Server, Platten u
 <div><div class="hint" style="margin-top:28px">Für den Health-Status (<code>/health/jobs</code>, Uptime Kuma, Home Assistant): Ist der letzte Lauf älter, gilt die Aufgabe als überfällig. Leer = aus dem Zeitplan berechnet (doppelter Abstand plus eine Stunde).</div></div></div>
 </div>
 
-{% set enc_ok = can("jobs.encrypt") %}<div class="card" id="encrypt"><h2>🔒 Ziel verschlüsseln</h2>
+{% set enc_ok = can("jobs.encrypt") %}<div class="card" data-tab="protect" id="encrypt"><h2>🔒 Ziel verschlüsseln</h2>
 {% if not enc_ok %}<div class="msg info">Zum Ändern fehlt dir das Recht „Verschlüsselung des Ziels einrichten oder ausschalten“.</div>{% endif %}
 <fieldset {{ "disabled" if not enc_ok }}>
 <label class="check"><input type="checkbox" name="encrypt" id="enc" {{ "checked" if job.encrypt }} onchange="encShow()"> Daten im Ziel verschlüsseln, sodass dort niemand sie lesen kann</label>
@@ -767,7 +808,7 @@ document.getElementById('spdhint').textContent={gentle:'Schont Server, Platten u
 <script>function encShow(){const on=document.getElementById('enc').checked;document.getElementById('encbox').style.display=on?'':'none';const o=document.getElementById('encoff');if(o)o.style.display=on?'none':''}</script>
 </div>
 
-{% set sc_ok = can("jobs.scripts") %}<div class="card" id="scripts"><h2>Skripte, Snapshot und Wake-on-LAN</h2>
+{% set sc_ok = can("jobs.scripts") %}<div class="card" data-tab="adv" id="scripts"><h2>Skripte, Snapshot und Wake-on-LAN</h2>
 {% if not sc_ok %}<div class="msg info">Zum Ändern fehlt dir das Recht „Skripte, Snapshots und Wake-on-LAN einrichten“.</div>{% endif %}
 <fieldset {{ "disabled" if not sc_ok }}>
 <h3>Wake-on-LAN</h3>
@@ -809,8 +850,8 @@ document.querySelectorAll('.snap-btrfs').forEach(e=>e.style.display=v==='btrfs'?
 document.querySelectorAll('.snap-cmd').forEach(e=>e.style.display=v==='command'?'':'none')}snapShow()</script>
 </div>
 
-</fieldset>{% if editable %}<div style="display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap">
-<div><button class="btn pri">Speichern</button> <a class="btn" href="/">Abbrechen</a>
+</fieldset>{% if editable %}<div class="savebar">
+<div><button class="btn pri">Speichern</button>{% if can("jobs.run") %} <button class="btn" name="after" value="dryrun" title="Speichern und gleich einen Testlauf starten (es wird nichts kopiert oder gelöscht)">Speichern und testen</button>{% endif %} <a class="btn" href="/">Abbrechen</a>
 {% if job_id and job.direction == "bisync" and can("jobs.run") %} <button class="btn" type="submit" form="resyncform" title="Beide Seiten neu zusammenführen (--resync), gelöscht wird dabei nichts">Neu zusammenführen</button>{% endif %}</div>
 {% if job_id and can("jobs.delete") %}<button class="btn del" type="submit" form="delform">Aufgabe entfernen</button>{% endif %}
 </div>{% else %}<a class="btn" href="/">Zurück</a>{% endif %}
@@ -948,11 +989,54 @@ document.addEventListener('DOMContentLoaded',()=>{
   document.querySelectorAll('#fbt th[data-k]').forEach(th=>th.onclick=()=>{FB.sort.k===th.dataset.k?FB.sort.d*=-1:(FB.sort={k:th.dataset.k,d:th.dataset.k==='name'?1:-1});fbRender()});
   fbEl('fbq').addEventListener('input',()=>FB.data&&fbRender())});
 </script>
+<script>
+// Aufgabe: Zusammenfassung oben, Reiter für die Bereiche, Abzeichen „was ist eingestellt“
+(function(){const F=document.getElementById('jobform'),T=document.getElementById('jtabs');if(!F||!T)return;
+const cards=[...F.querySelectorAll('fieldset [data-tab]')],btns=[...T.querySelectorAll('[data-t]')];
+const KEY='ms-jobtab',v=n=>{const e=F.elements[n];if(!e)return '';if(e.type==='checkbox')return e.checked;if(e.length!==undefined&&!e.tagName){const c=[...e].find(x=>x.checked);return c?c.value:''}return (e.value||'').trim()};
+const E=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let cur=null;
+window.jtShow=function(t,keep){cur=t;btns.forEach(b=>{const on=t==='all'||b.dataset.t===t;b.classList.toggle('on',t!=='all'&&b.dataset.t===t);b.setAttribute('aria-selected',t!=='all'&&b.dataset.t===t)});
+ cards.forEach(c=>{c.style.display=(t==='all'||c.dataset.tab===t)?'':'none'});T.querySelector('.jall').classList.toggle('on',t==='all');
+ if(!keep){try{sessionStorage.setItem(KEY,location.pathname+'|'+t)}catch(e){}}
+ window.dispatchEvent(new Event('resize'))};
+window.jtAll=()=>jtShow(cur==='all'?'basic':'all');
+btns.forEach(b=>b.addEventListener('click',()=>{jtShow(b.dataset.t);T.scrollIntoView({block:'nearest'})}));
+// Ungültiges Feld in einem verborgenen Reiter: dorthin wechseln, damit der Browser es zeigen kann
+F.addEventListener('invalid',e=>{const c=e.target.closest('[data-tab]');if(c&&c.style.display==='none')jtShow(c.dataset.tab)},true);
+function badges(){const n={};
+ const ex=(F.elements.excludes&&F.elements.excludes.value||'').split('\n').filter(x=>x.trim()).length;if(ex)n.filter=ex===1?'1 Regel':'{0} Regeln'.replace('{0}',ex);
+ const bh=[];if(v('versioning'))bh.push('Papierkorb');if(v('window_on'))bh.push('Zeitfenster');if(v('bw_mode')&&v('bw_mode')!=='global')bh.push('Bandbreite');if(bh.length)n.behave=bh.length===1?bh[0]:'{0} aktiv'.replace('{0}',bh.length);
+ let p=0;if(v('verify')&&v('verify')!=='off')p++;if(v('delete_guard'))p++;if(v('space_check')&&v('space_check')!=='off')p++;if(v('retry'))p++;if(v('encrypt'))p++;if(p)n.protect='{0} aktiv'.replace('{0}',p);
+ if(v('notify_mode')&&v('notify_mode')!=='global')n.notify=v('notify_mode')==='off'?'aus':'eigene';
+ let a=0;if(v('script_pre')||v('script_post'))a++;if(v('snapshot')&&v('snapshot')!=='off')a++;if(v('wol_mac'))a++;if(v('vis_mode')==='some')a++;if(a)n.adv='{0} aktiv'.replace('{0}',a);
+ btns.forEach(b=>{const s=b.querySelector('.n');s.textContent=n[b.dataset.t]||'';s.style.display=n[b.dataset.t]?'':'none'})}
+function summary(){const bi=v('direction')==='bisync',src=v('source')||'…',dst=v('dest')||'…',pills=[];
+ const tr=v('trigger');if(tr==='time'){const c=document.getElementById('cronprev');pills.push('🕒 '+((c&&c.textContent.trim())||v('schedule')))}
+ else{const r=F.querySelector('input[name=trigger]:checked');if(r)pills.push(r.parentElement.textContent.trim())}
+ if(tr!=='manual'&&F.elements.enabled&&!v('enabled'))pills.push('⏸ '+'automatischer Start aus');
+ if(v('paused'))pills.push('⏸ '+'pausiert');
+ if(v('versioning'))pills.push('🗑 '+'Papierkorb an');
+ if(v('verify')&&v('verify')!=='off')pills.push('🔎 '+'Prüflauf');
+ if(v('delete_guard'))pills.push('🛡 '+'Löschwarnung ab {0} %'.replace('{0}',v('delete_guard')));
+ if(v('encrypt'))pills.push('🔒 '+'verschlüsselt');
+ if(v('window_on'))pills.push('🕘 '+'Zeitfenster {0}–{1}'.replace('{0}',v('window_start')).replace('{1}',v('window_end')));
+ if(v('no_delete'))pills.push('➕ '+'löscht nichts im Ziel');
+ if(v('dry_run'))pills.push('🧪 '+'nur Testlauf');
+ document.getElementById('jsum').innerHTML='<b>'+(bi?'⇄ ':'➡ ')+E(src)+(bi?' ⇄ ':' → ')+E(dst)+'</b>'+pills.map(x=>'<span class="pill">'+E(x)+'</span>').join('')}
+function upd(){badges();summary()}
+F.addEventListener('input',upd);F.addEventListener('change',upd);setTimeout(upd,0);
+// Startreiter: Sprungziel (#protect, #encrypt …), sonst der zuletzt offene dieser Seite, sonst Grundlagen
+let start='basic';try{const s=(sessionStorage.getItem(KEY)||'').split('|');if(s[0]===location.pathname&&s[1])start=s[1]}catch(e){}
+const h=location.hash.slice(1),he=h&&document.getElementById(h),hc=he&&he.closest('[data-tab]');if(hc)start=hc.dataset.tab;
+{% if error %}const bad=F.querySelector('fieldset [data-tab] .fehler, fieldset [data-tab] :invalid');if(bad&&bad.closest('[data-tab]'))start=bad.closest('[data-tab]').dataset.tab;{% endif %}
+jtShow(start,true);if(hc)setTimeout(()=>he.scrollIntoView({block:'start'}),50);})();
+</script>
 {% endblock %}""",
 
 "log.html": r"""{% extends "base.html" %}{% block title %}{{ job.name }}{% endblock %}{% block subtitle %}<p class="path">{{ job.source }} {{ "⇄" if job.direction == "bisync" else "→" }} {{ job.dest }}</p>{% endblock %}
 {% block actions %}{% if can("jobs.restore") and job.versioning %}<a class="btn" href="/job/{{ job_id }}/versions">🗑 Papierkorb</a>{% endif %}{% if can("jobs.preview") %}<a class="btn" href="/job/{{ job_id }}/usage">📊 Platzbedarf</a>{% endif %}{% endblock %}
-{% block body %}{% if msg %}<div class="msg ok">{{ msg }}</div>{% endif %}
+{% block body %}{% if msg %}<div class="msg ok flash" role="status">{{ msg }}</div>{% endif %}
 {% if job.delete_hold %}{% set h = job.delete_hold %}<div class="card" style="border-color:var(--err)"><h2>🛑 Angehalten: Löschwarnung</h2>
 <p>{{ _("{0} von {1} Dateien im Ziel würden gelöscht ({2} %, Grenze {3} %).", h.deleted, h.total, h.pct, h.threshold) }} {{ _("Festgestellt am {0}.", h.at|dt) }} Nichts wurde verändert. Das kann auf eine versehentlich leere Quelle, ein nicht eingehängtes Laufwerk oder Ransomware hindeuten.</p>
 {% if h.examples %}<details><summary>Betroffene Dateien (Auszug)</summary><pre style="max-height:240px">{{ h.examples|join("\n") }}</pre></details>{% endif %}
@@ -991,8 +1075,8 @@ document.addEventListener('DOMContentLoaded',()=>{
 {% endblock %}""",
 
 "remotes.html": r"""{% extends "base.html" %}{% block title %}Speicherorte{% endblock %}{% block subtitle %}<p>Server und Clouds, zwischen denen gespiegelt wird.</p>{% endblock %}{% block actions %}{% if can("remotes.create") %}<a class="btn pri" href="/remotes/new">{{ ICON.plus }} Neuer Speicherort</a>{% endif %}{% endblock %}{% block body %}
-{% if msg %}<div class="msg ok">{{ msg }}</div>{% endif %}
-{% if err %}<div class="msg err">{{ err }}</div>{% endif %}
+{% if msg %}<div class="msg ok flash" role="status">{{ msg }}</div>{% endif %}
+{% if err %}<div class="msg err flash" role="status">{{ err }}</div>{% endif %}
 <div class="card">
 
 {% if remotes %}<table><tr><th>Name</th><th>Typ</th><th class="hide-sm">Im Job verwenden als</th><th></th></tr>
@@ -1025,7 +1109,7 @@ Lokale Ordner brauchen keinen Eintrag: Sie werden in der docker-compose.yml unte
 .fm .st{font-size:12px;white-space:nowrap;margin-left:8px}.st.s-new{color:var(--ok)}.st.s-update{color:var(--run,#2563eb)}.st.s-delete{color:var(--err)}.st.s-to_a{color:var(--warn,#d97706)}
 .fm tr.s-delete td.nm{text-decoration:line-through;opacity:.7}.fm-sum span{margin-right:14px;white-space:nowrap}
 </style>
-{% if err %}<div class="msg err">{{ err }}</div>{% else %}
+{% if err %}<div class="msg err flash" role="status">{{ err }}</div>{% else %}
 <div class="card fm" id="fm">
 <div class="fm-head"><b>Ziel</b> <code>{{ data.dest }}</code>{% if data.dest_missing %} <span class="tag">wird angelegt</span>{% endif %}
 {% if data.mode == "bisync" %}<span class="tag">Zwei-Wege</span>{% endif %}<span style="flex:1"></span>
@@ -1351,28 +1435,40 @@ if(LOCS.length){const q=new URLSearchParams(location.search);const ok=v=>LOCS.so
 {% endblock %}""",
 
 "remote_edit.html": r"""{% extends "base.html" %}{% block title %}{{ name if name else "Neuer Speicherort" }}{% endblock %}{% block subtitle %}<p>{{ "Speicherort bearbeiten" if name else "Zugangsdaten für einen Server oder Cloud-Dienst" }}</p>{% endblock %}{% block body %}
-<div class="card">
-{% if err %}<div class="msg err">{{ err }}</div>{% endif %}
+{% if err %}<div class="msg err flash" role="status">{{ err }}</div>{% endif %}
 <form method="post" id="rf">
-<div class="row">
-<div><label>Name</label><input type="text" name="name" value="{{ name or form.get('name','') }}" {{ "disabled" if name }} placeholder="z. B. nas" required>
-<div class="hint">Im Job dann als <code>name:pfad</code> verwenden.</div></div>
-<div><label>Typ</label><select name="type" id="type" onchange="render()"></select></div></div>
+<div class="card" id="c_conn"><h2>Verbindung</h2>
+<div class="g2"><div><label for="rname">Name</label><input type="text" id="rname" name="name" value="{{ form.get('name') or name or '' }}" placeholder="z. B. nas" required pattern="[A-Za-z0-9_\-]+">
+{% if name %}<div class="hint">Umbenennen möglich: Aufgaben, die <code>{{ name }}:</code> verwenden, werden automatisch auf den neuen Namen umgestellt.{% if used_by %} <span>Verwendet von:</span> {{ used_by|join(", ") }}{% endif %}</div>
+{% else %}<div class="hint">Im Job dann als <code>name:pfad</code> verwenden.</div>{% endif %}</div>
+<div><label for="type">Typ</label><select name="type" id="type" onchange="render()"></select></div></div>
 {% if name %}<div id="typewarn" class="msg err" style="display:none;margin-top:14px">Achtung: Du wechselst das Protokoll. Beim Speichern wird der Speicherort mit dem neuen Typ neu eingerichtet, alle Felder werden neu abgefragt und das Passwort muss neu eingegeben werden. Aufgaben, die ihn verwenden, behalten den Namen. Pfade können sich je nach Protokoll unterscheiden (z. B. SMB: <code>freigabe/ordner</code>, SFTP: <code>/pfad</code>). Schlägt die Einrichtung fehl, bleibt der alte Stand erhalten.</div>{% endif %}
 <div id="oauth" class="msg info" style="display:none;margin-top:14px">Dieser Dienst nutzt eine Anmeldung im Browser. Nach dem Speichern führt dich der nächste Schritt durch die Anmeldung
 (einmal <code>rclone authorize</code> auf deinem PC ausführen und das Ergebnis hier einfügen). Client-ID und Secret kannst du leer lassen.</div>
-<div id="fields"></div>
-<details style="margin-top:14px"><summary style="cursor:pointer">Erweiterte Optionen</summary><div id="adv"></div></details>
-{% if name %}<p class="hint">Passwortfelder leer lassen, um das gespeicherte Passwort zu behalten.</p>{% endif %}
-{% if can("remotes.edit") or not name %}{% with vis_what="remote", vis_nocard=true %}{% include "vis_picker.html" %}{% endwith %}{% endif %}
-<p style="margin-top:20px"><button class="btn pri">{{ "Speichern" if name else "Weiter" }}</button> <a class="btn" href="/remotes">Abbrechen</a></p>
-</form></div>
+<div id="f_conn" class="g2"></div></div>
+<div class="card" id="c_auth"><h2>Anmeldedaten</h2><div id="f_auth" class="g2"></div>
+{% if name %}<p class="hint" style="margin-bottom:0">Passwortfelder leer lassen, um das gespeicherte Passwort zu behalten. Ein geleertes Feld wird beim Speichern entfernt, dann gilt der Standard.</p>{% endif %}</div>
+<div class="card" id="c_more"><h2>Weitere Einstellungen</h2><div id="f_more" class="g2"></div></div>
+<details class="card rsec" id="c_adv"><summary><h2>Erweiterte Optionen <small class="mut" id="advcount"></small></h2></summary>
+<div class="advtools"><input type="text" id="advq" placeholder="Option suchen, z. B. timeout, cache, encoding" autocomplete="off" oninput="advFilter()" aria-label="Option suchen"><label class="check" style="margin:0"><input type="checkbox" id="advchg" onchange="advFilter()"> nur gesetzte anzeigen</label></div>
+<div id="adv" class="g2"></div><div id="advnone" class="hint" hidden>Keine passende Option.</div></details>
+{% if can("remotes.edit") or not name %}{% with vis_what="remote" %}{% include "vis_picker.html" %}{% endwith %}{% endif %}
+{% if name %}<details class="card rsec" id="c_raw"><summary><h2>Alle Einträge (rclone.conf)</h2></summary>
+<p class="mut" style="margin-top:0">Für Profis: jeder gespeicherte Eintrag dieses Speicherorts, auch solche, die oben nicht als Feld erscheinen. Gespeicherte Passwörter und Tokens stehen als <code>••••••</code> da und bleiben so erhalten. Ein neues Passwort hier eintippen geht auch, es wird beim Speichern verschleiert.</p>
+<textarea name="raw_conf" id="raw_conf" rows="{{ [(raw or '').count('\n') + 3, 18]|min }}" spellcheck="false" style="font-family:ui-monospace,monospace;width:100%" oninput="document.getElementById('rawnote').hidden=this.value.trim()===document.getElementById('raw_orig').value.trim()">{{ raw or '' }}</textarea>
+<textarea id="raw_orig" name="raw_orig" hidden>{{ form.get('raw_orig') if form.get('raw_orig') is not none else (raw or '') }}</textarea>
+<div class="msg info" id="rawnote" hidden style="margin:8px 0 0">Du hast den Text geändert: Beim Speichern gilt dieser Text, die Felder oben werden dann nicht übernommen.</div></details>{% endif %}
+<div class="savebar"><div><button class="btn pri">{{ "Speichern" if name else "Weiter" }}</button>{% if name and can("remotes.test") %} <button class="btn" name="after" value="test" title="Speichern und danach die Verbindung prüfen">🔌 Speichern und Verbindung testen</button>{% endif %} <a class="btn" href="/remotes">Abbrechen</a></div></div>
+</form>
 <script>
 const P={{ providers|tojson }}, EX={{ (existing or {})|tojson }}, FORM={{ form|tojson if form else '{}' }}, EDIT={{ 'true' if name else 'false' }};
 const DE={host:'Server (IP oder Name)',user:'Benutzer',pass:'Passwort',port:'Port',url:'URL',domain:'Domäne',vendor:'Anbieter',
  key_file:'Schlüsseldatei (z. B. /config/id_ed25519)',provider:'Anbieter',access_key_id:'Access Key ID',secret_access_key:'Secret Access Key',
  region:'Region',endpoint:'Endpoint',account:'Konto / Account',key:'Schlüssel',remote:'Darunterliegender Speicherort (z. B. nas:verschluesselt)',
  password:'Passwort',password2:'Salt-Passwort (optional)',client_id:'Client-ID (optional)',client_secret:'Client-Secret (optional)'};
+const SECRETS={{ (secrets_set or [])|tojson }};
+const AUTH=/^(user|pass|password2?|domain|key_file|key_file_pass|key_pem|key_use_agent|pubkey|pubkey_file|access_key_id|secret_access_key|session_token|client_id|client_secret|bearer_token|spn|use_kerberos|key|sas_url|account_key|env_auth|ask_password|api_key|app_key|app_secret|username|login|otp|2fa|.*_token)$/;
+const CONN=/^(host|port|url|endpoint|region|provider|vendor|account|server|share|base_url|location_constraint|remote|tls|explicit_tls)$/;
 const sel=document.getElementById('type');
 function opt(v,t){const o=document.createElement('option');o.value=v;o.textContent=t;return o}
 const g1=document.createElement('optgroup');g1.label='Häufig';const g2=document.createElement('optgroup');g2.label='Weitere';
@@ -1384,7 +1480,7 @@ const KEEP=['host','user'];
 function same(){return !EDIT||sel.value===EX.type}
 function val(n){ if(('opt_'+n) in FORM) return FORM['opt_'+n]; if(!same()&&!KEEP.includes(n)) return ''; return EX[n]!==undefined?String(EX[n]):''; }
 function field(o){
-  const w=document.createElement('div'); w.dataset.provider=o.Provider||'';
+  const w=document.createElement('div'); w.className='rfield'; w.dataset.provider=o.Provider||''; w.dataset.name=o.Name; w.dataset.set=(EX[o.Name]!==undefined&&EX[o.Name]!=='')||SECRETS.includes(o.Name)?'1':'';
   const l=document.createElement('label'); l.textContent=(DE[o.Name]||o.Help.split('\n')[0])+(o.Required?' *':''); w.append(l);
   let i;
   const ex=o.Examples||[];
@@ -1400,34 +1496,47 @@ function field(o){
   w.append(i);
   const h=document.createElement('div'); h.className='hint'; const rest=o.Help.split('\n').slice(DE[o.Name]?0:1).join(' ').trim();
   h.textContent=rest.length>260?rest.slice(0,260)+'…':rest; if(rest) w.append(h);
+  if(o.IsPassword&&EDIT&&same()&&SECRETS.includes(o.Name)){const c=document.createElement('label');c.className='check';c.style.marginTop='6px';
+    c.innerHTML='<input type="checkbox" name="clear_opt" value="'+o.Name+'"> '+'gespeichertes Passwort entfernen';w.append(c);}
+  w.dataset.text=((DE[o.Name]||'')+' '+o.Name+' '+o.Help).toLowerCase();
   return w;
 }
 function filter(){
   const pv=(document.querySelector('[name=opt_provider]')||{}).value||'';
-  document.querySelectorAll('#fields>div,#adv>div').forEach(w=>{
+  document.querySelectorAll('#rf .rfield').forEach(w=>{
     const on=!w.dataset.provider||matches({Provider:w.dataset.provider},pv);
     w.style.display=on?'':'none'; w.querySelectorAll('input,select').forEach(i=>i.disabled=!on);});
 }
 function render(){
-  const p=P.find(x=>x.name===sel.value); const F=document.getElementById('fields'), A=document.getElementById('adv'); F.innerHTML='';A.innerHTML='';
+  const p=P.find(x=>x.name===sel.value); const FC=document.getElementById('f_conn'),FA=document.getElementById('f_auth'),FM=document.getElementById('f_more'),A=document.getElementById('adv'); [FC,FA,FM,A].forEach(x=>x.innerHTML='');
   document.getElementById('oauth').style.display=p.oauth?'block':'none';
   const tw=document.getElementById('typewarn');if(tw)tw.style.display=same()?'none':'block';
-  p.options.forEach(o=>(o.Advanced?A:F).append(field(o)));
+  p.options.forEach(o=>(o.Advanced?A:CONN.test(o.Name)?FC:AUTH.test(o.Name)?FA:FM).append(field(o)));
   // Neuer Speicherort: Standard-Port des Typs vorausfuellen (bleibt aenderbar)
-  const po=document.querySelector('#fields [name=opt_port],#adv [name=opt_port]'), pd=(p.options.find(o=>o.Name==='port')||{}).DefaultStr;
+  const po=document.querySelector('#rf [name=opt_port]'), pd=(p.options.find(o=>o.Name==='port')||{}).DefaultStr;
   if(po && !same() && pd && (!EDIT||!('opt_port' in FORM))) po.value=pd;
   if(po && !EDIT && !po.value && pd) po.value=pd;
   const tl=document.querySelector('[name=opt_tls]');
   if(po && tl && sel.value==='ftp') tl.addEventListener('change',()=>{ if(['','21','990'].includes(po.value)) po.value=tl.value==='true'?'990':'21'; });
   filter();
+  document.getElementById('c_auth').style.display=FA.children.length?'':'none';
+  document.getElementById('c_more').style.display=FM.children.length?'':'none';
+  document.getElementById('c_adv').style.display=A.children.length?'':'none';
+  advFilter(true);
 }
+function advFilter(init){const q=(document.getElementById('advq').value||'').trim().toLowerCase(),only=document.getElementById('advchg').checked;
+  const all=[...document.querySelectorAll('#adv .rfield')].filter(w=>w.style.display!=='none');let shown=0,setn=0;
+  all.forEach(w=>{if(w.dataset.set)setn++;const on=(!q||q.split(/\s+/).every(x=>w.dataset.text.includes(x)))&&(!only||w.dataset.set);w.classList.toggle('nomatch',!on);if(on)shown++});
+  document.getElementById('advnone').hidden=shown>0;
+  document.getElementById('advcount').textContent='('+'{0} Optionen'.replace('{0}',all.length)+(setn?', '+'{0} gesetzt'.replace('{0}',setn):'')+')';
+  if(init===true&&setn)document.getElementById('c_adv').open=true;}
 render();
 </script>
 {% endblock %}""",
 
 "remote_wizard.html": r"""{% extends "base.html" %}{% block title %}{{ name }} einrichten{% endblock %}{% block body %}
 <div class="card">
-{% if err %}<div class="msg err">{{ err }}</div>{% endif %}
+{% if err %}<div class="msg err flash" role="status">{{ err }}</div>{% endif %}
 <form method="post">
 {% if q.Name == "config_token" %}
 <p><b>Anmeldung bei {{ typ }}</b>: Weil der Container keinen Browser hat, meldest du dich einmal an deinem PC an:</p>
@@ -1479,10 +1588,10 @@ document.querySelectorAll('details.tpl[data-prefix="{{ prefix }}"]').forEach(box
   upd()})})();
 </script>""",
 "settings.html": r"""{% extends "base.html" %}{% block title %}Einstellungen{% endblock %}{% block body %}{% include "tabs.html" %}<p class="mut" style="margin:-6px 0 14px">Standard-Benachrichtigungen für alle Aufgaben. Jede Aufgabe kann eigene festlegen.</p>
-{% if msg %}<div class="msg ok">{{ msg }}</div>{% endif %}
-{% if err %}<div class="msg err">{{ err }}</div>{% endif %}
+{% if msg %}<div class="msg ok flash" role="status">{{ msg }}</div>{% endif %}
+{% if err %}<div class="msg err flash" role="status">{{ err }}</div>{% endif %}
 <form method="post"><fieldset {{ "disabled" if not can("notify.edit") }}>
-<div class="card"><h2>Standard</h2>
+<div class="card"><h2 id="std">Standard</h2>
 <label>Wann benachrichtigen</label>
 <select name="when"><option value="always" {{ "selected" if s.when == "always" }}>immer (Erfolg und Fehler)</option>
 <option value="fail" {{ "selected" if s.when == "fail" }}>nur bei Fehler</option>
@@ -1516,7 +1625,7 @@ document.querySelectorAll('details.tpl[data-prefix="{{ prefix }}"]').forEach(box
 {% if can("notify.edit") %}<p><button class="btn sm" type="submit" form="reportform">{{ ICON.bell }} Bericht jetzt senden</button></p>{% endif %}
 </div>
 
-<div class="card"><h2>Texte der Benachrichtigungen</h2>
+<div class="card"><h2 id="texts">Texte der Benachrichtigungen</h2>
 <p class="mut" style="margin-top:-4px">Betreff und Text je Ereignis mit Variablen anpassen. Gilt für alle Kanäle (E-Mail-Betreff, Telegram, Apprise, Webhook). Ohne Änderung wird der Standardtext verwendet. Jede Aufgabe kann für ihre Läufe eigene Texte haben.</p>
 <input type="hidden" name="tpl_present" value="1">
 {% with items=tpl_data, prefix="tpl_" %}{% include "tpl_editor.html" %}{% endwith %}
@@ -1565,7 +1674,7 @@ document.querySelectorAll('#whbox [data-ex]').forEach(c=>c.onclick=()=>{ta.value
 <div class="row"><div><label>Benutzer</label><input type="text" name="smtp_user" value="{{ s.smtp_user }}" autocomplete="off"></div>
 <div><label>Passwort</label><input type="password" name="smtp_pass" autocomplete="new-password" placeholder="{{ '(gespeichert, leer lassen = unverändert)' if has_secret.smtp_pass }}"></div></div>
 <div class="row"><div><label>Absender</label><input type="text" name="smtp_from" value="{{ s.smtp_from }}" placeholder="mirrorsync@example.de (leer = Benutzer)"></div>
-<div><label>Empfänger (mehrere mit Komma)</label><input type="text" name="smtp_to" value="{{ s.smtp_to }}" placeholder="admin@example.de"></div></div>
+<div><label>Empfänger (mehrere mit Komma)</label><input type="text" name="smtp_to" value="{{ s.smtp_to }}" placeholder="robin@example.de"></div></div>
 <p><button class="btn sm" name="test" value="smtp">Speichern und testen</button></p></div>
 
 <div class="card"><h3>Telegram</h3>
@@ -1600,7 +1709,7 @@ document.querySelectorAll('#whbox [data-ex]').forEach(c=>c.onclick=()=>{ta.value
 </fieldset></form>
 <form id="testallform" method="post" action="/settings/notify/test-all"></form>
 <form id="reportform" method="post" action="/settings/report/send"></form>
-{% endblock %}""",
+{% include "tabs_end.html" %}{% endblock %}""",
 "login.html": r"""<!doctype html>
 <html lang="{{ lang_code() }}"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -1678,21 +1787,37 @@ if({% endraw %}{{ "false" if pk_off else "true" }}{% raw %}&&window.PublicKeyCre
 </form>
 </body></html>
 """,
-"tabs.html": r"""<div class="tabs">{% if can('users.view') %}<a href="/users" class="{{ 'active' if request.path.startswith('/users') }}">Benutzer{% if fail_badge %}<span class="badge">{{ fail_badge }}</span>{% endif %}</a>{% endif %}
-{% if can('roles.manage') %}<a href="/roles" class="{{ 'active' if request.path.startswith('/roles') }}">Rollen</a>{% endif %}
-{% if can('groups.manage') %}<a href="/groups" class="{{ 'active' if request.path.startswith('/groups') }}">Gruppen</a>{% endif %}
-{% if can('notify.view') %}<a href="/settings" class="{{ 'active' if request.path == '/settings' }}">Benachrichtigungen</a>{% endif %}
-{% if can('system.settings') %}<a href="/settings/general" class="{{ 'active' if request.path.startswith('/settings/general') }}">Allgemein</a>{% endif %}
-{% if can('system.access') %}<a href="/settings/access" class="{{ 'active' if request.path.startswith('/settings/access') }}">Zugriff</a>{% endif %}
-{% if can('system.api') %}<a href="/settings/api" class="{{ 'active' if request.path.startswith('/settings/api') }}">API</a>{% endif %}
-{% if g.role == 'admin' %}<a href="/settings/backup" class="{{ 'active' if request.path.startswith('/settings/backup') }}">Sicherung</a>{% endif %}
-<a href="/account" class="{{ 'active' if request.path.startswith('/account') }}">Mein Konto</a>
-<a href="/help{{ HELP_ANCHOR.get(request.path, '') }}" class="helptab{{ ' active' if request.path.startswith('/help') }}" style="margin-left:auto" title="Hilfe: alle Einstellungen erklärt, mit Suche">❓ Hilfe</a></div>
+"tabs.html": r"""{# Einstellungen: Leiste links mit Gruppen und Suchfeld. Öffnet .setwrap/.setmain, tabs_end.html schließt sie. #}
+<div class="setwrap"><div class="setnav" id="setnav">
+<div class="setsearch"><input type="text" role="searchbox" id="setq" placeholder="Einstellung suchen …" autocomplete="off" aria-label="Einstellungen durchsuchen" onkeydown="setKey(event)" oninput="setFind()" onfocus="setFind()"><div class="setres" id="setres" hidden></div></div>
+<div class="setgrps">{% for grp in SETTINGS_NAV() %}<div class="setgrp"><div class="setgrp-t">{{ grp.title }}</div>{% for it in grp["items"] %}<a href="{{ it.url }}{{ HELP_ANCHOR.get(request.path, '') if it.id == 'help' else '' }}" class="{{ 'active' if it.active }}"><span class="ico">{{ it.icon }}</span>{{ it.label }}{% if it.id == 'users' and fail_badge %}<span class="badge">{{ fail_badge }}</span>{% endif %}</a>{% endfor %}</div>{% endfor %}</div>
+</div><div class="setmain">
+<script>
+window.SETIDX={{ SETTINGS_INDEX()|tojson }};
+(function(){const N=s=>(s||'').toLowerCase().replace(/ä/g,'a').replace(/ö/g,'o').replace(/ü/g,'u').replace(/ß/g,'ss').replace(/[-_]/g,' ');
+const E=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));let sel=0,hits=[];
+window.setFind=function(){const q=document.getElementById('setq').value.trim(),r=document.getElementById('setres');if(!q){r.hidden=true;return}
+ const w=N(q).split(/\s+/);hits=SETIDX.map(e=>{const h=N(e.label+' '+e.page+' '+e.k);if(!w.every(x=>h.includes(x)))return null;return [w.reduce((a,x)=>a+(N(e.label).includes(x)?3:1),0),e]}).filter(Boolean).sort((a,b)=>b[0]-a[0]).slice(0,8).map(x=>x[1]);
+ hits.push({label:'„{0}“ in der Hilfe suchen'.replace('{0}',q),page:'Hilfe',url:'/help?q='+encodeURIComponent(q),icon:'❓'});sel=0;
+ r.innerHTML=hits.map((e,i)=>'<a href="'+E(e.url)+'" class="'+(i===0?'sel':'')+'"><span class="ico">'+E(e.icon||'')+'</span><span>'+E(e.label)+'<small>'+E(e.page)+'</small></span></a>').join('');r.hidden=false};
+window.setKey=function(ev){const r=document.getElementById('setres');if(r.hidden)return;const a=r.querySelectorAll('a');
+ if(ev.key==='ArrowDown'||ev.key==='ArrowUp'){ev.preventDefault();sel=(sel+(ev.key==='ArrowDown'?1:-1)+a.length)%a.length;a.forEach((x,i)=>x.classList.toggle('sel',i===sel))}
+ else if(ev.key==='Enter'){ev.preventDefault();if(a[sel])a[sel].click()}else if(ev.key==='Escape'){r.hidden=true}};
+document.addEventListener('click',e=>{const r=document.getElementById('setres');if(r&&!e.target.closest('.setsearch'))r.hidden=true});
+document.addEventListener('keydown',e=>{if(e.key==='/'&&!e.target.closest('input,textarea,select,[contenteditable]')){const q=document.getElementById('setq');if(q){e.preventDefault();q.focus()}}});
+// Sprungziel (#anker): einklappbaren Bereich öffnen, hinscrollen und kurz hervorheben
+function jump(){const id=decodeURIComponent(location.hash.slice(1));if(!id)return;const el=document.getElementById(id);if(!el)return;
+ let p=el;while(p){if(p.tagName==='DETAILS')p.open=true;p=p.parentElement}
+ setTimeout(()=>{el.scrollIntoView({block:'start'});const c=el.closest('.card')||el;c.classList.remove('sethit');void c.offsetWidth;c.classList.add('sethit')},30)}
+window.addEventListener('hashchange',jump);document.addEventListener('DOMContentLoaded',jump);
+document.addEventListener('click',e=>{const a=e.target.closest('.setres a');if(a&&a.pathname===location.pathname&&a.hash){setTimeout(jump,0);document.getElementById('setres').hidden=true}});})();
+</script>
 """,
+"tabs_end.html": r"""</div></div>""",
 "backup.html": r"""{% extends "base.html" %}{% block title %}Einstellungen{% endblock %}
 {% block body %}{% include "tabs.html" %}
-{% if msg %}<div class="msg ok">{{ msg }}</div>{% endif %}
-{% if err %}<div class="msg err">{{ err }}</div>{% endif %}
+{% if msg %}<div class="msg ok flash" role="status">{{ msg }}</div>{% endif %}
+{% if err %}<div class="msg err flash" role="status">{{ err }}</div>{% endif %}
 {% if preview %}{% set m = preview.m %}
 <div class="card" style="border-color:{{ 'var(--acc)' if preview.ok else 'var(--err)' }}"><h2>Import prüfen: {{ preview.name }}</h2>
 <table><tr><th>Exportiert</th><td>{{ m.created }}{% if m.note %} · {{ m.note }}{% endif %}{% if preview.enc %} · verschlüsselt{% endif %}</td></tr>
@@ -1711,7 +1836,7 @@ if({% endraw %}{{ "false" if pk_off else "true" }}{% raw %}&&window.PublicKeyCre
 {% else %}<form method="post" action="/settings/backup/apply"><p><button class="btn" name="cancel" value="1">Verwerfen</button></p></form>{% endif %}
 </div>{% endif %}
 
-<div class="card"><h2>Exportieren</h2>
+<div class="card"><h2 id="export">Exportieren</h2>
 <p class="mut" style="margin-top:0">Lädt den gesamten Stand als ZIP herunter: Aufgaben mit Verlauf, Zeitpläne, Speicherorte (rclone.conf), SSH-Schlüssel, Benutzer, Rollen, Einstellungen, Vorlagen, IP-Regeln, Anmeldeverlauf und Audit-Log.</p>
 <div class="msg err" style="margin:0 0 12px">⚠️ <b>Die Datei enthält Geheimnisse:</b> Zugangsdaten aller Speicherorte, Passwort-Hashes, 2FA-Schlüssel, Passkeys, Tokens und Webhook-Adressen. Wer sie hat, kann sich Zugang zu deinen Servern verschaffen. Am besten mit Passwort verschlüsseln und sicher aufbewahren.</div>
 <form method="post" action="/settings/backup/export">
@@ -1721,14 +1846,14 @@ if({% endraw %}{{ "false" if pk_off else "true" }}{% raw %}&&window.PublicKeyCre
 <label class="check"><input type="checkbox" name="logs"> Lauf-Logs mitnehmen (kann groß werden)</label>
 <p style="margin-top:12px"><button class="btn pri">Exportieren</button></p></form></div>
 
-<div class="card"><h2>Importieren</h2>
+<div class="card"><h2 id="import">Importieren</h2>
 <p class="mut" style="margin-top:0">Exportdatei auswählen. Sie wird zuerst geprüft und angezeigt, ersetzt wird erst nach deiner Bestätigung. Vorher legt MirrorSync automatisch eine Sicherung des aktuellen Stands an.</p>
 <form method="post" action="/settings/backup/import" enctype="multipart/form-data">
 <div class="row"><div><label>Exportdatei (.zip oder .zip.enc)</label><input type="file" name="file" accept=".zip,.enc" required></div>
 <div><label>Passwort (nur bei verschlüsselten Dateien)</label><input type="password" name="password" autocomplete="off"></div></div>
 <p style="margin-top:12px"><button class="btn">Datei prüfen</button></p></form></div>
 
-<form method="post" action="/settings/backup/auto" class="card"><h2>Automatische Sicherung</h2>
+<form method="post" action="/settings/backup/auto" class="card"><h2 id="auto">Automatische Sicherung</h2>
 <p class="mut" style="margin-top:0">Sichert den gesamten Stand (wie der Export) nach Zeitplan. Hat sich seit der letzten Sicherung nichts geändert, wird keine neue Datei angelegt. Verlauf, Anmeldungen und Zähler zählen dabei nicht als Änderung.</p>
 {% set st = ab.status %}{% if st.result %}<div class="msg {{ 'err' if st.result == 'fail' else 'info' }}" style="margin:0 0 12px">Letzter Lauf {{ st.time }} ({{ st.by }}):
 {% if st.result == 'ok' %}Sicherung <code>{{ st.file.split('/')[-1] }}</code> erstellt.{% elif st.result == 'skip' %}nichts geändert, keine neue Sicherung.{% else %}fehlgeschlagen: {{ st.error }}{% endif %}</div>{% endif %}
@@ -1756,7 +1881,7 @@ if({% endraw %}{{ "false" if pk_off else "true" }}{% raw %}&&window.PublicKeyCre
 <button class="btn" name="run" value="1" formnovalidate>Jetzt sichern</button>
 <label class="check" style="margin:0"><input type="checkbox" name="force"> auch ohne Änderung</label></p></form>
 
-<div class="card"><h2>Gespeicherte Sicherungen</h2>
+<div class="card"><h2 id="saved">Gespeicherte Sicherungen</h2>
 {% if backups %}<table><tr><th>Datei</th><th class="hide-sm">Zeit</th><th class="num hide-sm">Größe</th><th style="text-align:right">Aktionen</th></tr>
 {% for b in backups %}<tr><td><code>{{ b.name }}</code><br><small class="mut">{{ "automatisch" if b.auto else "vor Import" }}{% if b.enc %} · verschlüsselt{% endif %} · {{ b.dir }}</small></td><td class="hide-sm"><small>{{ b.time }}</small></td><td class="num hide-sm"><small>{{ (b.size / 1024)|round(0)|int }} KB</small></td>
 <td style="text-align:right;white-space:nowrap"><a class="btn sm" href="/settings/backup/file/{{ b.name }}">Herunterladen</a>
@@ -1765,27 +1890,27 @@ if({% endraw %}{{ "false" if pk_off else "true" }}{% raw %}&&window.PublicKeyCre
 <p class="hint">„Wiederherstellen…“ prüft die Datei zuerst und zeigt sie oben an, ersetzt wird erst nach Bestätigung. Verschlüsselte automatische Sicherungen werden mit dem gespeicherten Passwort geöffnet. Vor einem Import angelegte Sicherungen liegen unverschlüsselt in <code>config/backups/</code> (nur für root lesbar), die letzten 10 bleiben.</p>
 {% else %}<p class="mut" style="margin:0">Noch keine. Vor jedem Import und nach Zeitplan wird hier automatisch eine angelegt.</p>{% endif %}</div>
 
-<div class="card"><h2>Datenbank</h2>
+<div class="card"><h2 id="db">Datenbank</h2>
 <p class="mut" style="margin:0">SQLite-Datei <code>{{ db_info.path }}</code> · {{ (db_info.size / 1024)|round(0)|int }} KB{% if db_info.migrated %} · eingerichtet {{ db_info.migrated }}{% if db_info["from"] and db_info["from"] != "-" %}, übernommen aus {{ db_info["from"] }} (alte Dateien in <code>config/json-backup/</code>){% endif %}{% endif %}.</p>
 <p class="hint">Inhalt: {% for k, label in labels.items() %}{{ label }} {{ counts.get(k, 0) }}{{ " · " if not loop.last }}{% endfor %}.</p></div>
-{% endblock %}
+{% include "tabs_end.html" %}{% endblock %}
 """,
 "api_keys.html": r"""{% extends "base.html" %}{% block title %}Einstellungen{% endblock %}
 {% block body %}{% include "tabs.html" %}
-{% if msg %}<div class="msg ok">{{ msg }}</div>{% endif %}
-{% if err %}<div class="msg err">{{ err }}</div>{% endif %}
+{% if msg %}<div class="msg ok flash" role="status">{{ msg }}</div>{% endif %}
+{% if err %}<div class="msg err flash" role="status">{{ err }}</div>{% endif %}
 {% if new %}<div class="card" style="border-color:var(--acc)"><h2>API-Key „{{ new.name }}“ erstellt</h2>
 <p class="mut" style="margin-top:0"><b style="color:var(--fg)">Jetzt kopieren.</b> Später kannst du ihn in der Liste mit „Anzeigen“ noch einmal sehen, nach Bestätigung mit Passwort (und 2FA-Code) oder Passkey. Gespeichert ist er verschlüsselt.</p>
 <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><code id="newkey" style="user-select:all;word-break:break-all;font-size:13px;padding:8px 10px;flex:1">{{ new.token }}</code>
 <button type="button" class="btn" onclick="navigator.clipboard.writeText(document.getElementById('newkey').textContent);this.textContent='Kopiert'">Kopieren</button></div>
 <p class="hint">Test: <code>curl -H "Authorization: Bearer {{ new.token[:16] }}…" {{ base }}/api/v1/status</code></p></div>{% endif %}
 
-<div class="card"><h2>API und MCP</h2>
+<div class="card"><h2 id="apimcp">API und MCP</h2>
 <p class="mut" style="margin-top:0">Mit einem API-Key steuern n8n, Home Assistant, Skripte oder KI-Assistenten (MCP) MirrorSync. Jeder Key hat eine Rolle und damit genau deren Rechte und Beschränkungen auf Aufgaben und Speicherorte. Es gelten dieselben IP-Sperren wie in der GUI, höchstens 300 Anfragen pro Minute.</p>
 <table><tr><th>REST-API</th><td><code>{{ base }}/api/v1</code> · <a href="/api/docs" target="_blank" rel="noopener">Swagger-Dokumentation</a> · <a href="/api/v1/openapi.json" target="_blank" rel="noopener">openapi.json</a></td></tr>
 <tr><th>MCP-Server</th><td><code>{{ base }}/mcp</code> (Streamable HTTP, Header <code>Authorization: Bearer &lt;Key&gt;</code>)</td></tr></table></div>
 
-<div class="card"><h2>API-Keys</h2>
+<div class="card"><h2 id="keys">API-Keys</h2>
 {% if rows %}<table><tr><th>Name</th><th>Rolle</th><th class="hide-sm">Gültig bis / IP</th><th class="hide-sm">Zuletzt benutzt</th><th style="text-align:right">Aktionen</th></tr>
 {% for k in rows %}<tr style="{{ 'opacity:.55' if k.status != 'aktiv' }}"><td><b>{{ k.name }}</b> {% if k.status == 'aktiv' %}<span class="tag ok">aktiv</span>{% else %}<span class="tag fehler">{{ k.status }}</span>{% endif %}<br><small class="mut"><code>msk_{{ k.id }}_…</code> · erstellt {{ k.created }} von {{ k.created_by }}</small></td>
 <td>{{ k.role_name }}{% if k.group_names %}<br><small class="mut">{{ k.group_names|join(", ") }}</small>{% endif %}</td><td class="hide-sm"><small>{{ k.expires or "unbegrenzt" }}{% if k.disabled %}<br>deaktiviert{% endif %}{% if k.lock_from or k.lock_until %}<br>pausiert {{ k.lock_from|dt if k.lock_from else "ab sofort" }} – {{ k.lock_until|dt if k.lock_until else "offen" }}{% endif %}{% if k.windows %}<br>aktiv nur: {{ k.windows_text }}{% endif %}{% if k.ips %}<br>{{ k.ips|join(", ") }}{% else %}<br>alle IPs{% endif %}</small></td>
@@ -1830,7 +1955,7 @@ if(window.PublicKeyCredential&&window.isSecureContext)document.querySelectorAll(
 document.querySelectorAll('.rv_pw,.rv_code').forEach(i=>i.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();i.closest('.pmenu').querySelector('.btn.pri').click()}}));{% endraw %}
 </script>
 
-<form method="post" class="card"><h2>Neuen API-Key erstellen</h2>
+<form method="post" class="card"><h2 id="newkey">Neuen API-Key erstellen</h2>
 <div class="row"><div><label>Name</label><input type="text" name="name" maxlength="60" placeholder="z. B. n8n, Home Assistant, Claude" required></div>
 <div><label>Rolle (Rechte)</label><select name="role">{% for rid, r in roles.items() %}<option value="{{ rid }}" {{ "selected" if rid == "viewer" }}>{{ r.name }}{% if r.description %} – {{ r.description }}{% endif %}</option>{% endfor %}</select></div></div>
 <div class="hint">Für Key-eigene Rechte unter <a href="/roles">Rollen</a> eine passende Rolle anlegen (z. B. „Home Assistant“: nur ansehen und starten, beschränkt auf bestimmte Aufgaben). Du kannst nur Rollen vergeben, deren Rechte du selbst hast.</div>
@@ -1840,7 +1965,7 @@ document.querySelectorAll('.rv_pw,.rv_code').forEach(i=>i.addEventListener('keyd
 <div class="hint">Meldungen, Swagger-Beschreibungen und MCP-Tool-Texte. „Wie der Benutzer“ nimmt die Sprache aus dessen Konto (Mein Konto → Sprache), ohne bekannten Benutzer Englisch. Einzelne Anfragen können sie mit <code>?lang=en</code> oder dem Header <code>Accept-Language</code> überschreiben.</div>
 <div class="hint">Leer = unbegrenzt bzw. von überall. Hinter einem Reverse-Proxy muss unter Allgemein „Reverse-Proxy“ an sein, sonst sieht MirrorSync nur die Adresse des Proxys.</div>
 <p style="margin-top:14px"><button class="btn pri">Key erstellen</button></p></form>
-{% endblock %}
+{% include "tabs_end.html" %}{% endblock %}
 """,
 "api_docs.html": r"""<!doctype html><html lang="{{ lang_code() }}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>MirrorSync API</title><link rel="icon" href="/static/favicon.svg" type="image/svg+xml"><link rel="manifest" href="/manifest.webmanifest">
@@ -1899,7 +2024,7 @@ window.ui=SwaggerUIBundle({url:'/api/v1/openapi.json',dom_id:'#ui',deepLinking:t
 {% block subtitle %}<p class="path">{{ data.base }}</p>{% endblock %}
 {% block actions %}<a class="btn" href="/job/{{ job_id }}/log">Log</a><a class="btn" href="/job/{{ job_id }}">Aufgabe</a>{% endblock %}
 {% block body %}
-{% if msg %}<div class="msg ok">{{ msg }}</div>{% endif %}{% if err %}<div class="msg err">{{ err }}</div>{% endif %}
+{% if msg %}<div class="msg ok flash" role="status">{{ msg }}</div>{% endif %}{% if err %}<div class="msg err flash" role="status">{{ err }}</div>{% endif %}
 {% if not job.versioning %}<div class="msg info">Papierkorb/Versionierung ist bei dieser Aufgabe aus. Gelöschte und überschriebene Dateien werden dann direkt entfernt. Einschalten unter <a href="/job/{{ job_id }}">Aufgabe → Optionen</a>.{% if data.stamps %} Ältere Stände sind noch da.{% endif %}</div>{% endif %}
 <div class="card">
 <form method="get" class="row" style="align-items:flex-end;flex-wrap:wrap">
@@ -2042,11 +2167,11 @@ window.hCopy=function(b){const t=b.parentElement.querySelector('code').textConte
  if(navigator.clipboard)navigator.clipboard.writeText(t).then(done).catch(()=>{});else{const a=document.createElement('textarea');a.value=t;document.body.appendChild(a);a.select();document.execCommand('copy');a.remove();done()}}
 })();
 </script>
-{% endblock %}""",
+{% include "tabs_end.html" %}{% endblock %}""",
 "users.html": r"""{% extends "base.html" %}{% block title %}Einstellungen{% endblock %}
 {% block actions %}{% if can("users.manage") %}<a class="btn pri" href="/users/new">{{ ICON.plus }} Neuer Benutzer</a>{% endif %}{% endblock %}
 {% block body %}{% include "tabs.html" %}
-{% if msg %}<div class="msg info">{{ msg }}</div>{% endif %}
+{% if msg %}<div class="msg info flash" role="status">{{ msg }}</div>{% endif %}
 <div class="card" style="padding:6px 8px">
 {% if fails %}<div class="msg err" style="margin:6px 4px 10px">⚠️ {{ fails }} unbestätigte fehlgeschlagene Anmeldung{{ "en" if fails != 1 }}. <a href="/users/log?f=new">Ansehen und bestätigen</a></div>{% endif %}
 {% for grp in conflicts %}<div class="msg info" style="margin:6px 4px 10px">Die Benutzer <b>{{ grp|join(", ") }}</b> unterscheiden sich nur in Groß-/Kleinschreibung. Seit 1.9.0 zählt die Schreibweise bei der Anmeldung nicht mehr, deshalb klappt die Anmeldung für sie nur mit der exakten Schreibweise. Bitte einen davon löschen.</div>{% endfor %}
@@ -2068,11 +2193,11 @@ window.hCopy=function(b){const t=b.parentElement.querySelector('code').textConte
 {% for r in roles.values() %}<p style="margin:8px 0"><b>{{ r.name }}</b>: <span class="mut">{{ r.description }}</span></p>{% endfor %}
 <p>{% if can("roles.manage") %}<a class="btn sm" href="/roles">Rollen verwalten</a> {% endif %}<a class="btn sm" href="/users/log">Anmeldeverlauf</a></p>
 <p class="hint">2FA richtet jeder Benutzer selbst unter „Mein Konto“ ein. Verliert jemand sein Handy und alle Backup-Codes, kann ein Admin die 2FA hier unter „Bearbeiten“ zurücksetzen.</p></div>
-{% endblock %}
+{% include "tabs_end.html" %}{% endblock %}
 """,
 "user_edit.html": r"""{% extends "base.html" %}{% block title %}{{ name if name else "Neuer Benutzer" }}{% endblock %}
 {% block body %}{% include "tabs.html" %}
-{% if err %}<div class="msg err">{{ err }}</div>{% endif %}
+{% if err %}<div class="msg err flash" role="status">{{ err }}</div>{% endif %}
 <form method="post" class="card">
 <h2>{{ "Benutzer bearbeiten" if name else "Neuer Benutzer" }}</h2>
 <label>Benutzername</label><input type="text" name="name" value="{{ name or form.get('name','') }}" {{ "disabled" if name else "required autofocus" }} autocomplete="off">
@@ -2104,7 +2229,7 @@ window.hCopy=function(b){const t=b.parentElement.querySelector('code').textConte
 <div class="hint">Nach der Anmeldung kann der Benutzer nichts anderes tun, bis er unter „Mein Konto“ eine Authenticator-App eingerichtet hat. Er kann 2FA danach nicht selbst ausschalten.</div>{% if name %}<div class="hint">{% if u.totp_enabled %}2FA ist bei diesem Benutzer eingerichtet.{% else %}2FA ist bei diesem Benutzer noch nicht eingerichtet.{% endif %}</div>{% endif %}
 <p style="margin-top:20px"><button class="btn pri">Speichern</button> <a class="btn" href="/users">Abbrechen</a></p>
 </form>
-{% endblock %}
+{% include "tabs_end.html" %}{% endblock %}
 """,
 "account.html": r"""{% extends "base.html" %}{% block title %}Einstellungen{% endblock %}
 {% block body %}{% if not welcome and not force_2fa %}{% include "tabs.html" %}{% endif %}
@@ -2114,15 +2239,15 @@ window.hCopy=function(b){const t=b.parentElement.querySelector('code').textConte
 {% if welcome %}<div class="card" style="border-color:var(--acc)"><h2>Schritt 2 von 2: Konto zusätzlich absichern (optional)</h2>
 <p class="mut" style="margin:0 0 12px">Dein Admin <b style="color:var(--fg)">{{ g.user }}</b> ist angelegt und angemeldet. Du kannst jetzt eine Zwei-Faktor-Anmeldung und einen Passkey einrichten, beides geht auch später unter Einstellungen → Mein Konto.</p>
 <a class="btn pri" href="/account?done=1">Fertig, weiter zur Übersicht</a></div>{% endif %}
-{% if msg %}<div class="msg ok">{{ msg }}</div>{% endif %}
-{% if err %}<div class="msg err">{{ err }}</div>{% endif %}
+{% if msg %}<div class="msg ok flash" role="status">{{ msg }}</div>{% endif %}
+{% if err %}<div class="msg err flash" role="status">{{ err }}</div>{% endif %}
 {% if codes %}<div class="card" style="border-color:var(--acc)"><h2>Deine Backup-Codes</h2>
 <p class="mut">Jeder Code funktioniert genau einmal, falls du keinen Zugriff auf die Authenticator-App hast. <b>Jetzt speichern oder ausdrucken</b>, sie werden nur dieses eine Mal angezeigt.</p>
 <div class="codes" id="codes">{% for c in codes %}<span>{{ c }}</span>{% endfor %}</div>
 <p><button type="button" class="btn sm" onclick="navigator.clipboard.writeText([...document.querySelectorAll('#codes span')].map(e=>e.textContent).join('\n'));this.textContent='Kopiert'">Kopieren</button>
 <button type="button" class="btn sm" onclick="window.print()">Drucken</button></p></div>{% endif %}
 
-{% if not welcome %}<div class="card"><h2>Konto</h2>
+{% if not welcome %}<div class="card"><h2 id="konto">Konto</h2>
 <p class="mut" style="margin:0">Angemeldet als <b style="color:var(--fg)">{{ g.user }}</b> · Rolle {{ role_name(g.role) }}</p>
 <form method="post" style="margin-top:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><input type="hidden" name="action" value="language">
 <label for="mylang" style="margin:0">Sprache</label><select id="mylang" name="language" style="width:auto;min-width:180px"><option value="">Standard des Systems</option>{% for c, n in LANGS() %}<option value="{{ c }}" {{ "selected" if c == g.user_lang }}>{{ n }}</option>{% endfor %}</select>
@@ -2132,7 +2257,7 @@ window.hCopy=function(b){const t=b.parentElement.querySelector('code').textConte
 <td>{% if e.ok %}<span class="tag ok">ok</span>{% else %}<span class="tag fehler">fehlgeschlagen</span>{% endif %} <small class="mut">{{ e.reason }}</small></td></tr>{% endfor %}</table>
 <p class="hint">Eine Anmeldung, die du nicht kennst? Sofort das Passwort ändern und 2FA einschalten.</p>{% endif %}</div>{% endif %}
 
-<div class="card"><h2>Passkeys</h2>
+<div class="card"><h2 id="passkeys">Passkeys</h2>
 <p class="mut" style="margin-top:0">Mit einem Passkey meldest du dich ohne Passwort an: per Fingerabdruck, Gesicht, Geräte-PIN oder Sicherheitsschlüssel (z. B. YubiKey). Der Passkey ersetzt Passwort und 2FA-Code.</p>
 {% if passkeys_list %}<table><tr><th>Name</th><th class="hide-sm">Eingerichtet</th><th class="hide-sm">Zuletzt benutzt</th><th style="text-align:right">Aktionen</th></tr>
 {% for p in passkeys_list %}<tr><td>🔑 <b>{{ p.name }}</b><br><small class="mut">{{ p.rp_id }}{% if p.synced %} · synchronisiert{% endif %}</small></td><td class="hide-sm"><small>{{ p.created }}</small></td><td class="hide-sm"><small>{{ p.last_used or "noch nie" }}</small></td>
@@ -2164,7 +2289,7 @@ async function pkAdd(){const m=document.getElementById('pkmsg');m.className='hin
 </script>
 </div>
 
-<div class="card"><h2>Zwei-Faktor-Anmeldung (2FA)</h2>
+<div class="card"><h2 id="twofa">Zwei-Faktor-Anmeldung (2FA)</h2>
 {% if u.totp_enabled %}
 <p><span class="tag ok">aktiv</span> &nbsp;<span class="mut">Beim Anmelden wird zusätzlich ein Code aus deiner Authenticator-App abgefragt. Noch {{ backup_left }} Backup-Codes übrig.</span></p>
 <div class="row"><form method="post"><input type="hidden" name="action" value="codes"><label>Neue Backup-Codes erzeugen</label>
@@ -2190,18 +2315,18 @@ async function pkAdd(){const m=document.getElementById('pkmsg');m.className='hin
 {% endif %}
 </div>
 
-{% if not welcome %}<form method="post" class="card"><h2>Passwort ändern</h2><input type="hidden" name="action" value="password">
+{% if not welcome %}<form method="post" class="card"><h2 id="password">Passwort ändern</h2><input type="hidden" name="action" value="password">
 <label>Aktuelles Passwort</label><input type="password" name="old" autocomplete="current-password" required>
 <div class="row"><div><label>Neues Passwort</label><input type="password" name="password" autocomplete="new-password" required></div>
 <div><label>Wiederholen</label><input type="password" name="password2" autocomplete="new-password" required></div></div>
 <div class="hint">Mindestens 8 Zeichen. Andere angemeldete Geräte werden abgemeldet.</div>
 <p style="margin-top:16px"><button class="btn pri">Passwort ändern</button></p></form>{% endif %}
-{% endblock %}
+{% if not welcome and not force_2fa %}{% include "tabs_end.html" %}{% endif %}{% endblock %}
 """,
 "roles.html": r"""{% extends "base.html" %}{% block title %}Einstellungen{% endblock %}
 {% block actions %}<a class="btn pri" href="/roles/new">{{ ICON.plus }} Neue Rolle</a>{% endblock %}
 {% block body %}{% include "tabs.html" %}
-{% if msg %}<div class="msg info">{{ msg }}</div>{% endif %}
+{% if msg %}<div class="msg info flash" role="status">{{ msg }}</div>{% endif %}
 <div class="card" style="padding:6px 8px">
 <table><tr><th>Rolle</th><th>Rechte</th><th class="hide-sm">Gilt für</th><th>Benutzer</th><th style="text-align:right">Aktionen</th></tr>
 {% for rid, r in roles.items() %}<tr>
@@ -2215,11 +2340,11 @@ async function pkAdd(){const m=document.getElementById('pkmsg');m.className='hin
 {% if not r.locked and not counts.get(rid) %}<form class="inline" method="post" action="/roles/{{ rid }}/delete" onsubmit="return confirm('Rolle {{ r.name }} löschen?')"><button class="btn sm del">Entfernen</button></form>{% endif %}
 </td></tr>{% endfor %}</table></div>
 <p class="hint">Die Rolle Admin hat immer alle Rechte und kann nicht geändert werden, damit sich niemand aussperrt. Änderungen an einer Rolle gelten sofort für alle ihre Benutzer.</p>
-{% endblock %}
+{% include "tabs_end.html" %}{% endblock %}
 """,
 "api_key_edit.html": r"""{% extends "base.html" %}{% block title %}{{ key.name }}{% endblock %}
 {% block body %}{% include "tabs.html" %}
-{% if err %}<div class="msg err">{{ err }}</div>{% endif %}
+{% if err %}<div class="msg err flash" role="status">{{ err }}</div>{% endif %}
 <form method="post" class="card"><h2>API-Key bearbeiten</h2>
 <p class="mut" style="margin-top:0"><code>msk_{{ kid }}_…</code> · erstellt {{ key.created }} von {{ key.created_by }} · Status: <b>{{ status }}</b></p>
 <div class="row"><div><label>Name</label><input type="text" name="name" value="{{ key.name }}" maxlength="60" required></div>
@@ -2250,13 +2375,13 @@ async function pkAdd(){const m=document.getElementById('pkmsg');m.className='hin
 <p style="margin-top:20px"><button class="btn pri">Speichern</button> <a class="btn" href="/settings/api">Abbrechen</a></p>
 </form>
 <style>.days{display:flex;gap:4px;flex-wrap:wrap}.days label{display:inline-flex}.days input{display:none}.days span{padding:5px 9px;border:1px solid var(--bd);border-radius:8px;cursor:pointer;font-size:13px}.days input:checked+span{background:var(--acc);color:#fff;border-color:var(--acc)}</style>
-{% endblock %}
+{% include "tabs_end.html" %}{% endblock %}
 """,
 
 "groups.html": r"""{% extends "base.html" %}{% block title %}Einstellungen{% endblock %}
 {% block actions %}<a class="btn pri" href="/groups/new">{{ ICON.plus }} Neue Gruppe</a>{% endblock %}
 {% block body %}{% include "tabs.html" %}
-{% if msg %}<div class="msg info">{{ msg }}</div>{% endif %}
+{% if msg %}<div class="msg info flash" role="status">{{ msg }}</div>{% endif %}
 {% if not rows %}<div class="card empty"><p>Noch keine Gruppen.</p><p class="hint">Eine Gruppe fasst Benutzer und API-Keys zusammen. Sie kann zusätzliche Rechte geben, und bei jeder Aufgabe und jedem Speicherort lässt sich einstellen, welche Gruppen ihn sehen.</p></div>{% else %}
 <div class="card" style="padding:6px 8px">
 <table><tr><th>Gruppe</th><th>Mitglieder</th><th class="hide-sm">Zusätzliche Rechte</th><th class="hide-sm">Sieht</th><th style="text-align:right">Aktionen</th></tr>
@@ -2268,12 +2393,12 @@ async function pkAdd(){const m=document.getElementById('pkmsg');m.className='hin
 <td style="text-align:right;white-space:nowrap">{% if r.editable %}<a class="btn sm" href="/groups/{{ r.id }}/edit">Bearbeiten</a>
 <form class="inline" method="post" action="/groups/{{ r.id }}/delete" data-q="{{ _('Gruppe „{0}“ löschen? Die Mitglieder behalten ihre Konten, verlieren aber die Rechte und Sichtbarkeit dieser Gruppe.', r.name) }}" onsubmit="return confirm(this.dataset.q)"><button class="btn sm del">Entfernen</button></form>{% else %}<small class="mut">mehr Rechte als du</small>{% endif %}</td></tr>{% endfor %}</table></div>{% endif %}
 <p class="hint">Rechte eines Mitglieds = Rechte seiner Rolle plus die Rechte aller seiner Gruppen. Welche Aufgaben und Speicherorte jemand sieht, stellst du bei der Aufgabe bzw. beim Speicherort unter „Sichtbar für“ ein. Admins sehen immer alles.</p>
-{% endblock %}
+{% include "tabs_end.html" %}{% endblock %}
 """,
 
 "group_edit.html": r"""{% extends "base.html" %}{% block title %}{{ grp.name if gid else "Neue Gruppe" }}{% endblock %}
 {% block body %}{% include "tabs.html" %}
-{% if err %}<div class="msg err">{{ err }}</div>{% endif %}
+{% if err %}<div class="msg err flash" role="status">{{ err }}</div>{% endif %}
 <form method="post">
 <div class="card"><h2>Gruppe</h2>
 <div class="row"><div><label>Name</label><input type="text" name="name" value="{{ grp.name }}" required maxlength="40"></div>
@@ -2299,11 +2424,11 @@ async function pkAdd(){const m=document.getElementById('pkmsg');m.className='hin
 </form>
 <style>.permgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.permgroup{border:1px solid var(--bd);border-radius:10px;padding:12px 14px;background:var(--card2)}
 .permgroup h3{margin:0}.picklist{margin:6px 0 0 24px;max-height:260px;overflow:auto}@media(max-width:860px){.permgrid{grid-template-columns:1fr}}</style>
-{% endblock %}
+{% include "tabs_end.html" %}{% endblock %}
 """,
 
 "vis_picker.html": r"""{# erwartet: vis ("all" oder Liste), vis_opts, vis_what #}
-{% if vis_nocard %}<div style="margin-top:20px"><h3>Sichtbar für</h3>{% else %}<div class="card"><h2>Sichtbar für</h2>{% endif %}
+{% if vis_nocard %}<div style="margin-top:20px"><h3>Sichtbar für</h3>{% else %}<div class="card"{% if vis_tab %} data-tab="{{ vis_tab }}"{% endif %}><h2>Sichtbar für</h2>{% endif %}
 <label class="check"><input type="radio" name="vis_mode" value="all" {{ "checked" if vis is none or vis == "all" }} onchange="visShow()"> alle mit dem passenden Recht</label>
 <label class="check"><input type="radio" name="vis_mode" value="some" {{ "checked" if vis is not none and vis != "all" }} onchange="visShow()"> nur ausgewählte Benutzer und Gruppen</label>
 <div id="vis_box" class="row" style="margin:6px 0 0 24px">
@@ -2316,7 +2441,7 @@ async function pkAdd(){const m=document.getElementById('pkmsg');m.className='hin
 
 "role_edit.html": r"""{% extends "base.html" %}{% block title %}{{ role.name if rid else "Neue Rolle" }}{% endblock %}
 {% block body %}{% include "tabs.html" %}
-{% if err %}<div class="msg err">{{ err }}</div>{% endif %}
+{% if err %}<div class="msg err flash" role="status">{{ err }}</div>{% endif %}
 {% if locked %}<div class="msg info">Die Rolle Admin hat immer alle Rechte und ist nicht änderbar. Nutze „Als Vorlage“ für eine eigene Variante.</div>{% endif %}
 <form method="post"><fieldset {{ "disabled" if locked }}>
 <div class="card"><h2>Rolle</h2>
@@ -2359,7 +2484,7 @@ function grp(b,on){b.closest('.permgroup').querySelectorAll('input[type=checkbox
 function scope(){for(const k of ['jobs','remotes']){const some=document.querySelector('input[name='+k+'_scope][value=some]').checked;document.getElementById(k+'_list').style.display=some?'':'none'}}
 scope();
 </script>
-{% endblock %}
+{% include "tabs_end.html" %}{% endblock %}
 """,
 "run.html": r"""{% extends "base.html" %}{% block title %}{{ job.name }} · Lauf {{ entry.start if entry else run_id }}{% endblock %}{% block subtitle %}<p class="path">{{ job.source }} {{ "⇄" if job.direction == "bisync" else "→" }} {{ job.dest }}</p>{% endblock %}{% block body %}
 <div class="card">
@@ -2382,13 +2507,15 @@ scope();
 <script>const l=document.getElementById('log');if(l&&{{ 'true' if live else 'false' }})l.scrollTop=l.scrollHeight</script>
 {% endblock %}""",
 "general.html": r"""{% extends "base.html" %}{% block title %}Einstellungen{% endblock %}{% block body %}{% include "tabs.html" %}
-{% if msg %}<div class="msg ok">{{ msg }}</div>{% endif %}
-{% if err %}<div class="msg err">{{ err }}</div>{% endif %}
-<form method="post" class="card"><input type="hidden" name="section" value="lang"><h2>Sprache</h2>
+{% if msg %}<div class="msg ok flash" role="status">{{ msg }}</div>{% endif %}
+{% if err %}<div class="msg err flash" role="status">{{ err }}</div>{% endif %}
+<div class="setsec-tools"><button type="button" class="btn sm" onclick="secAll(true)">Alle aufklappen</button> <button type="button" class="btn sm" onclick="secAll(false)">Alle zuklappen</button></div>
+<details class="setsec" id="sec-ui"><summary><span class="ic">🖥</span><span class="tt"><b>Oberfläche</b><small>Sprache, Dateimanager</small></span></summary><div class="setsec-b">
+<form method="post" class="card" id="lang"><input type="hidden" name="section" value="lang"><h2>Sprache</h2>
 <div class="row"><div><label>Standardsprache</label><select name="language">{% for c, n in LANGS() %}<option value="{{ c }}" {{ "selected" if c == s.language }}>{{ n }}</option>{% endfor %}</select></div>
 <div style="align-self:end"><button class="btn pri">Speichern</button></div></div>
 <div class="hint">Gilt für die Anmeldeseite, Benachrichtigungen, API-Meldungen und alle Benutzer ohne eigene Auswahl. Jeder Benutzer stellt seine Sprache unter <a href="/account">Mein Konto</a> ein.</div></form>
-<form method="post" class="card"><input type="hidden" name="section" value="files"><h2>Dateimanager</h2>
+<form method="post" class="card" id="files"><input type="hidden" name="section" value="files"><h2>Dateimanager</h2>
 <div class="row"><div style="flex:0 0 300px"><label for="files_speed">Tempo beim Kopieren und Verschieben</label><select name="files_speed" id="files_speed">
 {% set fsp = s.files_speed or "normal" %}<option value="gentle" {{ "selected" if fsp == "gentle" }}>Schonend (2 parallel)</option>
 <option value="normal" {{ "selected" if fsp == "normal" }}>Normal (4 parallel)</option>
@@ -2396,7 +2523,9 @@ scope();
 <option value="max" {{ "selected" if fsp == "max" }}>Sehr schnell (16 parallel)</option></select></div>
 <div style="align-self:end"><button class="btn pri">Speichern</button></div></div>
 <div class="hint">Wie viele Dateien der Dateimanager gleichzeitig überträgt. Mehr parallel lohnt sich vor allem bei vielen kleinen Dateien und bei Clouds. Aufgaben haben ihr eigenes Tempo unter „Optionen“.</div></form>
-<form method="post" class="card"><input type="hidden" name="section" value="update"><h2>Updates</h2>
+</div></details>
+<details class="setsec" id="sec-updates"><summary><span class="ic">⬆</span><span class="tt"><b>Updates und Neustart</b><small>Nach Updates suchen, selbst aktualisieren, alte Images, Neustart</small></span></summary><div class="setsec-b">
+<form method="post" class="card" id="update"><input type="hidden" name="section" value="update"><h2>Updates</h2>
 <label class="check"><input type="checkbox" name="update_check" {{ "checked" if upd.enabled }}> Nach neuen Versionen suchen</label>
 {% set upd_h = upd.interval_minutes % 60 == 0 %}<div class="row" style="margin-top:8px"><div style="flex:0 0 300px"><label>Prüfen alle</label><div style="display:flex;gap:8px"><input type="number" name="update_interval_value" min="1" max="43200" value="{{ (upd.interval_minutes // 60) if upd_h else upd.interval_minutes }}" style="width:110px"><select name="update_interval_unit"><option value="min" {{ "selected" if not upd_h }}>Minuten</option><option value="h" {{ "selected" if upd_h }}>Stunden</option></select></div></div></div>
 <div class="hint">Fragt im eingestellten Abstand bei GitHub nach, ob es eine neuere Version gibt, und zeigt sie unten links neben der Versionsnummer an. Übertragen wird dabei nur die eigene Versionsnummer. Erlaubt sind 5 Minuten bis 720 Stunden, Standard 1 Stunde.</div>
@@ -2441,6 +2570,8 @@ scope();
 <div><label>Wochentage</label><div style="display:flex;gap:10px;flex-wrap:wrap">{% for d in range(7) %}<label class="check" style="margin:0"><input type="checkbox" name="restart_day_{{ d }}" {{ "checked" if d in rs.days }}> {{ day_names[d] }}</label>{% endfor %}</div></div></div>
 <div class="hint">Läuft gerade eine Aufgabe, wartet der Neustart, bis sie fertig ist (höchstens bis Mitternacht). Zeitzone des Containers.</div>
 <p><button class="btn pri">Speichern</button></p></form></div>{% endif %}
+</div></details>
+<details class="setsec" id="sec-monitoring"><summary><span class="ic">📈</span><span class="tt"><b>Überwachung</b><small>Health, Prometheus, Datenvolumen pro Monat</small></span></summary><div class="setsec-b">
 <form method="post" class="card" id="monitor"><input type="hidden" name="section" value="monitor"><h2>Überwachung und Datenvolumen</h2>
 <p class="mut" style="margin-top:-4px">Für Uptime Kuma, Home Assistant, Grafana und andere: Zustand der Aufgaben und Kennzahlen abrufen.</p>
 <table class="chg" style="margin:6px 0 8px"><tr><td><b>Health</b></td><td><code>{{ base_url }}/health/jobs</code></td></tr>
@@ -2449,7 +2580,7 @@ scope();
 <tr><td></td><td><small class="mut">Läufe, Datenmengen, Dauer, Zustand und freier Speicher je Aufgabe, für Grafana.</small></td></tr></table>
 <div class="hint">Zugriff mit einem API-Key mit dem Recht <code>system.monitor</code> (oder <code>jobs.view</code>): Header <code>Authorization: Bearer msk_…</code> oder <code>?key=msk_…</code> in der Adresse. Es erscheinen nur die Aufgaben, die der Key sehen darf.</div>
 <label class="check"><input type="checkbox" name="monitor_public" {{ "checked" if s.monitor_public }}> Ohne Anmeldung abrufbar (zeigt Namen und Zustand aller Aufgaben, keine Pfade oder Zugangsdaten)</label>
-<div class="section"><h3>Datenvolumen pro Monat</h3>
+<div class="section"><h3 id="volume">Datenvolumen pro Monat</h3>
 <div class="row"><div style="flex:0 0 220px"><label>Limit (GB pro Monat)</label><input type="text" inputmode="decimal" name="volume_limit_gb" value="{{ s.volume_limit_gb or '' }}" placeholder="kein Limit"></div>
 <div style="flex:0 0 200px"><label>Warnen ab (%)</label><input type="text" inputmode="numeric" name="volume_warn_pct" value="{{ s.volume_warn_pct or '80' }}"></div>
 <div>{% if vol %}<label>Dieser Monat</label><div style="margin-top:8px"><b>{{ vol.used|hbytes }}</b> von {{ vol.limit|hbytes }} ({{ vol.pct }} %)</div><div class="fm-bar" style="width:100%;margin-top:6px"><i style="width:{{ [vol.pct,100]|min }}%;background:{{ 'var(--err)' if vol.exceeded else ('var(--warn)' if vol.warn else 'var(--ok)') }}"></i></div>{% endif %}</div></div>
@@ -2457,7 +2588,9 @@ scope();
 <label class="check"><input type="checkbox" name="volume_stop" {{ "checked" if s.volume_stop }}> Bei erreichtem Limit automatische Läufe bis zum Monatsende anhalten (von Hand gestartete laufen weiter)</label>
 <div class="hint">Gezählt wird, was MirrorSync in echten Läufen überträgt. Den Verlauf je Monat und Aufgabe zeigt die Seite <a href="/stats">Statistik</a>.</div></div>
 <p><button class="btn pri">Speichern</button></p></form>
-<form method="post"><div class="card"><h2>Logs aufbewahren</h2>
+</div></details>
+<details class="setsec" id="sec-logsec"><summary><span class="ic">📜</span><span class="tt"><b>Logs</b><small>Aufbewahrung, alte Logs löschen</small></span></summary><div class="setsec-b">
+<form method="post"><div class="card"><h2 id="logs">Logs aufbewahren</h2>
 <p class="mut" style="margin-top:-4px">Jeder Lauf bekommt ein eigenes Log. Ältere Läufe werden nach jedem Lauf automatisch gelöscht.</p>
 <div class="row"><div><label>Läufe pro Aufgabe behalten</label><input type="text" inputmode="numeric" name="log_keep_runs" value="{{ s.log_keep_runs }}"><div class="hint">0 bis 1000, 0 = unbegrenzt</div></div>
 {% set ku = s.log_keep_unit if s.log_keep_unit in ("d", "w", "m") else "d" %}{% set kf = {"d": 1, "w": 7, "m": 30}[ku] %}<div><label>Höchstens so lange behalten</label><div style="display:flex;gap:8px"><input type="text" inputmode="numeric" name="log_keep_value" value="{{ ((s.log_keep_days or 0)|int // kf) }}" style="width:110px"><select name="log_keep_unit"><option value="d" {{ "selected" if ku == "d" }}>Tage</option><option value="w" {{ "selected" if ku == "w" }}>Wochen</option><option value="m" {{ "selected" if ku == "m" }}>Monate</option></select></div><div class="hint">0 = unbegrenzt. Ein Monat zählt als 30 Tage.</div></div></div>
@@ -2469,7 +2602,9 @@ scope();
 <div class="row"><div style="flex:0 0 260px"><label>Läufe löschen, die gestartet sind vor dem</label><input type="date" name="purge_before" value="{{ purge.before if purge else '' }}" required></div></div>
 <p style="margin-top:12px"><button class="btn" name="purge_action" value="preview">Anzahl anzeigen</button>{% if purge and purge.runs %} <button class="btn del" name="purge_action" value="delete" onclick="return confirm('Die angezeigten Läufe und ihre Logs endgültig löschen? Das lässt sich nicht rückgängig machen.')">Jetzt endgültig löschen</button>{% endif %}</p></div></form>
 
-<form method="post"><input type="hidden" name="section" value="security"><div class="card"><h2>Anmeldung und Sicherheit</h2>
+</div></details>
+<details class="setsec" id="sec-secsec"><summary><span class="ic">🔐</span><span class="tt"><b>Anmeldung und Sicherheit</b><small>Kontosperre, 2FA erzwingen, Meldungen, Reverse-Proxy, Passkeys, Länder-Datenbank</small></span></summary><div class="setsec-b">
+<form method="post"><input type="hidden" name="section" value="security"><div class="card"><h2 id="security">Anmeldung und Sicherheit</h2>
 <div class="row"><div><label>Konto sperren nach so vielen Fehlversuchen</label><input type="text" inputmode="numeric" name="lock_attempts" value="{{ s.lock_attempts }}"><div class="hint">0 = nie sperren. Falsches Passwort und falscher 2FA-Code zählen.</div></div>
 <div><label>Sperrdauer in Minuten</label><input type="text" inputmode="numeric" name="lock_minutes" value="{{ s.lock_minutes }}"><div class="hint">0 = dauerhaft deaktivieren, bis ein Admin es wieder freigibt. Der letzte Admin wird höchstens 15 Minuten gesperrt.</div></div></div>
 {% set r2 = s.require_2fa_mode if s.require_2fa_mode in ("off", "new", "all") else "off" %}
@@ -2485,13 +2620,13 @@ scope();
 <option value="off" {{ "selected" if fm == "off" }}>nie</option></select></div>
 <div><label>Höchstens eine Meldung alle … Minuten</label><input type="text" inputmode="numeric" name="fail_notify_minutes" value="{{ s.fail_notify_minutes or 15 }}"></div></div>
 <div class="hint">Versand über die Standard-Kanäle unter <a href="/settings">Benachrichtigungen</a> (Webhook, E-Mail, Telegram). Fehlversuche innerhalb der Drosselzeit werden gesammelt und mit der nächsten Meldung geschickt. Eine Sperre wird immer sofort gemeldet.</div>
-<h3>IP-Adresse und Land</h3>
+<h3 id="proxy">IP-Adresse und Land</h3>
 <label class="check"><input type="checkbox" name="trust_proxy" {{ "checked" if s.trust_proxy }}> MirrorSync läuft hinter einem Reverse-Proxy (z. B. Nginx Proxy Manager, Traefik, Caddy): IP-Adresse aus dem Header X-Forwarded-For verwenden</label>
 <div class="hint">Nur einschalten, wenn wirklich ein Proxy davor sitzt, sonst kann jeder eine falsche Adresse vorgeben. Deine Adresse gerade: <code>{{ my_ip }}</code> {{ my_loc.flag }} {{ my_loc.name }}{% if fwd and not s.trust_proxy %} · Der Browser kam über einen Proxy (<code>X-Forwarded-For: {{ fwd }}</code>), Häkchen setzen.{% endif %}</div>
-<h3>Passkeys</h3>
+<h3 id="passkeys">Passkeys</h3>
 <label>Öffentliche Adresse von MirrorSync</label><input type="text" name="public_url" value="{{ s.public_url or '' }}" placeholder="https://sync.example.de">
 <div class="hint">Passkeys sind an einen Domainnamen gebunden und brauchen HTTPS. Leer = die Adresse, über die du MirrorSync gerade aufrufst{% if pk_now %} (jetzt: <code>{{ pk_now }}</code>){% endif %}. Über eine IP-Adresse oder <code>http://</code> gibt es keine Passkeys. Die Adresse später zu ändern macht bestehende Passkeys unbrauchbar.</div>
-<label class="check" style="margin-top:16px"><input type="checkbox" name="geoip_auto" {{ "checked" if s.geoip_auto }}> Länder-Datenbank (DB-IP Lite, ca. 8 MB) automatisch laden und erneuern</label>
+<label class="check" id="geoip" style="margin-top:16px"><input type="checkbox" name="geoip_auto" {{ "checked" if s.geoip_auto }}> Länder-Datenbank (DB-IP Lite, ca. 8 MB) automatisch laden und erneuern</label>
 {% set gsched = s.geoip_mode == "schedule" %}{% set gdow = (s.geoip_dow or "mon").split(",") %}
 <label>Erneuern</label>
 <div class="seg" id="gmode"><label><input type="radio" name="geoip_mode" value="interval" {{ "checked" if not gsched }} onchange="gShow()"><span>Nach Intervall</span></label><label><input type="radio" name="geoip_mode" value="schedule" {{ "checked" if gsched }} onchange="gShow()"><span>Nach Zeitplan (Uhrzeit und Wochentage)</span></label></div>
@@ -2506,12 +2641,19 @@ scope();
 Die Abfrage erfolgt lokal im Container, es werden keine Adressen an fremde Dienste geschickt. Eigene Datei (z. B. <code>GeoLite2-Country.mmdb</code>) kannst du nach <code>config/geoip/</code> legen. {{ attribution }}</div>
 <p style="margin-top:16px"><button class="btn pri">Speichern</button> <button class="btn" name="geoip_now" value="1">Speichern und Länder-Datenbank jetzt laden</button></p></div></form>
 
-<form method="post"><input type="hidden" name="section" value="bw"><div class="card"><h2>Bandbreite (Standard)</h2>{% set bw_unit_select = true %}
+</div></details>
+<details class="setsec" id="sec-perf"><summary><span class="ic">🚀</span><span class="tt"><b>Leistung</b><small>Bandbreite (Standard) für alle Aufgaben</small></span></summary><div class="setsec-b">
+<form method="post"><input type="hidden" name="section" value="bw"><div class="card"><h2 id="bw">Bandbreite (Standard)</h2>{% set bw_unit_select = true %}
 <p class="mut" style="margin-top:-4px">Gilt für alle Aufgaben mit „Standard verwenden“. Jede Aufgabe kann eigene Grenzen haben.<br>Aktuell: <b>{{ bw_desc }}</b></p>
 {% include "bw_editor.html" %}
 {% if bw_tt %}<details style="margin-top:10px"><summary class="hint" style="cursor:pointer">rclone-Zeittabelle anzeigen</summary><pre style="margin-top:6px">--bwlimit "{{ bw_tt }}"</pre></details>{% endif %}
 <p style="margin-top:16px"><button class="btn pri">Bandbreite speichern</button></p></div></form>
-{% endblock %}""",
+</div></details>
+<script>(function(){const K='ms-gen-open';let st={};try{st=JSON.parse(localStorage.getItem(K)||'{}')}catch(e){}
+const all=[...document.querySelectorAll('details.setsec')];const any=Object.keys(st).length>0;
+all.forEach((d,i)=>{d.open=any?!!st[d.id]:i===0;d.addEventListener('toggle',()=>{st[d.id]=d.open;try{localStorage.setItem(K,JSON.stringify(st))}catch(e){}})});
+window.secAll=o=>all.forEach(d=>{d.open=o});})()</script>
+{% include "tabs_end.html" %}{% endblock %}""",
 "bw_editor.html": r"""<input type="hidden" name="bw_json" id="bw_json">
 {% if bw_unit_select %}<div class="row"><div style="flex:0 0 220px"><label>Einheit</label><select name="bw_unit" id="bw_unit"><option value="MB/s" {{ "selected" if bw_unit() == "MB/s" }}>MB/s (Megabyte pro Sekunde)</option><option value="Mbit/s" {{ "selected" if bw_unit() == "Mbit/s" }}>Mbit/s (Megabit pro Sekunde)</option></select></div></div>{% endif %}
 <label>Außerhalb der Zeitfenster</label>
@@ -2561,7 +2703,7 @@ const f=document.getElementById('bw_json').form;f.addEventListener('submit',()=>
 })();
 </script>""",
 "login_log.html": r"""{% extends "base.html" %}{% block title %}Einstellungen{% endblock %}{% block body %}{% include "tabs.html" %}
-{% if msg %}<div class="msg ok">{{ msg }}</div>{% endif %}
+{% if msg %}<div class="msg ok flash" role="status">{{ msg }}</div>{% endif %}
 <div class="card">
 <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><h2 style="margin:0">Anmeldeverlauf{% if who %} von {{ who }}{% endif %}</h2><a class="btn" href="/users">Zurück</a></div>
 <div class="chips" style="margin-top:12px">{% for k, label in [("all","Alle"),("new","Unbestätigt"),("fail","Fehlgeschlagen"),("ok","Erfolgreich")] %}<a class="chip {{ 'active' if flt == k }}" href="?f={{ k }}{% if who %}&u={{ who|urlencode }}{% endif %}">{{ label }}{% if k == "new" and unacked %} <b>{{ unacked }}</b>{% endif %}</a>{% endfor %}{% if who %}<a class="chip" href="?f={{ flt }}">alle Benutzer</a>{% endif %}</div>
@@ -2588,7 +2730,7 @@ const f=document.getElementById('bw_json').form;f.addEventListener('submit',()=>
 f.net.value=ip;f.minutes.value=parseInt(d)||0;f.note.value='aus dem Anmeldeverlauf';f.submit()}</script>{% endif %}
 <p class="hint">Unbestätigte Fehlversuche erscheinen als rote Zahl bei „Einstellungen“ und „Benutzer“, bis du sie bestätigst oder löschst. Gespeichert werden die letzten 1000 Anmeldeversuche in der Datenbank.{% if geo.ok %} {{ attribution }}{% else %} Für die Länder unter Einstellungen → Allgemein die Länder-Datenbank laden.{% endif %}</p>
 </div>
-{% endblock %}""",
+{% include "tabs_end.html" %}{% endblock %}""",
 "audit.html": r"""{% extends "base.html" %}{% block title %}Audit-Log{% endblock %}
 {% block subtitle %}<p>Wer hat wann was gemacht: Änderungen an Aufgaben, Zeitplänen, Speicherorten, Benutzern, Rollen, Einstellungen und Zugriffsregeln, Starts und Stopps, An- und Abmeldungen.</p>{% endblock %}
 {% block actions %}<a class="btn" href="/audit/export.csv{% if args %}?{{ args|urlencode }}{% endif %}">⬇ CSV exportieren</a>{% endblock %}
@@ -2937,10 +3079,10 @@ setInterval(async()=>{if(editing||document.hidden||String(getSelection())!=='')r
 </script>
 {% endblock %}""",
 "access.html": r"""{% extends "base.html" %}{% block title %}Einstellungen{% endblock %}{% block body %}{% include "tabs.html" %}
-{% if msg %}<div class="msg ok">{{ msg }}</div>{% endif %}
-{% if err %}<div class="msg err">{{ err }}</div>{% endif %}
+{% if msg %}<div class="msg ok flash" role="status">{{ msg }}</div>{% endif %}
+{% if err %}<div class="msg err flash" role="status">{{ err }}</div>{% endif %}
 {% if off %}<div class="msg info">Der Zugriffsschutz ist per Umgebungsvariable <code>IPGUARD=off</code> abgeschaltet. Die Regeln werden gespeichert, aber nicht angewendet.</div>{% endif %}
-<div class="card"><h2>Deine Verbindung</h2>
+<div class="card"><h2 id="conn">Deine Verbindung</h2>
 <p style="margin:0">Deine Adresse: <code>{{ my_ip }}</code> {{ my_loc.flag }} {{ my_loc.name }} ·
 {% if my_verdict %}<span class="tag fehler">wäre gesperrt: {{ my_verdict[0] }}</span>{% else %}<span class="tag ok">erlaubt</span>{% endif %}</p>
 {% if fwd and not trust_proxy %}<div class="msg err" style="margin:10px 0 0">Du kommst über einen Reverse-Proxy (<code>X-Forwarded-For: {{ fwd }}</code>), aber „Reverse-Proxy“ ist unter <a href="/settings/general">Allgemein</a> aus. Dann sieht MirrorSync für alle Besucher nur die Adresse des Proxys ({{ my_ip }}), und eine Sperre würde alle treffen. Bitte zuerst dort das Häkchen setzen.</div>
@@ -2948,7 +3090,7 @@ setInterval(async()=>{if(editing||document.hidden||String(getSelection())!=='')r
 <p class="hint">Schutz vor dem Aussperren: Regeln, die deine aktuelle Adresse sperren würden, werden nicht gespeichert. Der Container selbst (127.0.0.1) ist nie gesperrt. Notfall-Zurücksetzen siehe README.</p></div>
 
 <form method="post">
-<div class="card"><h2>Erlaubt-Liste</h2>
+<div class="card"><h2 id="allow">Erlaubt-Liste</h2>
 <p class="mut" style="margin-top:-4px">Ist sie leer, sind alle Adressen erlaubt. Sonst kommen nur diese Adressen, Netze und Hostnamen an MirrorSync heran. Eine Zeile pro Eintrag, Kommentar nach <code>#</code>.</p>
 <textarea name="allow" rows="5" placeholder="192.168.1.0/24   # Heimnetz&#10;10.8.0.0/24      # VPN&#10;buero.example.de # Büro mit DynDNS">{{ cfg.allow|join("\n") }}</textarea>
 <div class="hint">Hostnamen (FQDN, z. B. <code>buero.example.de</code>) werden bei einer Anfrage per DNS aufgelöst (IPv4 und IPv6) und die Adresse damit verglichen. Das Ergebnis gilt 5 Minuten, so passen auch DynDNS-Namen. Platzhalter wie <code>*.example.de</code> gehen nicht. Ist der DNS gerade nicht erreichbar, gilt der letzte bekannte Stand.</div>
@@ -2956,7 +3098,7 @@ setInterval(async()=>{if(editing||document.hidden||String(getSelection())!=='')r
 <p style="margin:8px 0 0"><button type="button" class="btn sm" onclick="addLan()">Nur lokales Netz erlauben (private Bereiche eintragen)</button></p>
 </div>
 
-<div class="card"><h2>Länder</h2>
+<div class="card"><h2 id="countries">Länder</h2>
 <div class="row"><div><label>Regel</label><select name="country_mode">
 <option value="off" {{ "selected" if cfg.country_mode == "off" }}>aus</option>
 <option value="allow" {{ "selected" if cfg.country_mode == "allow" }}>nur diese Länder erlauben</option>
@@ -2966,7 +3108,7 @@ setInterval(async()=>{if(editing||document.hidden||String(getSelection())!=='')r
 <div class="hint">Das lokale Netz ist von der Länderregel immer ausgenommen. {% if geo.ok %}Länder-Datenbank: <code>{{ geo.file }}</code>{% if geo.date %} vom {{ geo.date }}{% endif %}.{% else %}<span class="fehler">Keine Länder-Datenbank geladen, die Länderregel wirkt deshalb noch nicht.</span> Laden unter <a href="/settings/general">Allgemein</a>.{% endif %} Adressen, deren Land unbekannt ist, werden nicht gesperrt.</div>
 </div>
 
-<div class="card"><h2>Automatisch sperren</h2>
+<div class="card"><h2 id="autoban">Automatisch sperren</h2>
 <div class="row"><div><label>IP sperren nach so vielen Fehlversuchen</label><input type="text" inputmode="numeric" name="auto_attempts" value="{{ cfg.auto_attempts }}"><div class="hint">0 = aus. Zählt falsche Passwörter, 2FA-Codes und unbekannte Benutzer.</div></div>
 <div><label>innerhalb von Minuten</label><input type="text" inputmode="numeric" name="auto_window" value="{{ cfg.auto_window }}"></div>
 <div><label>Sperrdauer in Minuten</label><input type="text" inputmode="numeric" name="auto_minutes" value="{{ cfg.auto_minutes }}"><div class="hint">0 = dauerhaft</div></div></div>
@@ -2976,7 +3118,7 @@ setInterval(async()=>{if(editing||document.hidden||String(getSelection())!=='')r
 <p><button class="btn pri">Regeln speichern</button></p>
 </form>
 
-<div class="card"><h2>Sperrliste</h2>
+<div class="card"><h2 id="blocklist">Sperrliste</h2>
 <form method="post" action="/settings/access/block"><div class="row" style="align-items:flex-end">
 <div style="flex:2"><label>IP-Adresse, Netz oder Hostname</label><input type="text" name="net" placeholder="1.2.3.4  oder  1.2.3.0/24  oder  facebook.com" required></div>
 <div style="flex:2"><label>Notiz</label><input type="text" name="note" placeholder="optional"></div>
@@ -2997,7 +3139,7 @@ function addLan(){const t=document.querySelector('[name=allow]');const add=['10.
 function tog(el,c){const i=document.getElementById('cc');let l=i.value.split(/[,\s;]+/).map(x=>x.trim().toUpperCase()).filter(Boolean);
  if(l.includes(c)){l=l.filter(x=>x!==c);el.classList.remove('active')}else{l.push(c);el.classList.add('active')}i.value=l.join(', ')}
 </script>
-{% endblock %}""",
+{% include "tabs_end.html" %}{% endblock %}""",
 }
 
 ICONS = {'chart': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6" rx="1"/><rect x="12" y="8" width="3" height="10" rx="1"/><rect x="17" y="5" width="3" height="13" rx="1"/></svg>', 'dash': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>', 'folder': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>', 'audit': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/><path d="M8 13h8M8 17h5"/></svg>', 'clock': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>', 'jobs': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 1-15.5 6.2L3 16"/><path d="M3 12a9 9 0 0 1 15.5-6.2L21 8"/><path d="M21 3v5h-5"/><path d="M3 21v-5h5"/></svg>', 'storage': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="7" rx="2"/><rect x="3" y="13" width="18" height="7" rx="2"/><path d="M7 7.5h.01M7 16.5h.01"/></svg>', 'bell': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/></svg>', 'theme': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 3v18" /><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor"/></svg>', 'logout': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>', 'play': '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l12.5-7.5z"/></svg>', 'plus': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>', 'gear': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>', 'lock': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>'}

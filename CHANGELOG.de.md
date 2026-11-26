@@ -3,6 +3,39 @@
 Versionsnummern nach [SemVer](https://semver.org/lang/de/): MAJOR.MINOR.PATCH
 (MAJOR = inkompatible Änderung, MINOR = neue Funktion, PATCH = Fehlerbehebung).
 
+## 1.55.0 – 2026-11-26
+**Übersichtliche Einstellungen**
+- **Einstellungen** mit einer Leiste links statt zehn Tabs nebeneinander, in vier Gruppen: **Benutzer & Rechte**
+  (Benutzer, Rollen, Gruppen), **Sicherheit** (Zugriff, API), **System** (Allgemein, Benachrichtigungen, Sicherung)
+  und **Persönlich** (Mein Konto, Hilfe). Sichtbar sind wie bisher nur Seiten, für die man das Recht hat. Am Handy
+  stehen die Seiten als Knöpfe zum Wischen über dem Inhalt.
+- **Suchfeld** für die Einstellungen: springt direkt zur passenden Einstellung (z. B. „2FA“, „Bandbreite“, „Passkeys“),
+  klappt den Bereich auf und hebt ihn kurz hervor; `/` springt ins Suchfeld. Ohne Treffer geht es in die Hilfe.
+- **Allgemein** in Bereiche zum Aufklappen aufgeteilt: Oberfläche, Updates und Neustart, Überwachung, Logs, Anmeldung
+  und Sicherheit, Leistung. „Alle aufklappen“ und „Alle zuklappen“; offene Bereiche merkt sich der Browser.
+
+**Aufgabe bearbeiten**
+- **Reiter** statt einer langen Seite: Grundlagen, Filter, Verhalten, Prüfen & schützen, Benachrichtigungen, Erweitert.
+  Abzeichen zeigen, wo etwas eingestellt ist („3 Regeln“, „2 aktiv“), „Alle anzeigen“ zeigt alles untereinander.
+  Fehlt ein Pflichtfeld in einem anderen Reiter, springt das Formular dorthin.
+- **Zusammenfassung** oben: Quelle → Ziel, Start, Papierkorb, Prüflauf, Löschwarnung, Verschlüsselung, Zeitfenster.
+- **Speichern-Leiste** bleibt beim Scrollen unten. Neu: **Speichern und testen** speichert und startet gleich einen
+  Testlauf (braucht `jobs.run`).
+
+**Speicherort bearbeiten**
+- Aufgeteilt in **Verbindung**, **Anmeldedaten**, **Erweiterte Optionen** und **Sichtbar für**, Felder zweispaltig.
+- **Alles bearbeitbar**: Der **Name lässt sich ändern**, Aufgaben (Quelle, Ziel, SSH-Host) und Speicherorte, die darauf
+  aufbauen (z. B. Verschlüsselung), werden mit umgestellt. Geleerte Felder werden entfernt (dann gilt der Standard),
+  ein gespeichertes Passwort lässt sich **entfernen**.
+- **Alle Einträge (rclone.conf)**: alle gespeicherten Einträge als Text, auch solche ohne eigenes Feld; Passwörter
+  stehen als `••••••` da und bleiben erhalten, neue werden verschleiert gespeichert.
+- Erweiterte Optionen mit **Suche** und „nur gesetzte anzeigen“; **Speichern und Verbindung testen**.
+
+**Weiteres**
+- **Meldungen** oben auf der Seite (z. B. „Aufgabe „rr“ entfernt.“) lassen sich mit **×** wegklicken.
+- API und MCP: neu `GET /api/v1/settings/search` bzw. `find_setting` (Einstellung finden, mit Link); `update_remote`
+  mit `new_name`, `clear` und `raw`; `get_remote` liefert `raw`. Hilfe und alle Texte in fünf Sprachen.
+
 ## 1.54.0 – 2026-11-26
 **Hilfe**
 - Neue **Hilfe** (Tab „❓ Hilfe“ in den Einstellungen, Knopf „❓ Hilfe“ in jeder Aufgabe): erklärt alles, was man in
