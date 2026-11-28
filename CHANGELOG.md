@@ -3,6 +3,60 @@
 Version numbers follow [SemVer](https://semver.org/): MAJOR.MINOR.PATCH
 (MAJOR = incompatible change, MINOR = new feature, PATCH = bug fix).
 
+## 1.58.0 – 2026-11-28
+**Live log**
+- The log of a running sync loads new lines without reloading the page. Checkbox **Auto-refresh**: when off, the log
+  stays where it is instead of jumping away while you scroll up.
+- When you scroll up, **⬇ Jump to bottom** appears with the number of new lines since the pause; one click jumps to the
+  end and turns auto-refresh back on.
+- **Search** with highlighting and “only matches”, selection **errors only**, **warnings only** or both; errors are red,
+  warnings yellow. **Line wrap** can be toggled.
+- **↓ .txt**: the whole log as a text file, even while the sync is running (current state), or only the lines shown.
+- New log filter “Warnings” (GUI, API, MCP).
+
+**Jobs**
+- **Detect renames** (Behavior → Options): renamed or moved files are only renamed in the destination instead of being
+  copied again (rclone `--track-renames`), by checksum or by size and modification time.
+- **Size filter** (Filter tab): skip files smaller or larger than a limit (e.g. < 1 KB, > 4 GB).
+- **One source, multiple destinations**: up to 10 further destinations mirrored in the same run after the main
+  destination. The history shows the result per destination.
+- **Tags** per job with a tag filter in the overview, **note** per job (overview, log, PDF, calendar).
+- **Priority** (high, normal, low) and **queue**: Settings → General → Runs and calendar limits the number of
+  simultaneous runs; further ones wait (status “waiting”) and start by priority.
+- **Global maintenance mode**: pause all schedules, live runs, chains and retries with one click, for a duration, until
+  a date (ends automatically) or until you end it. Banner with “End”. New page Settings → Maintenance mode, new
+  permission `system.maintenance` (the template role Operator has it).
+- **FreeFileSync import** (overview → 📥 Import): read `.ffs_batch` and `.ffs_gui`, replace Windows paths, check folder
+  pairs and create them as jobs (comparison, excludes, size filter, versioning, two-way).
+
+**Analysis**
+- **Compare two runs**: key figures side by side and which files were copied, deleted, renamed or reported with an
+  error only in one, only in the other or in both runs.
+- **Run report as PDF** in the history and in every run.
+- **♊ Find duplicate files** in source or destination (checksum, name and size, or size only) with the possible saving.
+
+**File manager**
+- **🖼 Thumbnails** and image view for JPG, PNG, GIF, WebP, AVIF and BMP (can be turned off, size limit).
+- **🔗 Share links**: time-limited download link for a file, optionally with password and download limit, list with
+  downloads and delete. New permission `files.share`, every download is in the audit log.
+
+**Integrations**
+- **MQTT for Home Assistant** (Settings → MQTT): status and progress of all jobs live, MQTT discovery creates the device
+  “MirrorSync” with sensors, optional buttons to start, test and stop and a switch for maintenance mode. Connection
+  test, TLS, user and password.
+- **Calendar export (iCal)**: Schedules → 📅 Calendar (.ics) and a personal calendar subscription under My account
+  (Outlook, Google, Apple). Follow-up jobs appear estimated after their predecessor.
+
+**Settings, permissions, API/MCP, help, languages**
+- New pages **Maintenance mode** (Maintenance group) and **MQTT** (Monitoring group); under General new sections
+  **Image preview**, **Share links** and **Runs and calendar**. Everything can be found via the settings search.
+- Backup: new parts “MQTT (Home Assistant)”, “File manager” and “Share links”.
+- New API/MCP tools: `get_run_log_tail`, `compare_runs`, `get_run_report`, `find_duplicates`, `get_duplicates`,
+  `import_ffs`, `get_maintenance`, `set_maintenance`, `get_queue`, `list_share_links`, `create_share_link`,
+  `delete_share_link`, `get_calendar`, `get_mqtt`, `update_mqtt`, `test_mqtt`, `update_run_settings`. Jobs know
+  `track_renames`, `min_size`, `max_size`, `extra_dests`, `tags`, `priority` and `note`; `run_job` reports `queued`.
+- Help entries for all new features, all texts in English, Spanish, French and Italian.
+
 ## 1.57.0 – 2026-11-26
 **Restore test**
 - New under **Job → Check & protect**: after a successful run MirrorSync brings back a few random files from the

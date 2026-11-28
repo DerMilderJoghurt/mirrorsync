@@ -23,6 +23,9 @@ TEXT_MAX = 1024 * 1024          # Bearbeiten im Editor
 READ_MAX = 5 * 1024 * 1024      # Lesen per API (base64)
 LIST_MAX = 5000
 TASKS_KEEP = 50
+# Bildvorschau (seit 1.58.0). Kein SVG: koennte Skripte enthalten.
+THUMB_TYPES = {"jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png", "gif": "image/gif", "webp": "image/webp",
+               "bmp": "image/bmp", "avif": "image/avif", "ico": "image/x-icon"}
 
 OP_PERMS = {"locations": "files.view", "list": "files.view", "size": "files.view", "info": "files.view",
             "read": "files.view", "tasks": "files.view",
@@ -611,11 +614,15 @@ def _fail(e):
 def register(app, core_module):
     global core
     core = core_module
-    core.ENDPOINT_PERMS.update({"files_page": "files.view", "files_download": "files.view", "files_upload": "files.edit"})
+    core.ENDPOINT_PERMS.update({"files_page": "files.view", "files_download": "files.view", "files_upload": "files.edit",
+                                "files_thumb": "files.view"})
 
     @app.get("/files")
     def files_page():
-        return core.render_template("files.html", locations=locations(), can_local=g.access.has("local.paths"))
+        st = core.load_settings()
+        return core.render_template("files.html", locations=locations(), can_local=g.access.has("local.paths"),
+                                    thumbs=bool(st.get("thumbs", True)), share_on=bool(st.get("share_enabled", True)),
+                                    share_max=st.get("share_max_days") or 30)
 
     @app.post("/files/op/<op>")
     def files_op(op):
@@ -640,6 +647,37 @@ def register(app, core_module):
                                   _yes(request.form.get("overwrite"))))
         except FileError as e:
             return _fail(e)
+
+    @app.get("/files/thumb")
+    def files_thumb():
+        """Bild fuer die Vorschau im Dateimanager (seit 1.58.0): inline, nur Bildformate, hoechstens thumbs_max_mb."""
+        st = core.load_settings()
+        if not st.get("thumbs", True):
+            return jsonify({"ok": False, "error": "Bildvorschau ist ausgeschaltet."}), 404
+        try:
+            full, rel, disp = resolve(request.args.get("loc"), request.args.get("path"))
+            ext = rel.rsplit(".", 1)[-1].lower() if "." in rel else ""
+            if ext not in THUMB_TYPES:
+                raise FileError(415, "Kein unterstütztes Bildformat.")
+            it = _stat(full) if rel else None
+            if not it or it.get("IsDir"):
+                raise FileError(404, "Datei nicht gefunden.")
+            try:
+                limit = float(st.get("thumbs_max_mb") or 20) * 1048576
+            except ValueError:
+                limit = 20 * 1048576
+            if (it.get("Size") or 0) > limit:
+                raise FileError(413, "Zu groß für die Vorschau.")
+        except FileError as e:
+            return _fail(e)
+        rc, out, err = _rc("cat", full, timeout=120)
+        if rc != 0:
+            return _fail(_err(err, full))
+        resp = Response(out, mimetype=THUMB_TYPES[ext])
+        resp.headers["Cache-Control"] = "private, max-age=3600"
+        resp.headers["X-Content-Type-Options"] = "nosniff"
+        resp.headers["Content-Security-Policy"] = "default-src 'none'; sandbox"
+        return resp
 
     @app.get("/files/download")
     def files_download():

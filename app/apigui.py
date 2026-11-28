@@ -757,7 +757,22 @@ def a_get_general(a):
             "language": s.get("language") or core.i18n.default_lang,
             "languages": [{"code": c, "name": n} for c, n in core.i18n.languages()],
             "geoip": core.geoip.status(), "update": core.update_status(),
-            "files": {"speed": core.speed_of(s, "files_speed")}}
+            "files": _files_cfg(s), "runs": _runs_cfg(s)}
+
+
+def _files_cfg(s):
+    return {"speed": core.speed_of(s, "files_speed"), "thumbs": s.get("thumbs", True) is not False,
+            "thumbs_max_mb": float(s.get("thumbs_max_mb") or 20), "share_enabled": s.get("share_enabled", True) is not False,
+            "share_max_days": int(s.get("share_max_days") or 30)}
+
+
+def _numtxt(v):
+    """Zahl fuer ein Formularfeld: 20.0 -> "20", 2.5 -> "2.5"; anderes unveraendert (das Formular prueft)."""
+    return ("%g" % v) if isinstance(v, (int, float)) and not isinstance(v, bool) else str(v)
+
+
+def _runs_cfg(s):
+    return {"max_parallel": int(s.get("max_parallel") or 0), "ical_days": core.ical_days(s)}
 
 
 @action("get_update", "GET", "/update", None, "System",
@@ -801,15 +816,35 @@ def a_self_update(a):
 
 
 @action("update_files_settings", "PATCH", "/settings/files", "system.settings", "Einstellungen",
-        "Tempo des Dateimanagers beim Kopieren und Verschieben (speed): gentle = 2 Dateien gleichzeitig, normal = 4 "
-        "(rclone-Standard), fast = 8 und schnelles Auflisten, max = 16 und schnelles Auflisten.",
-        {"speed": S(STR, "gentle, normal, fast oder max", enum=["gentle", "normal", "fast", "max"])}, ["speed"])
+        "Dateimanager: speed = Tempo beim Kopieren und Verschieben (gentle = 2 Dateien gleichzeitig, normal = 4 "
+        "(rclone-Standard), fast = 8 und schnelles Auflisten, max = 16 und schnelles Auflisten), thumbs = Bildvorschau, "
+        "thumbs_max_mb = größte Bilddatei für die Vorschau, share_enabled = Freigabelinks erlauben (aus sperrt alle Links), "
+        "share_max_days = längste Gültigkeit eines Freigabelinks. Nur angegebene Felder werden geändert.",
+        {"speed": S(STR, "gentle, normal, fast oder max", enum=["gentle", "normal", "fast", "max"]), "thumbs": S(BOOL),
+         "thumbs_max_mb": S(NUM), "share_enabled": S(BOOL), "share_max_days": S(INT, "1 bis 365")})
 def a_update_files_settings(a):
-    _check_keys(a, ("speed",))
-    if a.get("speed") not in core.SPEEDS:
+    _check_keys(a, ("speed", "thumbs", "thumbs_max_mb", "share_enabled", "share_max_days"))
+    cur = _files_cfg(core.load_settings())
+    speed = a.get("speed", cur["speed"])
+    if speed not in core.SPEEDS:
         raise ApiError(400, _t("Unbekanntes Tempo."))
-    msg = done(gui("POST", "/settings/general", form={"section": "files", "files_speed": a["speed"]}))
-    return {"ok": True, "message": msg, "files": {"speed": core.speed_of(core.load_settings(), "files_speed")}}
+    form = {"section": "files", "files_speed": speed, "thumbs": _bool(a.get("thumbs", cur["thumbs"])),
+            "thumbs_max_mb": _numtxt(a.get("thumbs_max_mb", cur["thumbs_max_mb"])),
+            "share_enabled": _bool(a.get("share_enabled", cur["share_enabled"])), "share_max_days": str(a.get("share_max_days", cur["share_max_days"]))}
+    msg = done(gui("POST", "/settings/general", form=form))
+    return {"ok": True, "message": msg, "files": _files_cfg(core.load_settings())}
+
+
+@action("update_run_settings", "PATCH", "/settings/runs", "system.settings", "Einstellungen",
+        "Läufe und Kalender: max_parallel = höchstens gleichzeitig laufende Aufgaben (0 = unbegrenzt, weitere warten in "
+        "der Warteschlange nach Priorität), ical_days = wie viele Tage der Kalender-Export vorausberechnet (1 bis 90).",
+        {"max_parallel": S(INT, "0 bis 100"), "ical_days": S(INT, "1 bis 90")})
+def a_update_run_settings(a):
+    _check_keys(a, ("max_parallel", "ical_days"))
+    cur = _runs_cfg(core.load_settings())
+    msg = done(gui("POST", "/settings/general", form={"section": "runs", "max_parallel": str(a.get("max_parallel", cur["max_parallel"])),
+                                                      "ical_days": str(a.get("ical_days", cur["ical_days"]))}))
+    return {"ok": True, "message": msg, "runs": _runs_cfg(core.load_settings())}
 
 
 @action("update_update_settings", "PATCH", "/settings/update", "system.settings", "Einstellungen",
@@ -2209,6 +2244,257 @@ def a_test_notify_all(a):
         body = {}
     return {"ok": bool(body.get("ok")), "results": {k: (None if v is None else _t(v)) for k, v in (body.get("results") or {}).items()},
             "message": _t(body.get("error") or "")}
+
+
+# ================================================================= Neu in 1.58.0
+@action("get_run_log_tail", "GET", "/jobs/{job_id}/runs/{run_id}/tail", "jobs.logs", "Aufgaben",
+        "Neue Zeilen eines Lauf-Logs ab Byte-Position pos (wie das Live-Log der GUI). Ohne pos die letzten Zeilen. "
+        "Liefert pos (für den nächsten Aufruf), lines [[art, text]] mit art error|warn|copied|deleted|notice|info, live "
+        "(läuft noch) und status. run_id \"current\" = laufender bzw. letzter Lauf. filter: all, error, warn, copied, deleted, notice.",
+        {"job_id": S(STR), "run_id": S(STR), "pos": S(INT), "filter": S(STR, enum=["all", "error", "warn", "copied", "deleted", "notice"]),
+         "q": S(STR, "Suchtext")}, ["job_id", "run_id"], ro=True)
+def a_run_tail(a):
+    jid = a["job_id"]
+    j = api._job(jid)
+    run = a["run_id"]
+    if run in ("current", "latest", ""):
+        hist = j.get("history", [])
+        run = core._current_run.get(jid) or (hist[0].get("run") if hist else "")
+    if not run or not core.RUN_ID_RE.match(run) or not core.os.path.exists(core.run_log_path(jid, run)):
+        raise ApiError(404, _t("Kein Log für diesen Lauf."))
+    pos = a.get("pos")
+    try:
+        pos = None if pos in (None, "") else int(pos)
+    except ValueError:
+        raise ApiError(400, _t("pos muss eine Zahl sein."))
+    flt = a.get("filter") or "all"
+    if flt not in core.LOG_FILTERS:
+        raise ApiError(400, core.i18n.t("Unbekannter Filter: {0}", flt))
+    return dict(core.log_tail(jid, run, pos, flt, a.get("q") or ""), job=jid, run=run)
+
+
+@action("compare_runs", "GET", "/jobs/{job_id}/compare", "jobs.logs", "Aufgaben",
+        "Zwei Läufe einer Aufgabe vergleichen: Kennzahlen (a, b, diff) und je Art (copied, deleted, renamed, errors) die Dateien "
+        "nur in A, nur in B und in beiden (je höchstens 500). Ohne a und b die beiden letzten Läufe. run-IDs aus job_history.",
+        {"job_id": S(STR), "a": S(STR, "älterer Lauf"), "b": S(STR, "neuerer Lauf")}, ["job_id"], ro=True)
+def a_compare_runs(a):
+    from urllib.parse import urlencode
+    api._job(a["job_id"])
+    qs = {k: a[k] for k in ("a", "b") if a.get(k)}
+    r = gui("GET", f"/job/{a['job_id']}/compare" + ("?" + urlencode(qs) if qs else ""), headers=JSON_H)
+    if r["status"] == 404 and isinstance(r["resp"].get_json(silent=True), dict):
+        raise ApiError(404, _t(r["resp"].get_json()["error"] or "Nicht gefunden."))
+    b = _body(r)
+    b.pop("ok", None)
+    return b
+
+
+@action("get_run_report", "GET", "/jobs/{job_id}/runs/{run_id}/report", "jobs.logs", "Aufgaben",
+        "Laufbericht als PDF (Kennzahlen, Fehler, Warnungen, kopierte, gelöschte und umbenannte Dateien). REST liefert die "
+        "PDF-Datei (application/pdf), MCP liefert sie als base64 (pdf_base64) mit Dateiname.",
+        {"job_id": S(STR), "run_id": S(STR)}, ["job_id", "run_id"], ro=True)
+def a_run_report(a):
+    jid, run = a["job_id"], a["run_id"]
+    j = api._job(jid)
+    if not core.RUN_ID_RE.match(run) or not core.os.path.exists(core.run_log_path(jid, run)):
+        raise ApiError(404, _t("Kein Log für diesen Lauf."))
+    pdf = core.run_report_pdf(jid, j, run)
+    name = f"mirrorsync-{core.re.sub(r'[^A-Za-z0-9_-]+', '_', j.get('name', jid))}-{run}.pdf"
+    if a.get("_mcp"):
+        return {"filename": name, "size": len(pdf), "pdf_base64": base64.b64encode(pdf).decode()}
+    return Response(pdf, mimetype="application/pdf", headers={"Content-Disposition": f'attachment; filename="{name}"'})
+
+
+@action("find_duplicates", "POST", "/jobs/{job_id}/duplicates", "jobs.preview", "Aufgaben",
+        "Doppelte Dateien in Quelle (side=source) oder Ziel (side=dest) suchen. mode: hash = gleicher Inhalt (Prüfsumme), name = "
+        "gleicher Name und Größe, size = nur gleiche Größe. min_kb = Mindestgröße. Läuft im Hintergrund; das Ergebnis liefert "
+        "get_duplicates. action=stop bricht ab. Es wird nichts gelöscht.",
+        {"job_id": S(STR), "side": S(STR, enum=["source", "dest"]), "mode": S(STR, enum=["hash", "name", "size"]),
+         "min_kb": S(NUM), "action": S(STR, enum=["start", "stop"])}, ["job_id"])
+def a_find_duplicates(a):
+    api._job(a["job_id"])
+    form = {"side": a.get("side") or "source"}
+    if a.get("action") == "stop":
+        form["action"] = "stop"
+    else:
+        form.update(mode=a.get("mode") or "hash", min_kb=_numtxt(a.get("min_kb", 1)))
+    b = _body(gui("POST", f"/job/{a['job_id']}/duplicates", form=form, headers=JSON_H))
+    return {"ok": True, "started": bool(b.get("started")), "stopped": a.get("action") == "stop"}
+
+
+@action("get_duplicates", "GET", "/jobs/{job_id}/duplicates", "jobs.preview", "Aufgaben",
+        "Stand bzw. Ergebnis der Suche nach doppelten Dateien: state (läuft, ok, fehler), files, n_groups, dup_files, wasted "
+        "(mögliche Ersparnis in Bytes) und groups [{size, count, wasted, paths}] mit der größten Ersparnis zuerst.",
+        {"job_id": S(STR), "side": S(STR, enum=["source", "dest"])}, ["job_id"], ro=True)
+def a_get_duplicates(a):
+    api._job(a["job_id"])
+    b = _body(gui("GET", f"/job/{a['job_id']}/duplicates?side=" + ("dest" if a.get("side") == "dest" else "source"), headers=JSON_H))
+    b.pop("ok", None)
+    b.pop("path", None) if not g.access.has("jobs.view") else None
+    return b
+
+
+@action("import_ffs", "POST", "/jobs/import-ffs", "jobs.create", "Aufgaben",
+        "FreeFileSync-Datei (.ffs_batch oder .ffs_gui) einlesen: content = XML-Text (REST auch als Datei-Upload \"file\"), "
+        "mappings = Pfad-Zuordnungen je Zeile (z. B. \"\\\\NAS\\daten = NAS:daten\"). Ohne create nur Vorschau (pairs mit name, "
+        "source, dest, Optionen und warnings). create=true legt die Aufgaben an (only = Liste der Namen, sonst alle), mit "
+        "trigger (manual|time), schedule und enabled.",
+        {"content": S(STR), "filename": S(STR), "mappings": S(STR), "create": S(BOOL), "only": STRS,
+         "trigger": S(STR, enum=["manual", "time"]), "schedule": S(STR, "Cron, z. B. 0 3 * * *"), "enabled": S(BOOL)})
+def a_import_ffs(a):
+    need("jobs.create")
+    fname, blob = a.get("_file") or (a.get("filename") or "", (a.get("content") or "").encode("utf-8"))
+    if not blob:
+        raise ApiError(400, _t("Bitte eine Datei auswählen."))
+    remotes = [r["name"] for r in core.list_remotes() if g.access.remote_ok(r["name"])]
+    try:
+        res = core.ffsimport.parse(blob, fname, remotes, a.get("mappings") or "")
+    except core.ffsimport.ImportError_ as e:
+        raise ApiError(400, _t(str(e)))
+    res["warnings"] = [_t(w) for w in res.get("warnings", [])]
+    if not _bool(a.get("create", False)):
+        return dict(res, created=[], errors=[])
+    only = set(a.get("only") or [])
+    pairs = [p for p in res["pairs"] if not only or p.get("name") in only]
+    trig = a.get("trigger") or "manual"
+    if trig not in ("manual", "time"):
+        raise ApiError(400, _t("trigger: manual oder time."))
+    made, errs = core.ffs_create(pairs, trig, a.get("schedule") or "0 3 * * *", _bool(a.get("enabled", False)))
+    core.schedule_all()
+    return dict(res, created=[{"id": i, "name": n} for i, n in made], errors=[{"name": n, "error": e} for n, e in errs])
+
+
+@action("get_maintenance", "GET", "/maintenance", "jobs.view", "System",
+        "Globaler Wartungsmodus: on, until (Ende, leer = bis zum Beenden), since, by, reason. Solange er an ist, startet nichts "
+        "automatisch (Zeitpläne, Live, Ketten, Wiederholungen); von Hand geht weiter.", ro=True)
+def a_get_maintenance(a):
+    m = core.maintenance_state()
+    return {"on": bool(m), **({k: m.get(k, "") for k in ("until", "since", "by", "reason")} if m else {})}
+
+
+@action("set_maintenance", "PUT", "/maintenance", "system.maintenance", "System",
+        "Wartungsmodus ein- oder ausschalten. on=true mit hours (Dauer in Stunden) oder until (JJJJ-MM-TTTHH:MM), ohne beides bis "
+        "zum Beenden; reason optional. Laufende Läufe laufen weiter. Danach starten die Zeitpläne von selbst wieder.",
+        {"on": S(BOOL), "hours": S(NUM), "until": S(STR, "JJJJ-MM-TTTHH:MM"), "reason": S(STR)}, ["on"])
+def a_set_maintenance(a):
+    need("system.maintenance")
+    form = {"action": "on" if _bool(a.get("on")) else "off", "hours": _numtxt(a.get("hours") or ""), "until": a.get("until") or "",
+            "reason": a.get("reason") or "", "back": "/"}
+    r = gui("POST", "/maintenance", form=form)
+    done(r)
+    return a_get_maintenance({})
+
+
+@action("get_queue", "GET", "/queue", "jobs.view", "Aufgaben",
+        "Warteschlange: Aufgaben, die auf einen freien Platz warten (Einstellung „Höchstens gleichzeitig laufende Aufgaben“), "
+        "in Startreihenfolge mit pos, priority (high|normal|low), at und by. max_parallel 0 = unbegrenzt.", ro=True)
+def a_get_queue(a):
+    return {"max_parallel": core.max_parallel(), "running": len(core._running),
+            "queue": core.queue_view(lambda jid, j: g.access.job_ok(jid, j))}
+
+
+@action("list_share_links", "GET", "/files/shares", "files.share", "Dateien",
+        "Freigabelinks (eigene, Admins alle): id, url, name, display (Pfad), expires, max_downloads, downloads, password, state "
+        "(active, expired, used, revoked).", ro=True)
+def a_list_shares(a):
+    return {"enabled": core.sharelinks.enabled(), "max_days": core.sharelinks.max_seconds() // 86400, "links": core.sharelinks.visible()}
+
+
+@action("create_share_link", "POST", "/files/shares", "files.share", "Dateien",
+        "Zeitlich begrenzten Freigabelink für eine Datei erstellen. loc = Speicherort (wie im Dateimanager), path = Datei darin. "
+        "duration: 1h, 24h, 7d, 30d, 90d (höchstens die eingestellte Gültigkeit) oder seconds. max_downloads 0 = unbegrenzt, "
+        "password optional. Wer den Link hat, lädt die Datei ohne Anmeldung herunter.",
+        {"loc": S(STR), "path": S(STR), "duration": S(STR, enum=["1h", "24h", "7d", "30d", "90d"]), "seconds": S(INT),
+         "max_downloads": S(INT), "password": S(STR), "note": S(STR)}, ["loc", "path"])
+def a_create_share(a):
+    js = {k: a[k] for k in ("loc", "path", "duration", "seconds", "max_downloads", "password", "note") if a.get(k) not in (None, "")}
+    b = _body(gui("POST", "/files/share", js=js, headers=JSON_H))
+    b.pop("ok", None)
+    return b
+
+
+@action("delete_share_link", "DELETE", "/files/shares/{share_id}", "files.share", "Dateien",
+        "Freigabelink löschen (sperrt ihn sofort). Nur der Ersteller oder ein Admin.", {"share_id": S(STR)}, ["share_id"])
+def a_delete_share(a):
+    _body(gui("POST", f"/files/share/{a['share_id']}/delete", headers=JSON_H))
+    return {"ok": True, "deleted": a["share_id"]}
+
+
+@action("get_calendar", "GET", "/calendar", "jobs.view", "Zeitpläne",
+        "Geplante Läufe der nächsten Tage (Einstellung ical_days) als Kalender. REST liefert eine .ics-Datei (text/calendar), MCP "
+        "eine Liste events [{start, end, job_id, name, kind}] mit kind time (Zeitplan) oder after (geschätzt nach der Kette).",
+        {"days": S(INT, "1 bis 90, Standard aus den Einstellungen")}, ro=True)
+def a_get_calendar(a):
+    try:
+        days = max(1, min(90, int(a.get("days") or core.ical_days())))
+    except ValueError:
+        days = core.ical_days()
+    vis = lambda jid, j: g.access.job_ok(jid, j)
+    jobs = core.load_jobs()
+    if a.get("_mcp"):
+        evs = core.ical.events(jobs, days, visible=vis)
+        return {"days": days, "count": len(evs), "events": [
+            {"start": st.isoformat(timespec="minutes"), "end": (st + core.datetime.timedelta(minutes=m)).isoformat(timespec="minutes"),
+             "job_id": jid, "name": j.get("name", jid), "kind": kind} for st, m, jid, j, kind in evs]}
+    return core._ics_response(core.ical.build(jobs, days, visible=vis))
+
+
+MQTT_KEYS = ("mqtt_enabled", "mqtt_host", "mqtt_port", "mqtt_tls", "mqtt_tls_insecure", "mqtt_user", "mqtt_topic",
+             "mqtt_discovery", "mqtt_discovery_prefix", "mqtt_interval", "mqtt_commands")
+
+
+def _mqtt_view(s=None):
+    c = core.mqttbridge.settings(s)
+    return {"settings": dict({k.replace("mqtt_", "", 1): c.get(k) for k in MQTT_KEYS}, password_set=bool(c.get("mqtt_password"))),
+            "status": core.mqttbridge.status()}
+
+
+@action("get_mqtt", "GET", "/settings/mqtt", "system.settings", "Einstellungen",
+        "MQTT für Home Assistant: Einstellungen (ohne Passwort, password_set) und Verbindungsstatus (connected, since, messages, "
+        "error). Themen: <topic>/status, <topic>/state, <topic>/job/<id>/state, Befehle auf <topic>/job/<id>/set "
+        "(run, dry, verify, stop) und <topic>/maintenance/set (ON, OFF).", ro=True)
+def a_get_mqtt(a):
+    need("system.settings")
+    return _mqtt_view()
+
+
+@action("update_mqtt", "PATCH", "/settings/mqtt", "system.settings", "Einstellungen",
+        "MQTT-Einstellungen ändern (nur angegebene Felder): enabled, host, port, tls, tls_insecure, user, password (nur "
+        "setzen; leerer Text löscht es), topic, discovery (Home Assistant MQTT-Discovery), discovery_prefix, interval "
+        "(Sekunden zwischen Fortschritts-Meldungen), commands (Befehle über MQTT erlauben).",
+        {"enabled": S(BOOL), "host": S(STR), "port": S(INT), "tls": S(BOOL), "tls_insecure": S(BOOL), "user": S(STR),
+         "password": S(STR), "topic": S(STR), "discovery": S(BOOL), "discovery_prefix": S(STR), "interval": S(INT), "commands": S(BOOL)})
+def a_update_mqtt(a):
+    need("system.settings")
+    keys = [k.replace("mqtt_", "", 1) for k in MQTT_KEYS] + ["password"]
+    _check_keys(a, tuple(keys) + ("job_id",))
+    c = core.mqttbridge.settings()
+    form = {"section": "mqtt"}
+    for k in MQTT_KEYS:
+        short = k.replace("mqtt_", "", 1)
+        v = a.get(short, c.get(k))
+        if isinstance(c.get(k), bool) or k in ("mqtt_enabled", "mqtt_tls", "mqtt_tls_insecure", "mqtt_discovery", "mqtt_commands"):
+            form[k] = _bool(v)
+        else:
+            form[k] = _numtxt(v) if v is not None else ""
+    if "password" in a:
+        if a["password"]:
+            form["mqtt_password"] = a["password"]
+        else:
+            form["mqtt_password_clear"] = True
+    msg = done(gui("POST", "/settings/mqtt", form=form))
+    return dict(_mqtt_view(), ok=True, message=msg)
+
+
+@action("test_mqtt", "POST", "/settings/mqtt/test", "system.settings", "Einstellungen",
+        "Verbindung zum MQTT-Broker mit den gespeicherten Einstellungen testen (ändert nichts).")
+def a_test_mqtt(a):
+    need("system.settings")
+    c = core.mqttbridge.settings()
+    if not (c.get("mqtt_host") or "").strip():
+        raise ApiError(400, _t("Bitte den Broker angeben."))
+    ok, text = core.mqttbridge.test(c)
+    return {"ok": ok, "message": text}
 
 
 def register(app, core_module):

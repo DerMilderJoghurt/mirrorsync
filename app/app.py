@@ -2,9 +2,11 @@
 
 Sync-Motor ist rclone (SMB, WebDAV, SFTP/SSH, FTP, S3, lokale Ordner, ...).
 """
+import base64
 import copy
 import datetime
 import hmac
+import io
 import ipaddress
 import json
 import os
@@ -38,6 +40,11 @@ import db as dbmod
 import files as filemgr
 import changelog
 import help as helpdoc
+import mqttbridge
+import ical
+import sharelinks
+import ffsimport
+import pdfreport
 import geoip
 import i18n
 import monitor
@@ -64,6 +71,11 @@ LOG_DIR = os.environ.get("LOG_DIR", "/logs")
 RCLONE_CONF = os.path.join(CONFIG_DIR, "rclone.conf")
 JOBS_FILE = os.path.join(CONFIG_DIR, "jobs.json")
 TZ = os.environ.get("TZ", "Europe/Berlin")
+try:
+    import zoneinfo
+    TZINFO = zoneinfo.ZoneInfo(TZ)
+except Exception:  # noqa: BLE001
+    TZINFO = datetime.timezone.utc
 WEB_USER = os.environ.get("WEB_USER", "admin")
 WEB_PASS = os.environ.get("WEB_PASS", "")
 with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "VERSION"), encoding="utf-8") as _f:
@@ -148,8 +160,9 @@ app.jinja_env.globals["HELP_ANCHOR"] = {"/settings": "#notify", "/settings/gener
 # Einstellungen: Leiste links mit Gruppen und Suchindex (nur erlaubte Seiten)
 app.jinja_env.globals["SETTINGS_NAV"] = lambda: settingsnav.nav(request.path, can, g.get("role") == "admin")
 app.jinja_env.globals["SETTINGS_INDEX"] = lambda: settingsnav.index(can, g.get("role") == "admin")
+app.jinja_env.globals["MAINT"] = lambda: maintenance_state()
 app.jinja_env.globals["STATUS"] = {"ok": "OK", "fehler": "Fehler", "laeuft": "läuft",
-                                    "gestoppt": "gestoppt", "abgebrochen": "abgebrochen", "freigabe": "Freigabe nötig"}
+                                    "gestoppt": "gestoppt", "abgebrochen": "abgebrochen", "freigabe": "Freigabe nötig", "wartet": "wartet"}
 
 _lock = threading.RLock()
 _running = {}  # job_id -> subprocess.Popen
@@ -515,7 +528,75 @@ def filter_args(job):
     else:
         for pattern in exclude_list(job) + ns:
             out += ["--exclude", pattern]
+    for key, flag in (("min_size", "--min-size"), ("max_size", "--max-size")):   # Groessenfilter (seit 1.58.0)
+        v = size_flag(job.get(key))
+        if v:
+            out += [flag, v]
     return out
+
+
+SIZE_RE = re.compile(r"^\s*(\d+(?:[.,]\d+)?)\s*([KMGTP]?)(?:i?B)?\s*$", re.I)
+TRACK_RENAMES = ("off", "hash", "modtime")
+PRIORITIES = ("high", "normal", "low")
+PRIO_ORDER = {"high": 0, "normal": 1, "low": 2}
+
+
+def size_flag(v):
+    """'4 GB', '4G', '500k', '1.5 MB' -> rclone-Wert wie '4G' (Einheiten zur Basis 1024). Leer/ungueltig -> ''."""
+    m = SIZE_RE.match(str(v or ""))
+    if not m:
+        return ""
+    num, unit = m.group(1).replace(",", "."), m.group(2).upper()
+    if "." in num:   # rclone kann keine Kommazahlen: eine Einheit kleiner rechnen
+        units = " KMGTP"
+        i = units.index(unit or " ")
+        val = float(num)
+        while i > 0 and val != int(val):
+            val, i = val * 1024, i - 1
+        num, unit = str(int(val)), units[i].strip()
+    return num + (unit or "B") if unit or num else ""
+
+
+def _size_bytes(v):
+    m = SIZE_RE.match(str(v or ""))
+    if not m:
+        return 0
+    return float(m.group(1).replace(",", ".")) * 1024 ** " KMGTP".index(m.group(2).upper() or " ")
+
+
+def extra_dests(job):
+    """Weitere Ziele einer Aufgabe (eine Quelle, mehrere Ziele, seit 1.58.0). Nur beim Spiegeln ohne Verschluesselung."""
+    if is_bisync(job) or job.get("encrypt"):
+        return []
+    out = []
+    for ln in str(job.get("extra_dests") or "").splitlines():
+        ln = ln.strip()
+        if ln and not ln.startswith("#") and ln not in out:
+            out.append(ln)
+    return out
+
+
+def all_tags(jobs):
+    """Alle Tags der Aufgaben, die der Benutzer sieht (fuer Filter und Vorschlaege)."""
+    seen = {}
+    for jid, j in jobs.items():
+        if has_request_context() and not g.access.job_ok(jid, j):
+            continue
+        for t in job_tags(j):
+            seen.setdefault(t.lower(), t)
+    return sorted(seen.values(), key=str.lower)
+
+
+def job_tags(job):
+    t = job.get("tags") or []
+    if isinstance(t, str):
+        t = re.split(r"[,\n;]+", t)
+    out = []
+    for x in t:
+        x = str(x).strip().lstrip("#")[:30]
+        if x and x.lower() not in [o.lower() for o in out]:
+            out.append(x)
+    return out[:20]
 
 
 def _cmd_tail(job, cmd):
@@ -553,6 +634,12 @@ def build_sync_cmd(job, dry_run, mode="full", max_age=None):
     cmd += filter_args(job)   # mit Auswahl nur die ausgewaehlten Dateien/Ordner; im Ziel bleibt alles andere unberuehrt
     if job.get("delete_excluded") and not delta and not selection_list(job):
         cmd.append("--delete-excluded")
+    tr = job.get("track_renames") if job.get("track_renames") in TRACK_RENAMES else "off"
+    if tr != "off" and cmd[1] == "sync":
+        # Umbenannte/verschobene Dateien im Ziel nur umbenennen statt neu kopieren (seit 1.58.0)
+        cmd.append("--track-renames")
+        if tr == "modtime":
+            cmd += ["--track-renames-strategy", "modtime"]
     return _cmd_tail(job, cmd)
 
 
@@ -565,7 +652,8 @@ LOG_DEFAULTS = {"log_keep_runs": "50", "log_keep_days": "30", "log_keep_unit": "
                 "fail_notify": "", "fail_notify_minutes": "15", "audit_keep_days": "365", "update_check": True, "update_interval": "60", "update_notify": False, "update_notify_channels": [],
                 "selfupdate_auto": False, "selfupdate_time": "04:00", "selfupdate_prune": True,
                 "restart_auto": False, "restart_time": "04:30", "restart_days": [6],
-                "monitor_public": False, "volume_limit_gb": "", "volume_warn_pct": "80", "volume_notify": True, "volume_stop": False}
+                "max_parallel": "0", "share_max_days": "30", "share_enabled": True, "thumbs": True, "thumbs_max_mb": "20",
+                "ical_days": "14", "monitor_public": False, "volume_limit_gb": "", "volume_warn_pct": "80", "volume_notify": True, "volume_stop": False}
 RUN_ID_RE = re.compile(r"^[A-Za-z0-9_.-]{1,64}$")
 
 
@@ -573,6 +661,7 @@ def load_settings():
     data = dict(notify.DEFAULTS, **LOG_DEFAULTS)
     data.update(json.loads(json.dumps(notify.LIST_DEFAULTS)))
     data.update(json.loads(json.dumps(backup.AUTO_DEFAULTS)))
+    data.update(mqttbridge.DEFAULTS)
     data.update(DB.get_map("settings"))
     return data
 
@@ -1604,6 +1693,31 @@ def _pipeline(job_id, job, handle, cmd_fn, logf, started, dry, by, run_id, log_p
                 info["snapshot"] = name or False
                 if not name:
                     info["no_retry"] = True
+            more = extra_dests(job) if cmd_fn and not is_bisync(job) else []
+            if more and not handle.stopped:
+                # Eine Quelle, mehrere Ziele (seit 1.58.0): nacheinander in dasselbe Log, jedes Ziel fuer sich
+                res = [{"dest": effective_dest(job), "code": rc}]
+                for n, d in enumerate(more, 2):
+                    if handle.stopped:
+                        break
+                    jd = dict(job, dest=d)
+                    w("\n" + i18n.t("=== Weiteres Ziel {0} von {1}: {2} ===", n, len(more) + 1, effective_dest(jd)))
+                    c2 = cmd_fn(jd)
+                    w("$ " + " ".join(shlex.quote(c) for c in c2) + "\n")
+                    r2 = handle.run(c2, logf)
+                    if r2 == 0 and not dry:
+                        try:
+                            for line in prune_versions(jd):
+                                w(line)
+                        except Exception as e:  # noqa: BLE001
+                            w(f"Versionen aufräumen: {e}")
+                    res.append({"dest": effective_dest(jd), "code": r2})
+                    if r2 != 0 and rc == 0:
+                        rc = r2
+                info["dests"] = res
+                bad = [x["dest"] for x in res if x["code"] != 0]
+                w(i18n.t("=== Ziele: {0} von {1} erfolgreich{2} ===", len(res) - len(bad), len(res),
+                         (" (" + i18n.t("fehlgeschlagen: {0}", ", ".join(bad)) + ")") if bad else ""))
     except Exception as e:   # noqa: BLE001  ein Fehler im Ablauf darf die Aufgabe nicht haengen lassen
         w(i18n.t("=== Interner Fehler: {0} ===", f"{type(e).__name__}: {e}"))
         rc = rc if rc not in (None, 0) else 1
@@ -1824,6 +1938,8 @@ def _watch(job_id, job, rc, logf, started, dry, by, run_id, log_path, mode="full
                     entry["retry_next"] = retry["at"]
                 if info.get("space_low"):
                     entry["space_low"] = True
+                if info.get("dests"):
+                    entry["dests"] = info["dests"]
                 if win_stop:
                     entry["window"] = win_stop
                     if win_stop == "resume":
@@ -1841,6 +1957,8 @@ def _watch(job_id, job, rc, logf, started, dry, by, run_id, log_path, mode="full
             print(f"Statistik: {e}", flush=True)
     if retry:
         _schedule_retry(job_id, retry)
+    threading.Thread(target=_queue_next, daemon=True).start()   # freier Platz: naechste wartende Aufgabe
+    _mqtt_push()
     if quiet:
         try:
             os.remove(log_path)
@@ -1899,13 +2017,129 @@ def _log_results(log_path, results):
         pass
 
 
+# ---------------------------------------------------------------- Warteschlange und Wartungsmodus (seit 1.58.0)
+_queue = []          # wartende Starts: {"id", "kw", "prio", "at", "seq"}; nur im Speicher
+_queue_seq = [0]
+
+
+def max_parallel(s=None):
+    """Hoechstens so viele Laeufe gleichzeitig (Einstellung max_parallel, 0 = unbegrenzt)."""
+    try:
+        return max(0, int((s or load_settings()).get("max_parallel") or 0))
+    except (TypeError, ValueError):
+        return 0
+
+
+def queue_view(visible=None):
+    """Warteschlange in Startreihenfolge: [{id, name, priority, at, pos, by}]."""
+    jobs = load_jobs()
+    out = []
+    with _lock:
+        items = sorted(_queue, key=lambda x: (PRIO_ORDER.get(x["prio"], 1), x["seq"]))
+    for n, q in enumerate(items, 1):
+        j = jobs.get(q["id"])
+        if not j or (visible and not visible(q["id"], j)):
+            continue
+        out.append({"id": q["id"], "name": j.get("name", q["id"]), "priority": q["prio"], "at": q["at"], "pos": n,
+                    "by": q["kw"].get("by", ""), "dry_run": bool(q["kw"].get("dry_run")), "mode": q["kw"].get("mode", "full")})
+    return out
+
+
+def queue_pos(job_id):
+    if not _queue:
+        return 0
+    for q in queue_view():
+        if q["id"] == job_id:
+            return q["pos"]
+    return 0
+
+
+def queue_remove(job_id):
+    with _lock:
+        before = len(_queue)
+        _queue[:] = [q for q in _queue if q["id"] != job_id]
+        return before != len(_queue)
+
+
+def _queue_next():
+    """Nach dem Ende eines Laufs: wartende Aufgaben nach Prioritaet starten, solange Plaetze frei sind."""
+    lim = max_parallel()
+    while True:
+        with _lock:
+            if not _queue or (lim and len(_running) >= lim):
+                return
+            _queue.sort(key=lambda x: (PRIO_ORDER.get(x["prio"], 1), x["seq"]))
+            q = _queue.pop(0)
+        kw = dict(q["kw"], _from_queue=True)
+        kw["by"] = kw.get("by", "") + " (" + i18n.t("aus der Warteschlange", lang=i18n.default_lang) + ")"
+        try:
+            start_job(q["id"], **kw)
+        except Exception as e:  # noqa: BLE001
+            print(f"Warteschlange: {e}", flush=True)
+        _mqtt_push()
+
+
+def maintenance_state(s=None):
+    """Globaler Wartungsmodus: {"on", "until", "by", "since", "reason"} oder None, wenn aus bzw. abgelaufen."""
+    m = (s or load_settings()).get("maintenance") or {}
+    if not m.get("on"):
+        return None
+    until = (m.get("until") or "").strip()
+    if until and until <= datetime.datetime.now().strftime("%Y-%m-%dT%H:%M"):
+        return None
+    return m
+
+
+def set_maintenance(on, until="", by="", reason=""):
+    s = load_settings()
+    if on:
+        s["maintenance"] = {"on": True, "until": until or "", "by": by, "reason": (reason or "")[:300],
+                            "since": datetime.datetime.now().strftime("%Y-%m-%d %H:%M")}
+    else:
+        s["maintenance"] = {"on": False}
+    save_settings(s)
+    if not on:
+        with _lock:
+            _queue[:] = [q for q in _queue if q["kw"].get("manual")]   # automatische Starts aus der Wartezeit verwerfen
+    _mqtt_push()
+    return s["maintenance"]
+
+
+def maintenance_tick():
+    """Jede Minute: abgelaufenen Wartungsmodus beenden (automatisches Ende) und im Audit-Log vermerken.
+    Nebenbei abgelaufene Freigabelinks aufraeumen."""
+    try:
+        sharelinks.cleanup()
+    except Exception as e:  # noqa: BLE001
+        print(f"Freigabelinks: {e}", flush=True)
+    s = load_settings()
+    m = s.get("maintenance") or {}
+    if m.get("on") and not maintenance_state(s):
+        s["maintenance"] = {"on": False, "ended": datetime.datetime.now().strftime("%Y-%m-%d %H:%M")}
+        save_settings(s)
+        try:
+            audit_log.add("System", "system", "Wartungsmodus beendet (Zeit abgelaufen)", "Wartungsmodus")
+        except Exception:  # noqa: BLE001
+            pass
+        _mqtt_push()
+
+
+def _mqtt_push():
+    try:
+        mqttbridge.push()
+    except Exception:  # noqa: BLE001
+        pass
+
+
 def start_job(job_id, dry_run=False, by="Zeitplan", mode="full", manual=False, resync=False, guard_ok=False, retry_attempt=0,
-              solo=False, restore_only=False):
+              solo=False, restore_only=False, _from_queue=False):
     """Startet einen Job im Hintergrund. False, wenn er schon laeuft (Laeufe ueberlappen nie).
     mode=delta: Live-Lauf, kopiert nur seit dem letzten erfolgreichen Lauf geaenderte Dateien.
     mode=verify: nur pruefen, ob Quelle und Ziel 1:1 gleich sind.
     guard_ok: Loeschwarnung fuer diesen Lauf freigegeben. retry_attempt: Nummer der Wiederholung nach einem Fehler.
     solo: nur diese Aufgabe, Folgeaufgaben der Kette werden danach nicht gestartet (seit 1.56.0)."""
+    call = dict(dry_run=dry_run, by=by, mode=mode, manual=manual, resync=resync, guard_ok=guard_ok, retry_attempt=retry_attempt,
+                solo=solo, restore_only=restore_only)
     with _lock:
         if job_id in _running:
             return False
@@ -1914,6 +2148,8 @@ def start_job(job_id, dry_run=False, by="Zeitplan", mode="full", manual=False, r
             return False
         if is_paused(job) and not manual:
             return False   # pausiert: kein Start per Zeitplan, Live oder Kette
+        if not manual and maintenance_state():
+            return False   # Wartungsmodus: keine automatischen Starts (Zeitplan, Live, Kette, Wiederholung)
         if job.get("delete_hold") and not manual and not guard_ok:
             return False   # wartet auf Freigabe nach einer Loeschwarnung
         if not manual and mode != "verify":
@@ -1929,6 +2165,17 @@ def start_job(job_id, dry_run=False, by="Zeitplan", mode="full", manual=False, r
                     jobs_w[job_id]["window_wait"] = "deferred"
                     save_jobs(jobs_w)
             return False
+        lim = max_parallel()
+        if lim and len(_running) >= lim:
+            # Alle Plaetze belegt: in die Warteschlange (Live-Runden entfallen, die naechste Runde holt alles nach)
+            if mode == "delta":
+                return False
+            if any(q["id"] == job_id for q in _queue):
+                return "queued"
+            _queue_seq[0] += 1
+            _queue.append({"id": job_id, "kw": call, "prio": job.get("priority") if job.get("priority") in PRIORITIES else "normal",
+                           "at": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "seq": _queue_seq[0]})
+            return "queued"
         max_age = None
         if mode == "delta" and job.get("dry_run"):
             return False   # "nur Testlauf": Live-Runden auslassen, nur der volle Abgleich laeuft als Test
@@ -2042,6 +2289,7 @@ def window_tick(now=None):
 
 
 def stop_job(job_id):
+    queue_remove(job_id)   # wartet nur: aus der Warteschlange nehmen
     with _lock:
         proc = _running.get(job_id)
         if proc:
@@ -2145,6 +2393,7 @@ def schedule_all():
         j.remove()
     scheduler.add_job(resume_expired, IntervalTrigger(minutes=1, timezone=TZ), id="_resume", coalesce=True, max_instances=1)
     scheduler.add_job(window_tick, CronTrigger(second=5, timezone=TZ), id="_window", coalesce=True, max_instances=1)
+    scheduler.add_job(maintenance_tick, CronTrigger(second=10, timezone=TZ), id="_maint", coalesce=True, max_instances=1)
     st = load_settings()
     if geoip_scheduled(st):
         h, m = (st.get("geoip_time") or "03:00").split(":")
@@ -2495,7 +2744,7 @@ def bootstrap_users():
 
 # Endpunkt -> benoetigtes Recht. None = nur angemeldet. Fehlende Endpunkte = nur angemeldet.
 ENDPOINT_PERMS = {
-    "job_preview": "jobs.preview", "job_preview_page": "jobs.preview", "update_apply": "system.update", "update_state": "system.update", "index": "jobs.view", "jobs_running": "jobs.view", "schedules": "jobs.view", "schedules_json": "jobs.view", "schedule_job": "jobs.edit", "schedule_chains": "jobs.edit", "show_log": "jobs.logs", "show_run": "jobs.logs", "download_run": "jobs.logs", "delete_job": "jobs.delete", "stop": "jobs.run",
+    "run_tail": "jobs.logs", "schedules_ics": "jobs.view", "account_ical": None, "job_duplicates": "jobs.preview", "jobs_import": "jobs.create", "job_compare": "jobs.logs", "run_pdf": "jobs.logs", "maintenance_toggle": "system.maintenance", "job_preview": "jobs.preview", "job_preview_page": "jobs.preview", "update_apply": "system.update", "update_state": "system.update", "index": "jobs.view", "jobs_running": "jobs.view", "schedules": "jobs.view", "schedules_json": "jobs.view", "schedule_job": "jobs.edit", "schedule_chains": "jobs.edit", "show_log": "jobs.logs", "show_run": "jobs.logs", "download_run": "jobs.logs", "delete_job": "jobs.delete", "stop": "jobs.run",
     "job_notify_test": "jobs.notify", "job_pause": "jobs.edit",
     "remotes": "remotes.view", "test_remote": "remotes.test", "delete_remote": "remotes.delete",
     "duplicate_job": "jobs.create", "duplicate_remote": "remotes.create",
@@ -2506,7 +2755,7 @@ ENDPOINT_PERMS = {
     "groups_page": "groups.manage", "group_edit": "groups.manage", "group_delete": "groups.manage",
     "general_settings": "system.settings", "security_settings": "system.settings", "updates_settings": "system.settings",
     "restart_settings": "system.settings", "logs_settings": "system.settings", "monitoring_settings": "system.settings",
-    "network_settings": "system.settings", "audit_page": "system.audit", "audit_export": "system.audit",
+    "network_settings": "system.settings", "mqtt_settings": "system.settings", "audit_page": "system.audit", "audit_export": "system.audit",
     "access_settings": "system.access", "access_block": "system.access", "access_unblock": "system.access",
     "job_approve": "jobs.approve", "job_hold_dismiss": "jobs.approve", "job_verify": "jobs.run", "job_restoretest": "jobs.run",
     "job_versions": "jobs.restore", "job_versions_restore": "jobs.restore", "job_versions_download": "jobs.restore",
@@ -2534,6 +2783,8 @@ def endpoint_perm():
         return "system.restart"
     if ep == "settings_page":
         return "notify.edit" if post else "notify.view"
+    if ep == "maintenance_settings":
+        return "system.maintenance" if g.access.has("system.maintenance") else "system.settings"
     if ep == "jobs_bulk":
         return JOB_BULK.get(request.form.get("action"), "jobs.edit")
     if ep == "remotes_bulk":
@@ -2647,6 +2898,8 @@ def auth():
     blocked = _ip_blocked()
     if blocked:
         return blocked
+    if request.path.startswith(("/s/", "/calendar/")):
+        return None   # Freigabelinks und Kalender-Abo: Zugang ueber das Token in der Adresse (seit 1.58.0)
     if request.path.startswith(("/static", "/health/")) or request.path in ("/health", "/favicon.ico", "/metrics"):
         return None   # /health/jobs und /metrics pruefen den Zugriff selbst (API-Key, Sitzung oder freigegeben)
     if request.path.startswith(("/api/v1", "/mcp")):   # REST-API und MCP: API-Key (Bearer)
@@ -2769,7 +3022,7 @@ AUDIT_EP = {
     "duplicate_job": ["job"], "duplicate_remote": ["remote"], "jobs_bulk": ["job"], "remotes_bulk": ["remote"],
     "settings_page": ["settings"], "general_settings": ["settings"], "security_settings": ["settings"],
     "updates_settings": ["settings"], "restart_settings": ["settings"], "logs_settings": ["settings"],
-    "monitoring_settings": ["settings"], "network_settings": ["settings"],
+    "monitoring_settings": ["settings"], "network_settings": ["settings"], "mqtt_settings": ["settings"],
     "access_settings": ["access"], "access_block": ["access"], "access_unblock": ["access"],
     "role_edit": ["role"], "role_delete": ["role", "user"], "role_restore": ["role"], "user_edit": ["user", "group"], "user_delete": ["user", "group"],
     "group_edit": ["group"], "group_delete": ["group"], "api_key_edit": ["apikey", "group"],
@@ -3269,8 +3522,24 @@ def index():
                          pause_text=pause_text(job), window_text=timewin.describe(job.get("window"), i18n.translate),
                          window_open=(lambda t: t.strftime("%d.%m. %H:%M") if t else "")(timewin.next_open(job.get("window"))) if job.get("window_wait") and job.get("window") else "",
                          live_full_text=live_full_text(job) if trig == "live" else "",
-                         direction="bisync" if is_bisync(job) else "mirror", **next_start_view(jobs, job_id)))
-    return render_template("index.html", jobs=rows, auto_refresh=bool(_running))
+                         direction="bisync" if is_bisync(job) else "mirror", tags=job_tags(job), queued=queue_pos(job_id),
+                         n_dests=len(extra_dests(job)), size_text=size_text(job), **next_start_view(jobs, job_id)))
+    tag = request.args.get("tag", "").strip()
+    if tag:
+        rows = [r for r in rows if tag.lower() in [t.lower() for t in r["tags"]]]
+    return render_template("index.html", jobs=rows, auto_refresh=bool(_running) or bool(_queue), tags=all_tags(visible), tag=tag,
+                           maint=maintenance_state(settings), queue=queue_view(g.access.job_ok), max_par=max_parallel(settings))
+
+
+def size_text(job):
+    lo, hi = size_flag(job.get("min_size")), size_flag(job.get("max_size"))
+    if lo and hi:
+        return f"{lo}–{hi}"
+    if lo:
+        return f"≥ {lo}"
+    if hi:
+        return f"≤ {hi}"
+    return ""
 
 
 # ---------------------------------------------------------------- Dashboard
@@ -3748,7 +4017,8 @@ EMPTY_JOB = dict(name="", source="", dest="", schedule="0 3 * * *", enabled=True
                  excludes="", delete_excluded=False, notify_mode="global", notify_when="fail",
                  notify_webhook=False, notify_webhook_url="", notify_smtp=False, notify_smtp_to="",
                  notify_telegram=False, notify_telegram_chat_id="", notify_telegram_token="",
-                 encrypt=False, encrypt_names="standard", encrypt_dirnames=True)
+                 encrypt=False, encrypt_names="standard", encrypt_dirnames=True, track_renames="off", priority="normal",
+                 min_size="", max_size="", extra_dests="", tags=[], note="")
 
 
 def job_notify_from_form(f, old=None):
@@ -3949,6 +4219,22 @@ def apply_job_form(f, job, old, job_id, jobs, api=False):
         cw_err = i18n.t("Toleranz: bitte 1 bis {0} Sekunden angeben.", COMPARE_WINDOW_MAX)
     job["compare_window"] = cw if cw.isdigit() else "2"
     job["speed"] = f.get("speed") if f.get("speed") in SPEEDS else "normal"
+    # Seit 1.58.0: Umbenennungen erkennen, Groessenfilter, weitere Ziele, Tags, Prioritaet, Notiz
+    job["track_renames"] = f.get("track_renames") if f.get("track_renames") in TRACK_RENAMES else "off"
+    size_err = None
+    for key, label in (("min_size", "Mindestgröße"), ("max_size", "Höchstgröße")):
+        raw = str(f.get(key, "") or "").strip()
+        job[key] = raw[:20]
+        if raw and not size_flag(raw):
+            size_err = i18n.t("{0}: bitte eine Größe wie 500 KB, 4 GB oder 1.5 MB angeben (leer = keine Grenze).", i18n.t(label))
+    if not size_err and size_flag(job["min_size"]) and size_flag(job["max_size"]) \
+            and _size_bytes(job["min_size"]) > _size_bytes(job["max_size"]):
+        size_err = i18n.t("Größenfilter: Die Mindestgröße ist größer als die Höchstgröße.")
+    job["extra_dests"] = "\n".join(x.strip() for x in str(f.get("extra_dests", "") or "").replace("\r\n", "\n").splitlines()
+                                   if x.strip())[:4000]
+    job["tags"] = job_tags({"tags": f.get("tags", "")})
+    job["priority"] = f.get("priority") if f.get("priority") in PRIORITIES else "normal"
+    job["note"] = str(f.get("note", "") or "").replace("\r\n", "\n").strip()[:4000]
     win_err = None
     if "window_on" in f:
         job["window"], win_err = timewin.clean({
@@ -4032,8 +4318,19 @@ def apply_job_form(f, job, old, job_id, jobs, api=False):
         error = cw_err
     elif win_err:
         error = win_err
+    elif size_err:
+        error = size_err
     elif ext_err:
         error = ext_err
+    elif job["extra_dests"] and (is_bisync(job) or job.get("encrypt")):
+        error = i18n.t("Weitere Ziele gehen nur beim Spiegeln (Einweg) ohne Verschlüsselung.")
+    elif any(not g.access.path_ok(d) for d in extra_dests(job)):
+        error = i18n.t("Deine Rolle darf diesen Speicherort bzw. lokale Ordner nicht verwenden.")
+    elif any(d.rstrip("/") in (job["source"].rstrip("/"), job["dest"].rstrip("/"), effective_dest(job).rstrip("/"))
+             for d in extra_dests(job)):
+        error = i18n.t("Weitere Ziele: Ein Ziel darf weder die Quelle noch das Hauptziel sein.")
+    elif len(extra_dests(job)) > 10:
+        error = i18n.t("Weitere Ziele: höchstens 10.")
     elif not g.access.path_ok(job["source"]) or not g.access.path_ok(job["dest"]):
         error = "Deine Rolle darf diesen Speicherort bzw. lokale Ordner nicht verwenden."
     elif any(".." in x.strip().split("/") for x in f.get("selection", "").splitlines()):
@@ -4122,7 +4419,7 @@ def edit_job(job_id=None):
                            glob=glob, has_token=has_token, others=others, followers=followers, bw_cfg=job.get("bw") or settings.get("bw") or bwlimit.EMPTY,
                            ssh_remotes=[r for r in remote_exec.ssh_remotes() if g.access.remote_ok(r)],
                            enc_locked=bool(job_id and crypt_section(crypt_remote_name(job_id))), enc_remote=crypt_remote_name(job_id or ""),
-                           enc_min=ENC_PW_MIN)
+                           enc_min=ENC_PW_MIN, all_tags=all_tags(jobs), max_par=max_parallel(settings))
 
 
 def parse_bw(raw):
@@ -4571,6 +4868,155 @@ def job_pause(job_id):
     return redirect(back if back.startswith("/") and not back.startswith("//") else url_for("index"))
 
 
+# ---------------------------------------------------------------- FreeFileSync-Import (seit 1.58.0)
+def ffs_create(pairs, trigger="manual", schedule="", enabled=False):
+    """Vorschlaege als Aufgaben anlegen (gleiche Pruefungen wie im Formular). Liefert (angelegt [(id, name)], fehler [(name, text)])."""
+    made, errs = [], []
+    for p in pairs:
+        data = ffsimport.job_fields(p, trigger, schedule, enabled)
+        try:
+            res = api._save_job(None, data)
+            made.append((res["id"], res["name"]))
+        except api.ApiError as e:
+            errs.append((p.get("name", ""), i18n.translate(e.msg)))
+    if made:
+        audit_add("job", "aus FreeFileSync importiert", ", ".join(n for _, n in made), detail=f"{len(made)} Aufgabe(n)")
+    return made, errs
+
+
+@app.route("/jobs/import", methods=["GET", "POST"])
+def jobs_import():
+    f = request.form
+    remotes = [r["name"] for r in list_remotes() if g.access.remote_ok(r["name"])]
+    ctx = {"mappings": f.get("mappings", ""), "trigger": f.get("trigger", "manual"), "schedule": f.get("schedule", "0 3 * * *"),
+           "enabled": "enabled" in f, "remotes": remotes, "err": None, "res": None}
+    if request.method == "POST" and f.get("step") == "create":
+        try:
+            pairs = json.loads(base64.b64decode(f.get("data", "")).decode("utf-8"))
+        except Exception:  # noqa: BLE001
+            pairs = []
+        chosen = []
+        for i, p in enumerate(pairs if isinstance(pairs, list) else []):
+            if f"use_{i}" not in f:
+                continue
+            p = dict(p, name=f.get(f"name_{i}", p.get("name", "")).strip(), source=f.get(f"source_{i}", p.get("source", "")).strip(),
+                     dest=f.get(f"dest_{i}", p.get("dest", "")).strip())
+            chosen.append(p)
+        if not chosen:
+            ctx["err"] = i18n.t("Bitte mindestens ein Ordnerpaar auswählen.")
+        else:
+            made, errs = ffs_create(chosen, ctx["trigger"], ctx["schedule"], ctx["enabled"])
+            schedule_all()
+            if not errs:
+                session["flash"] = i18n.t("{0} Aufgabe(n) aus FreeFileSync angelegt.", len(made))
+                return redirect(url_for("index"))
+            ctx["err"] = "; ".join(f"{n}: {e}" for n, e in errs)
+            if made:
+                ctx["err"] = i18n.t("{0} Aufgabe(n) angelegt.", len(made)) + " " + ctx["err"]
+            ctx["res"] = {"pairs": [p for p in chosen if p["name"] in [n for n, _ in errs]], "warnings": [], "name": ""}
+    elif request.method == "POST":
+        up = request.files.get("file")
+        blob = up.read(ffsimport.MAX_BYTES + 1) if up and up.filename else f.get("xml", "").encode("utf-8")
+        if not blob:
+            ctx["err"] = i18n.t("Bitte eine Datei auswählen.")
+        else:
+            try:
+                ctx["res"] = ffsimport.parse(blob, up.filename if up and up.filename else "", remotes, ctx["mappings"])
+            except ffsimport.ImportError_ as e:
+                ctx["err"] = i18n.t(str(e))
+    if ctx["res"]:
+        ctx["data"] = base64.b64encode(json.dumps(ctx["res"]["pairs"], ensure_ascii=False).encode("utf-8")).decode()
+    return render_template("ffs_import.html", **ctx)
+
+
+# ---------------------------------------------------------------- Kalender (iCal) der geplanten Laeufe (seit 1.58.0)
+def ical_days(s=None):
+    try:
+        return max(1, min(90, int((s or load_settings()).get("ical_days") or 14)))
+    except ValueError:
+        return 14
+
+
+def _ics_response(text, name="mirrorsync.ics", download=True):
+    resp = flask.Response(text, mimetype="text/calendar")
+    resp.headers["Content-Type"] = "text/calendar; charset=utf-8"
+    resp.headers["Cache-Control"] = "no-cache"
+    if download:
+        resp.headers["Content-Disposition"] = f'attachment; filename="{name}"'
+    return resp
+
+
+@app.get("/schedules/calendar.ics")
+def schedules_ics():
+    return _ics_response(ical.build(load_jobs(), ical_days(), visible=g.access.job_ok))
+
+
+@app.get("/calendar/<token>.ics")
+def calendar_feed(token):
+    """Abo-Adresse fuer Kalender-Apps: Token pro Benutzer, zeigt nur die Aufgaben, die dieser Benutzer sehen darf."""
+    if not token or len(token) < 20:
+        abort(404)
+    for name, u in store.load().items():
+        tok = u.get("ical_token") or ""
+        if tok and hmac.compare_digest(tok, token) and not u.get("disabled"):
+            acc = make_access(name, u.get("role"))
+            if not acc.has("jobs.view"):
+                abort(404)
+            return _ics_response(ical.build(load_jobs(), ical_days(), visible=acc.job_ok), download=False)
+    abort(404)
+
+
+def ical_url(token):
+    base = (load_settings().get("public_url") or "").strip().rstrip("/") or request.host_url.rstrip("/")
+    return f"{base}/calendar/{token}.ics" if token else ""
+
+
+@app.post("/account/ical")
+def account_ical():
+    """Persoenliche Kalender-Abo-Adresse anlegen, erneuern oder loeschen."""
+    if request.form.get("action") == "delete":
+        store.update(g.user, ical_token="")
+        audit_add("user", "Kalender-Abo gelöscht", g.user)
+        session["flash"] = i18n.t("Kalender-Abo gelöscht. Die alte Adresse funktioniert nicht mehr.")
+    else:
+        store.update(g.user, ical_token=secrets.token_urlsafe(24))
+        audit_add("user", "Kalender-Abo erstellt", g.user)
+        session["flash"] = i18n.t("Kalender-Abo erstellt. Die Adresse steht unter „Kalender-Abo (iCal)“.")
+    return redirect(url_for("account") + "#ical")
+
+
+@app.post("/maintenance")
+def maintenance_toggle():
+    """Wartungsmodus ein (dauerhaft, fuer X Stunden oder bis Datum) oder aus (seit 1.58.0)."""
+    f = request.form
+    if f.get("action") == "off":
+        set_maintenance(False, by=g.user or "")
+        audit_add("system", "Wartungsmodus beendet", "Wartungsmodus")
+        session["flash"] = i18n.t("Wartungsmodus beendet. Zeitpläne laufen wieder.")
+    else:
+        until = maintenance_until(f.get("hours"), f.get("until"))
+        set_maintenance(True, until=until, by=g.user or "", reason=f.get("reason", "").strip())
+        audit_add("system", "Wartungsmodus eingeschaltet", "Wartungsmodus", detail=("bis " + until.replace("T", " ")) if until else "bis zum Beenden")
+        session["flash"] = i18n.t("Wartungsmodus eingeschaltet. Es startet nichts automatisch.")
+    back = f.get("back", "")
+    return redirect(back if back.startswith("/") and not back.startswith("//") else url_for("index"))
+
+
+def maintenance_until(hours=None, until=None):
+    """Ende des Wartungsmodus aus Stunden oder Datum (JJJJ-MM-TTTHH:MM). Leer = bis zum Beenden."""
+    now = datetime.datetime.now()
+    try:
+        h = float(str(hours).replace(",", ".")) if hours not in (None, "") else 0
+    except ValueError:
+        h = 0
+    if h > 0:
+        return (now + datetime.timedelta(hours=min(h, 24 * 366))).strftime("%Y-%m-%dT%H:%M")
+    u = str(until or "").strip()[:16].replace(" ", "T")
+    if re.match(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$", u) and u > now.strftime("%Y-%m-%dT%H:%M"):
+        return u
+    return ""
+
+
 @app.post("/job/<job_id>/stop")
 def stop(job_id):
     stop_job(job_id)
@@ -4584,26 +5030,81 @@ def show_log(job_id):
     running = job_id in _running
     hist = job.get("history", [])
     current = _current_run.get(job_id) or (hist[0].get("run") if hist else None)
-    text = "Noch kein Lauf."
-    if current and os.path.exists(run_log_path(job_id, current)):
-        path = run_log_path(job_id, current)
-        with open(path, encoding="utf-8", errors="replace") as f:
-            f.seek(max(0, os.path.getsize(path) - 100_000))
-            text = f.read()
-        # Hinweiszeilen einzeln uebersetzen (der ganze Text passt auf kein Muster)
-        text = "".join(i18n.translate(ln) if ln.startswith("===") else ln for ln in text.splitlines(True))
+    if current and not os.path.exists(run_log_path(job_id, current)):
+        current = None   # Log schon aufgeraeumt
     runs, days = keep_limits()
     job = dict(job, dest=effective_dest(job))
     follower_names = sorted((j["name"] for j in load_jobs().values() if trigger_of(j) == "after" and j.get("after_job") == job_id),
                             key=str.lower)
-    return render_template("log.html", job=job, job_id=job_id, log=text, current=current, follower_names=follower_names, msg=session.pop("flash", None),
-                           running=running, auto_refresh=running, keep_runs=runs, keep_days=days,
+    return render_template("log.html", job=job, job_id=job_id, current=current, queued=queue_pos(job_id), follower_names=follower_names, msg=session.pop("flash", None),
+                           running=running, auto_refresh=False, keep_runs=runs, keep_days=days,
                            has_file={h.get("run"): bool(h.get("run")) and os.path.exists(run_log_path(job_id, h["run"]))
                                      for h in hist})
 
 
-LOG_FILTERS = {"all": "Alle", "error": "Fehler", "copied": "Kopiert", "deleted": "Gelöscht", "notice": "Hinweise"}
+LOG_FILTERS = {"all": "Alle", "error": "Fehler", "warn": "Warnungen", "copied": "Kopiert", "deleted": "Gelöscht", "notice": "Hinweise"}
 MAX_LINES = 5000
+TAIL_START = 100_000     # Live-Log: beim ersten Abruf hoechstens die letzten 100 KB
+TAIL_CHUNK = 2_000_000   # pro Abruf hoechstens 2 MB nachladen
+
+
+def _log_line_out(line):
+    """Hinweiszeilen (=== … ===) in die Sprache der Anfrage uebersetzen."""
+    return i18n.translate(line) if line.startswith("===") else line
+
+
+def log_tail(job_id, run_id, pos=None, flt="all", q=""):
+    """Neue Zeilen eines Lauf-Logs ab Byte-Position pos (Live-Log seit 1.58.0).
+    pos=None: die letzten TAIL_START Bytes. Liefert dict mit pos (naechste Position), lines [[art, text]], live."""
+    path = run_log_path(job_id, run_id)
+    size = os.path.getsize(path)
+    start = max(0, size - TAIL_START) if pos is None else max(0, min(int(pos), size))
+    cut = pos is None and start > 0
+    if pos is not None and int(pos) > size:   # Datei neu angelegt/gekuerzt: von vorn
+        start, cut = 0, False
+    with open(path, "rb") as f:
+        f.seek(start)
+        data = f.read(TAIL_CHUNK)
+    end = data.rfind(b"\n")
+    live = _current_run.get(job_id) == run_id
+    if end < 0:
+        # noch keine ganze Zeile: bei laufendem Lauf auf den Rest warten
+        data, nxt = (b"", start) if live else (data, start + len(data))
+    else:
+        if not live and start + len(data) >= size:
+            end = len(data) - 1   # Lauf zu Ende: auch die letzte Zeile ohne Zeilenumbruch
+        data, nxt = data[:end + 1], start + end + 1
+    text = data.decode("utf-8", "replace")
+    rows = text.splitlines()
+    if cut and rows:
+        rows = rows[1:]   # erste Zeile ist abgeschnitten
+    q = (q or "").lower()
+    out = []
+    for ln in rows:
+        kind = notify.classify(ln)
+        if (flt == "all" or kind == flt) and (not q or q in ln.lower()):
+            out.append([kind, _log_line_out(ln)])
+    return {"ok": True, "pos": nxt, "size": size, "lines": out, "live": live, "more": nxt < size,
+            "skipped": start if cut else 0}
+
+
+@app.get("/job/<job_id>/run/<run_id>/tail")
+def run_tail(job_id, run_id):
+    """JSON fuer das Live-Log: neue Zeilen seit pos, auch waehrend eines Laufs."""
+    load_jobs().get(job_id) or abort(404)
+    if not RUN_ID_RE.match(run_id) or not os.path.exists(run_log_path(job_id, run_id)):
+        abort(404)
+    pos = request.args.get("pos")
+    flt = request.args.get("f", "all") if request.args.get("f") in LOG_FILTERS else "all"
+    try:
+        pos = None if pos in (None, "") else int(pos)
+    except ValueError:
+        pos = None
+    res = log_tail(job_id, run_id, pos, flt, request.args.get("q", "").strip())
+    job = load_jobs().get(job_id) or {}
+    entry = next((h for h in job.get("history", []) if h.get("run") == run_id), None)
+    res["status"] = "laeuft" if res["live"] else (entry or {}).get("status", "")
+    return res
 
 
 @app.get("/job/<job_id>/run/<run_id>")
@@ -4615,22 +5116,176 @@ def show_run(job_id, run_id):
     q = request.args.get("q", "").strip()
     counts = {k: 0 for k in LOG_FILTERS}
     lines, total = [], 0
-    with open(run_log_path(job_id, run_id), encoding="utf-8", errors="replace") as f:
-        for line in f:
-            kind = notify.classify(line)
-            counts["all"] += 1
-            if kind in counts:
-                counts[kind] += 1
-            if (flt == "all" or kind == flt) and (not q or q.lower() in line.lower()):
-                total += 1
-                lines.append((kind, line.rstrip("\n")))
-                if len(lines) > MAX_LINES:
-                    lines.pop(0)
-    entry = next((h for h in job.get("history", []) if h.get("run") == run_id), None)
     live = _current_run.get(job_id) == run_id
+    path = run_log_path(job_id, run_id)
+    size = os.path.getsize(path)
+    with open(path, "rb") as f:
+        raw = f.read(size)
+    if live and not raw.endswith(b"\n") and b"\n" in raw:
+        raw = raw[:raw.rfind(b"\n") + 1]   # halbe letzte Zeile holt das Live-Log nach
+    end_pos = len(raw)
+    for line in raw.decode("utf-8", "replace").splitlines(True):
+        kind = notify.classify(line)
+        counts["all"] += 1
+        if kind in counts:
+            counts[kind] += 1
+        if (flt == "all" or kind == flt) and (not q or q.lower() in line.lower()):
+            total += 1
+            lines.append((kind, _log_line_out(line.rstrip("\n"))))
+            if len(lines) > MAX_LINES:
+                lines.pop(0)
+    entry = next((h for h in job.get("history", []) if h.get("run") == run_id), None)
     return render_template("run.html", job=dict(job, dest=effective_dest(job)), job_id=job_id, run_id=run_id,
                            entry=entry, lines=lines, total=total, counts=counts, flt=flt, q=q, filters=LOG_FILTERS,
-                           live=live, auto_refresh=live and not q, max_lines=MAX_LINES)
+                           live=live, auto_refresh=False, max_lines=MAX_LINES, end_pos=end_pos)
+
+
+# ---------------------------------------------------------------- Zwei Laeufe vergleichen (seit 1.58.0)
+_RUN_RX = [
+    ("copied", re.compile(r"(?:INFO\s+|NOTICE): (.+?): (?:Copied \((?:new|replaced existing)\)|Skipped copy as --dry-run)")),
+    ("deleted", re.compile(r"(?:INFO\s+|NOTICE): (.+?): (?:Deleted|Moved into backup dir|Skipped delete as --dry-run)")),
+    ("renamed", re.compile(r"(?:INFO\s+|NOTICE): (.+?): (?:Moved \(server-side\)|Renamed|Skipped move as --dry-run)")),
+    ("errors", re.compile(r"ERROR : (.+?): (.+)$")),
+]
+COMPARE_KINDS = ("copied", "deleted", "renamed", "errors")
+COMPARE_MAX = 1000
+
+
+def run_files(job_id, run_id):
+    """Dateien eines Laufs aus seinem Log: {art: {pfad: text}} fuer kopiert, geloescht, umbenannt, Fehler."""
+    out = {k: {} for k in COMPARE_KINDS}
+    try:
+        with open(run_log_path(job_id, run_id), encoding="utf-8", errors="replace") as f:
+            for line in f:
+                for kind, rx in _RUN_RX:
+                    m = rx.search(line)
+                    if m:
+                        path = m.group(1).strip()
+                        if kind == "errors" and (" " in path and ":" in path or path.startswith(("Attempt", "Failed to"))):
+                            path = "–"   # allgemeine Fehlermeldung ohne Dateinamen
+                        out[kind].setdefault(path, (m.group(2).strip() if kind == "errors" else ""))
+                        break
+    except OSError:
+        pass
+    return out
+
+
+def compare_runs(job_id, job, a, b):
+    """Was hat sich zwischen Lauf a und Lauf b geaendert? a ist der aeltere. Liefert dict fuer GUI und API."""
+    hist = {h.get("run"): h for h in job.get("history", [])}
+    if a not in hist or b not in hist:
+        raise ValueError(i18n.t("Lauf nicht gefunden."))
+    if hist[a].get("start", "") > hist[b].get("start", ""):
+        a, b = b, a
+    fa, fb = run_files(job_id, a), run_files(job_id, b)
+    res = {"a": dict(hist[a], run=a), "b": dict(hist[b], run=b), "kinds": {}}
+    for k in COMPARE_KINDS:
+        sa, sb = set(fa[k]), set(fb[k])
+        only_a, only_b, both = sorted(sa - sb), sorted(sb - sa), sorted(sa & sb)
+        res["kinds"][k] = {"a": len(sa), "b": len(sb), "only_a": only_a[:COMPARE_MAX], "only_b": only_b[:COMPARE_MAX],
+                           "both": both[:COMPARE_MAX], "n_only_a": len(only_a), "n_only_b": len(only_b), "n_both": len(both),
+                           "msg_b": {p: fb[k][p] for p in (only_b + both)[:COMPARE_MAX] if fb[k].get(p)} if k == "errors" else {}}
+    diff = {}
+    for key in ("duration", "bytes", "copied", "deleted", "errors"):
+        va, vb = hist[a].get(key), hist[b].get(key)
+        diff[key] = (vb - va) if isinstance(va, (int, float)) and isinstance(vb, (int, float)) else None
+    res["diff"] = diff
+    # Dateien, die in beiden Laeufen kopiert wurden: aendern sich oft (z. B. Datenbanken, Logs)
+    res["repeat_copied"] = res["kinds"]["copied"]["both"][:50]
+    return res
+
+
+@app.get("/job/<job_id>/compare")
+def job_compare(job_id):
+    job = load_jobs().get(job_id) or abort(404)
+    a, b = request.args.get("a", ""), request.args.get("b", "")
+    runs = [h for h in job.get("history", []) if h.get("run") and os.path.exists(run_log_path(job_id, h["run"])) and h.get("mode") != "verify"]
+    if (not a or not b) and len(runs) >= 2:
+        a, b = runs[1]["run"], runs[0]["run"]   # Standard: die beiden letzten Laeufe
+    try:
+        res = compare_runs(job_id, job, a, b)
+        err = None
+    except ValueError as e:
+        res, err = None, str(e)
+    if request.headers.get("Accept", "").startswith("application/json"):
+        return ({"ok": True, **res} if res else {"ok": False, "error": err}), (200 if res else 404)
+    return render_template("compare.html", job=dict(job, dest=effective_dest(job)), job_id=job_id, r=res, err=err, runs=runs,
+                           a=(res or {}).get("a", {}).get("run", a), b=(res or {}).get("b", {}).get("run", b))
+
+
+# ---------------------------------------------------------------- Laufbericht als PDF (seit 1.58.0)
+REPORT_MAX = 2000
+
+
+def run_report_pdf(job_id, job, run_id):
+    """PDF mit Kennzahlen, Fehlern, Warnungen und den Listen kopierter, geloeschter und umbenannter Dateien."""
+    t = i18n.t
+    entry = next((h for h in job.get("history", []) if h.get("run") == run_id), {}) or {}
+    files = run_files(job_id, run_id)
+    warns = []
+    try:
+        with open(run_log_path(job_id, run_id), encoding="utf-8", errors="replace") as f:
+            for line in f:
+                if notify.classify(line) == "warn" and len(warns) < 300:
+                    warns.append(line.rstrip("\n"))
+    except OSError:
+        pass
+    d = pdfreport.Doc(footer=t("MirrorSync {0} · erstellt am {1}", VERSION, datetime.datetime.now().strftime("%d.%m.%Y %H:%M")))
+    d.title(t("Laufbericht"))
+    d.text(job.get("name", job_id), "B", 13, gap=0.6)
+    st = entry.get("status") or ("laeuft" if _current_run.get(job_id) == run_id else "")
+    stxt = {"ok": "OK", "fehler": "Fehler", "laeuft": "läuft", "gestoppt": "gestoppt", "freigabe": "Freigabe nötig"}.get(st, st or "–")
+    rows = [(t("Quelle"), job.get("source", "")),
+            (t("Ziel"), effective_dest(job) + "".join("\n" + x for x in extra_dests(job))),
+            (t("Lauf"), entry.get("start") or run_id), (t("Status"), t(stxt) + (" · " + t("Testlauf") if entry.get("dry_run") else ""),
+                                                        "ok" if st == "ok" else ("err" if st == "fehler" else "")),
+            (t("Dauer"), f"{entry.get('duration', '–')} s"), (t("Gestartet von"), entry.get("by") or "–"),
+            (t("Kopiert"), entry.get("copied", len(files["copied"]))), (t("Gelöscht"), entry.get("deleted", len(files["deleted"]))),
+            (t("Fehler"), entry.get("errors", len(files["errors"])), "err" if entry.get("errors") else ""),
+            (t("Datenmenge"), human_bytes(entry.get("bytes") or 0))]
+    if files["renamed"]:
+        rows.append((t("Umbenannt/verschoben"), len(files["renamed"])))
+    if entry.get("verify"):
+        rows.append((t("Prüflauf"), verify_text(entry["verify"]) or "–"))
+    if entry.get("restore"):
+        rows.append((t("Wiederherstellungs-Test"), restore_text(entry["restore"]) or "–"))
+    for x in entry.get("dests") or []:
+        rows.append((t("Ziel"), f"{x['dest']}: " + (t("OK") if not x["code"] else t("Fehler (Code {0})", x["code"])),
+                     "err" if x["code"] else "ok"))
+    if job.get("note"):
+        rows.append((t("Notiz"), job["note"]))
+    d.rows(rows)
+    sections = [("errors", t("Fehler"), "err"), ("copied", t("Kopiert"), ""), ("deleted", t("Gelöscht"), "warn"),
+                ("renamed", t("Umbenannt/verschoben"), "")]
+    if files["errors"]:
+        d.heading(t("Fehler"), len(files["errors"]))
+        for p, msg in list(files["errors"].items())[:500]:
+            d.lines([p + (": " + msg if msg else "")], "err")
+    if warns:
+        d.heading(t("Warnungen"), len(warns))
+        d.lines(warns, "warn")
+    for key, label, color in sections[1:]:
+        items = list(files[key])
+        if not items:
+            continue
+        d.heading(label, len(items))
+        d.lines(items[:REPORT_MAX], color)
+        if len(items) > REPORT_MAX:
+            d.text(t("… und {0} weitere (vollständige Liste im Log)", len(items) - REPORT_MAX), color="mut", size=9)
+    if not any(files.values()) and not warns:
+        d.heading(t("Dateien"))
+        d.text(t("In diesem Lauf wurde nichts kopiert, gelöscht oder gemeldet."), color="mut")
+    return d.build()
+
+
+@app.get("/job/<job_id>/run/<run_id>/pdf")
+def run_pdf(job_id, run_id):
+    job = load_jobs().get(job_id) or abort(404)
+    if not RUN_ID_RE.match(run_id) or not os.path.exists(run_log_path(job_id, run_id)):
+        abort(404)
+    safe = re.sub(r"[^A-Za-z0-9_.-]+", "_", job["name"]) or job_id
+    return send_file(io.BytesIO(run_report_pdf(job_id, job, run_id)), mimetype="application/pdf",
+                     as_attachment=request.args.get("inline") != "1", download_name=f"mirrorsync_{safe}_{run_id}.pdf")
 
 
 @app.get("/job/<job_id>/run/<run_id>/download")
@@ -4639,8 +5294,13 @@ def download_run(job_id, run_id):
     if not RUN_ID_RE.match(run_id) or not os.path.exists(run_log_path(job_id, run_id)):
         abort(404)
     safe = re.sub(r"[^A-Za-z0-9_.-]+", "_", job["name"]) or job_id
-    return send_file(run_log_path(job_id, run_id), mimetype="text/plain", as_attachment=True,
-                     download_name=f"mirrorsync_{safe}_{run_id}.log")
+    src = run_log_path(job_id, run_id)
+    if _current_run.get(job_id) == run_id:
+        # Lauf schreibt noch: Stand von jetzt als Ganzes senden (die Datei waechst sonst waehrend der Uebertragung)
+        with open(src, "rb") as f:
+            src = io.BytesIO(f.read())
+    return send_file(src, mimetype="text/plain; charset=utf-8", as_attachment=True,
+                     download_name=f"mirrorsync_{safe}_{run_id}.txt")
 
 
 # ---------------------------------------------------------------- Remotes
@@ -5240,7 +5900,8 @@ def settings_page():
 # Seiten der Einstellungen, die frueher alle unter "Allgemein" lagen (seit 1.56.0 eigene Seiten in der Leiste).
 # Alle teilen sich einen Handler: jedes Formular schickt "section", die Seite bestimmt nur, was angezeigt wird.
 GENERAL_PAGES = {"general": "Allgemein", "security": "Anmeldung und Sicherheit", "updates": "Updates",
-                 "restart": "Neustart", "logs": "Logs", "monitoring": "Überwachung", "network": "Bandbreite"}
+                 "restart": "Neustart", "logs": "Logs", "monitoring": "Überwachung", "network": "Bandbreite",
+                 "maintenance": "Wartungsmodus", "mqtt": "MQTT (Home Assistant)"}
 
 
 @app.route("/settings/general", methods=["GET", "POST"])
@@ -5276,6 +5937,41 @@ def monitoring_settings():
 @app.route("/settings/network", methods=["GET", "POST"])
 def network_settings():
     return _general_page("network")
+
+
+@app.get("/settings/maintenance")
+def maintenance_settings():
+    return _general_page("maintenance")
+
+
+@app.route("/settings/mqtt", methods=["GET", "POST"])
+def mqtt_settings():
+    return _general_page("mqtt")
+
+
+def save_mqtt_form(s, f):
+    """MQTT-Formular pruefen und in s uebernehmen. Gibt eine Fehlermeldung zurueck oder None."""
+    port, iv = (f.get("mqtt_port") or "1883").strip(), (f.get("mqtt_interval") or "10").strip()
+    host = (f.get("mqtt_host") or "").strip()
+    topic = (f.get("mqtt_topic") or "mirrorsync").strip().strip("/")
+    prefix = (f.get("mqtt_discovery_prefix") or "homeassistant").strip().strip("/")
+    if not port.isdigit() or not 1 <= int(port) <= 65535:
+        return "Port: 1 bis 65535."
+    if not iv.isdigit() or not 2 <= int(iv) <= 3600:
+        return "Fortschritt: alle 2 bis 3600 Sekunden."
+    if ("mqtt_enabled" in f) and not host:
+        return "Bitte den Broker angeben."
+    if not re.fullmatch(r"[A-Za-z0-9_\-/.]{1,100}", topic) or not re.fullmatch(r"[A-Za-z0-9_\-/.]{1,100}", prefix):
+        return "Thema und Präfix: nur Buchstaben, Ziffern, _ - / und Punkt, ohne + und #."
+    s.update(mqtt_enabled="mqtt_enabled" in f, mqtt_host=host, mqtt_port=str(int(port)), mqtt_tls="mqtt_tls" in f,
+             mqtt_tls_insecure="mqtt_tls_insecure" in f, mqtt_user=(f.get("mqtt_user") or "").strip(), mqtt_topic=topic,
+             mqtt_discovery="mqtt_discovery" in f, mqtt_discovery_prefix=prefix, mqtt_interval=str(int(iv)),
+             mqtt_commands="mqtt_commands" in f)
+    if f.get("mqtt_password"):
+        s["mqtt_password"] = f.get("mqtt_password")
+    elif "mqtt_password_clear" in f:
+        s["mqtt_password"] = ""
+    return None
 
 
 def _update_history(limit=8):
@@ -5359,13 +6055,41 @@ def _general_page(gpage):
             save_settings(s)
             msg = "Gespeichert."
     elif request.method == "POST" and request.form.get("section") == "files":
-        sp = request.form.get("files_speed")
+        f = request.form
+        sp = f.get("files_speed")
+        tmb, smd = (f.get("thumbs_max_mb") or "20").strip().replace(",", "."), (f.get("share_max_days") or "30").strip()
         if sp not in SPEEDS:
             err = "Unbekanntes Tempo."
+        elif not re.fullmatch(r"\d{1,4}(\.\d+)?", tmb) or not 0 < float(tmb) <= 2000:
+            err = "Bildvorschau: 0,1 bis 2000 MB."
+        elif not smd.isdigit() or not 1 <= int(smd) <= 365:
+            err = "Freigabelinks: 1 bis 365 Tage."
         else:
-            s["files_speed"] = sp
+            s.update(files_speed=sp, thumbs="thumbs" in f, thumbs_max_mb=tmb, share_enabled="share_enabled" in f,
+                     share_max_days=str(int(smd)))
             save_settings(s)
             msg = "Gespeichert."
+    elif request.method == "POST" and request.form.get("section") == "runs":
+        mp, idays = (request.form.get("max_parallel") or "0").strip(), (request.form.get("ical_days") or "14").strip()
+        if not mp.isdigit() or int(mp) > 100:
+            err = "Gleichzeitige Läufe: 0 bis 100."
+        elif not idays.isdigit() or not 1 <= int(idays) <= 90:
+            err = "Kalender: 1 bis 90 Tage."
+        else:
+            s.update(max_parallel=str(int(mp)), ical_days=str(int(idays)))
+            save_settings(s)
+            threading.Thread(target=_queue_next, daemon=True).start()
+            msg = "Gespeichert."
+    elif request.method == "POST" and request.form.get("section") == "mqtt":
+        err = save_mqtt_form(s, request.form)
+        if not err:
+            save_settings(s)
+            if request.form.get("mqtt_test"):
+                ok, info = mqttbridge.test(s)
+                msg, err = (i18n.t("Gespeichert. Verbindung zum Broker klappt."), None) if ok else (None, i18n.t("Gespeichert, aber keine Verbindung: {0}", info))
+            else:
+                msg = "Gespeichert."
+            mqttbridge.reconfigure()
     elif request.method == "POST" and request.form.get("section") == "restart":
         tm = (request.form.get("restart_time") or "").strip()
         days = [d for d in timewin.ALL_DAYS if f"restart_day_{d}" in request.form]
@@ -5477,7 +6201,8 @@ def _general_page(gpage):
                            selfupd=selfupd, old_imgs=old_imgs, restart=restart_status() if gpage == "restart" and (g.access.has("system.restart") or g.access.has("system.settings")) else None,
                            day_names=timewin.DAY_NAMES, vol=monitor.volume_state(s), base_url=_public_link("") or request.host_url.rstrip("/"),
                            fwd=request.headers.get("X-Forwarded-For", ""),
-                           bw_desc=bwlimit.describe(bw, s.get("bw_unit") or "MB/s"), bw_tt=bwlimit.timetable(bw))
+                           bw_desc=bwlimit.describe(bw, s.get("bw_unit") or "MB/s"), bw_tt=bwlimit.timetable(bw),
+                           mq=mqttbridge.status() if gpage == "mqtt" else {}, queue=queue_view() if gpage == "maintenance" else [])
 
 
 COUNTRY_CHOICES = [("DE", "Deutschland"), ("AT", "Österreich"), ("CH", "Schweiz"), ("NL", "Niederlande"), ("BE", "Belgien"),
@@ -6519,7 +7244,8 @@ def account():
                            welcome=session.get("welcome"), force_2fa=needs_2fa(u), must_2fa=must_2fa(u), passkeys_list=u.get("passkeys") or [], pk_problem=pk_problem,
                            pk_rp=rp_id,
                            backup_left=len(u.get("backup_codes") or []),
-                           my_logins=[e for e in login_log.load() if e.get("user") == g.user][:10])
+                           my_logins=[e for e in login_log.load() if e.get("user") == g.user][:10],
+                           ical_url=ical_url(u.get("ical_token")), ical_days=ical_days())
 
 
 # ---------------------------------------------------------------- Passkeys
@@ -7070,6 +7796,134 @@ def job_usage(job_id):
                            hot=transfer_hotspots(job_id, job), auto_refresh=view.get("state") == "läuft")
 
 
+# ---------------------------------------------------------------- Doppelte Dateien finden (seit 1.58.0)
+_dupes = {}           # (job_id, seite) -> Ergebnis
+DUPES_MAX_GROUPS = 500
+
+
+def _dupes_scan(key, path, flt, mode, min_bytes):
+    """Dateien auflisten, nach Groesse (und Name) gruppieren; mode=hash prueft Kandidaten per MD5/SHA-1 (zur Not per Download)."""
+    by_size, files = {}, 0
+    proc = subprocess.Popen(["rclone", "--config", RCLONE_CONF, "lsf", "-R", "--files-only", "--format", "sp", "--separator", "\t",
+                             *flt, path], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, errors="replace")
+    with _usage_lock:
+        _dupes[key]["proc"] = proc
+    for line in proc.stdout:
+        size, _, p = line.rstrip("\n").partition("\t")
+        try:
+            n = int(size)
+        except ValueError:
+            continue
+        files += 1
+        if n >= min_bytes and n > 0:
+            k = (n, p.rsplit("/", 1)[-1].lower()) if mode == "name" else n
+            by_size.setdefault(k, []).append(p)
+        if files % 5000 == 0:
+            with _usage_lock:
+                _dupes[key].update(files=files)
+    err = proc.stderr.read()[-400:]
+    rc = proc.wait()
+    if rc != 0:
+        with _usage_lock:
+            _dupes[key].update(state="fehler", error=err, proc=None)
+        return
+    cand = {k: v for k, v in by_size.items() if len(v) > 1}
+    groups = []
+    if mode == "hash" and cand:
+        paths = sorted({p for v in cand.values() for p in v})
+        need = sum((k if isinstance(k, int) else k[0]) * len(v) for k, v in cand.items())
+        with _usage_lock:
+            _dupes[key].update(phase="hash", candidates=len(paths), candidate_bytes=need)
+        with tempfile.NamedTemporaryFile("w", delete=False, suffix=".txt", encoding="utf-8") as tf:
+            tf.write("\n".join(paths) + "\n")
+            lst = tf.name
+        hashes = {}
+        try:
+            for extra in ([], ["--download"]):   # ohne Pruefsumme im Speicher: Kandidaten herunterladen und selbst rechnen
+                if _dupes[key].get("stop"):
+                    break
+                pr = subprocess.Popen(["rclone", "--config", RCLONE_CONF, "hashsum", "md5", *extra, "--files-from-raw", lst, path],
+                                      stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, errors="replace")
+                with _usage_lock:
+                    _dupes[key]["proc"] = pr
+                out, e2 = pr.communicate()
+                for ln in out.splitlines():
+                    h, _, p = ln.partition("  ")
+                    if h and p and not h.startswith("UNSUPPORTED") and len(h) >= 16:
+                        hashes[p] = h
+                if hashes:
+                    break
+        finally:
+            os.unlink(lst)
+        for k, v in cand.items():
+            size = k if isinstance(k, int) else k[0]
+            same = {}
+            for p in v:
+                if p in hashes:
+                    same.setdefault(hashes[p], []).append(p)
+            for h, ps in same.items():
+                if len(ps) > 1:
+                    groups.append({"size": size, "paths": sorted(ps), "hash": h})
+    else:
+        for k, v in cand.items():
+            size = k if isinstance(k, int) else k[0]
+            groups.append({"size": size, "paths": sorted(v)})
+    for gr in groups:
+        gr["count"] = len(gr["paths"])
+        gr["wasted"] = gr["size"] * (gr["count"] - 1)
+    groups.sort(key=lambda x: -x["wasted"])
+    with _usage_lock:
+        _dupes[key].update(state="ok", files=files, groups=groups[:DUPES_MAX_GROUPS], n_groups=len(groups),
+                           wasted=sum(x["wasted"] for x in groups), dup_files=sum(x["count"] - 1 for x in groups),
+                           at=time.strftime("%Y-%m-%d %H:%M:%S"), proc=None, phase="")
+
+
+def dupes_start(job_id, job, side, mode="hash", min_bytes=1024):
+    path = job["source"] if side == "source" else data_dest(job)
+    key = (job_id, side)
+    mode = mode if mode in ("hash", "size", "name") else "hash"
+    with _usage_lock:
+        if (_dupes.get(key) or {}).get("state") == "läuft":
+            return False
+        _dupes[key] = {"state": "läuft", "path": path, "files": 0, "mode": mode, "min_bytes": min_bytes, "phase": "list",
+                       "started": time.strftime("%Y-%m-%d %H:%M:%S")}
+    threading.Thread(target=_dupes_scan, args=(key, path, filter_args(job), mode, min_bytes), daemon=True).start()
+    return True
+
+
+def dupes_view(job_id, side):
+    with _usage_lock:
+        d = dict(_dupes.get((job_id, side)) or {})
+    d.pop("proc", None)
+    return dict(d, side=side)
+
+
+@app.route("/job/<job_id>/duplicates", methods=["GET", "POST"])
+def job_duplicates(job_id):
+    job = load_jobs().get(job_id) or abort(404)
+    side = "dest" if request.values.get("side") == "dest" else "source"
+    wants_json = request.headers.get("Accept", "").startswith("application/json")
+    if request.method == "POST":
+        if request.form.get("action") == "stop":
+            with _usage_lock:
+                d = _dupes.get((job_id, side)) or {}
+                d["stop"] = True
+                if d.get("proc"):
+                    d["proc"].kill()
+            return {"ok": True} if wants_json else redirect(url_for("job_duplicates", job_id=job_id, side=side))
+        mb = str(request.form.get("min_kb", "1")).strip()
+        min_bytes = int(float(mb.replace(",", ".")) * 1024) if re.match(r"^\d+([.,]\d+)?$", mb) else 1024
+        started = dupes_start(job_id, job, side, request.form.get("mode", "hash"), min_bytes)
+        if wants_json:
+            return {"ok": True, "started": started}
+        return redirect(url_for("job_duplicates", job_id=job_id, side=side))
+    view = dupes_view(job_id, side)
+    if wants_json:
+        return dict(view, ok=True)
+    return render_template("dupes.html", job=dict(job, dest=effective_dest(job)), job_id=job_id, d=view, side=side,
+                           auto_refresh=view.get("state") == "läuft")
+
+
 # ---------------------------------------------------------------- Statistik pro Monat
 @app.get("/stats")
 def stats_page():
@@ -7400,6 +8254,8 @@ def _geoip_loop():
 monitor.init(sys.modules[__name__])
 api.register(app, sys.modules[__name__])
 filemgr.register(app, sys.modules[__name__])
+sharelinks.register(app, sys.modules[__name__], filemgr)
+ical.core = sys.modules[__name__]
 apigui.register(app, sys.modules[__name__])
 
 
@@ -7482,6 +8338,7 @@ def main():
     except Exception as e:  # noqa: BLE001
         print(f"Neustart: {e}", flush=True)
     threading.Thread(target=_update_loop, daemon=True).start()
+    mqttbridge.start(sys.modules[__name__])
     scheduler.start()
     schedule_all()
     from waitress import serve

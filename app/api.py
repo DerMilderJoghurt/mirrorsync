@@ -276,6 +276,8 @@ def public_job(jid, j, history=False):
     out.setdefault("msg_tpl_on", False)
     out.setdefault("visible_to", "all")
     out["live_mode"] = core.live_mode(j)
+    out.update(tags=core.job_tags(j), extra_dests_list=core.extra_dests(j), priority=j.get("priority") or "normal",
+               track_renames=j.get("track_renames") or "off", queued=core.queue_pos(jid))
     out.update(encrypt=bool(j.get("encrypt")), encrypted=core.is_encrypted(j),
                encrypt_names=j.get("encrypt_names") or "standard", encrypt_dirnames=j.get("encrypt_dirnames", True) is not False)
     out.update(compare=core.compare_of(j), compare_window=core.compare_window(j), speed=core.speed_of(j),
@@ -306,7 +308,8 @@ TEXT_FIELDS = ("name", "source", "dest", "schedule", "max_delete", "extra_flags"
                "health_max_age", "script_pre", "script_post", "script_host", "script_timeout", "script_pre_fail", "script_post_when",
                "snapshot", "snapshot_host", "snapshot_target", "snapshot_dir", "snapshot_cmd", "snapshot_keep",
                "wol_mac", "wol_broadcast", "wol_port", "wol_wait", "wol_check", "wol_sleep_cmd", "wol_sleep_host",
-               "encrypt_names", "encrypt_password", "encrypt_password_confirm", "encrypt_password2")
+               "encrypt_names", "encrypt_password", "encrypt_password_confirm", "encrypt_password2",
+               "track_renames", "min_size", "max_size", "extra_dests", "tags", "priority", "note")
 SCRIPT_TEXT = ("script_pre", "script_post", "snapshot_cmd")
 
 
@@ -481,9 +484,11 @@ def op_job_run(jid, dry=False, solo=False):
     ok = core.start_job(jid, dry_run=bool(dry), by=g.user, manual=True, solo=bool(solo))
     if ok is False:
         raise ApiError(409, "Die Aufgabe konnte nicht gestartet werden (läuft bereits).")
-    core.audit_add("run", "Testlauf gestartet" if dry else "gestartet", j["name"],
+    queued = ok == "queued"
+    core.audit_add("run", ("Testlauf gestartet" if dry else "gestartet") + (" (wartet in der Warteschlange)" if queued else ""), j["name"],
                    detail="über API" + (", ohne Folgeaufgaben" if solo else ""))
-    return {"started": jid, "name": j["name"], "dry_run": bool(dry), "only_this": bool(solo), "run": core._current_run.get(jid)}
+    return {"started": jid, "name": j["name"], "dry_run": bool(dry), "only_this": bool(solo), "run": core._current_run.get(jid),
+            "queued": queued, "queue_pos": core.queue_pos(jid) if queued else None}
 
 
 def op_job_resync(jid, dry=False):
@@ -625,7 +630,10 @@ JOB_FIELDS = {"type": "object", "description": "Felder der Aufgabe, z. B. name, 
               "(Minuten, z. B. \"5, 15, 60\"), retry_on (network|any), nosync, health_max_age (Stunden), script_pre, script_post, script_host, "
               "snapshot (off|zfs|btrfs|command), snapshot_target, snapshot_dir, snapshot_cmd, snapshot_keep, wol_mac, wol_broadcast, wol_wait, "
               "wol_check, wol_sleep, wol_sleep_cmd, wol_sleep_host, encrypt, encrypt_password, encrypt_password_confirm, encrypt_ack, "
-              "encrypt_names (standard|obfuscate|off), encrypt_dirnames, encrypt_password2 (vollständig in der OpenAPI-Beschreibung)", "additionalProperties": True}
+              "encrypt_names (standard|obfuscate|off), encrypt_dirnames, encrypt_password2, track_renames (off|hash|modtime: Umbenennungen "
+              "erkennen), min_size/max_size (z. B. 1K, 500M, 4G: Größenfilter), extra_dests (weitere Ziele, eins je Zeile, nur Spiegeln "
+              "ohne Verschlüsselung), tags (Liste oder kommagetrennt), priority (high|normal|low: Reihenfolge in der Warteschlange), "
+              "note (Notiz) (vollständig in der OpenAPI-Beschreibung)", "additionalProperties": True}
 TOOLS = [
     ("status", "Überblick: Version, laufende, fehlgeschlagene und pausierte Aufgaben, Rechte des Keys.", None,
      _schema(), lambda a: op_status(), True),
@@ -636,8 +644,9 @@ TOOLS = [
     ("job_history", "Verlauf der letzten Läufe einer Aufgabe (Status, Dauer, kopiert, gelöscht, Fehler).", "jobs.logs",
      _schema(dict(JOB_ID, limit={"type": "integer", "default": 20}), ["job_id"]),
      lambda a: op_history(a["job_id"], a.get("limit", 20)), True),
-    ("job_log", "Log eines Laufs (ohne run_id: letzter bzw. laufender Lauf). Filter: all, error, copied, deleted, notice.",
-     "jobs.logs", _schema(dict(JOB_ID, run_id={"type": "string"}, filter={"type": "string", "enum": ["all", "error", "copied", "deleted", "notice"]},
+    ("job_log", "Log eines Laufs (ohne run_id: letzter bzw. laufender Lauf). Filter: all, error, warn, copied, deleted, notice. "
+     "Für neue Zeilen eines laufenden Syncs get_run_log_tail.",
+     "jobs.logs", _schema(dict(JOB_ID, run_id={"type": "string"}, filter={"type": "string", "enum": ["all", "error", "warn", "copied", "deleted", "notice"]},
                                search={"type": "string"}, max_lines={"type": "integer", "default": 200}), ["job_id"]),
      lambda a: op_log(a["job_id"], a.get("run_id"), a.get("filter", "all"), a.get("search", ""), a.get("max_lines", 200)), True),
     ("run_job", "Aufgabe jetzt starten (dry_run=true: nur Testlauf, ändert nichts; only_this=true: nur diese Aufgabe, "
@@ -718,7 +727,10 @@ def mcp_handle(msg):
                 "Außerdem lassen sich Speicherorte, Zeitpläne, Benutzer, Rollen, API-Keys, Benachrichtigungen, Vorlagen, "
                 "Einstellungen, Zugriffsregeln und Sicherungen ansehen, ändern und löschen, mit denselben Prüfungen wie in der GUI.") + " " + core.i18n.translate(
                 "Prüfen: verify_job und get_health. Löschwarnungen mit approve_job freigeben. Gelöschte oder überschriebene Dateien "
-                "mit list_versions und restore_versions zurückholen. Statistik mit get_stats, Versionshinweise mit get_changelog.")}}
+                "mit list_versions und restore_versions zurückholen. Statistik mit get_stats, Versionshinweise mit get_changelog.") + " " + core.i18n.translate(
+                "Live-Log mit get_run_log_tail, Läufe vergleichen mit compare_runs, Laufbericht als PDF mit get_run_report, doppelte "
+                "Dateien mit find_duplicates, Wartungsmodus mit set_maintenance, Warteschlange mit get_queue, Freigabelinks mit "
+                "create_share_link, geplante Läufe mit get_calendar, FreeFileSync-Import mit import_ffs.")}}
     if method == "ping":
         return {"jsonrpc": "2.0", "id": rid, "result": {}}
     if method == "tools/list":
@@ -810,6 +822,13 @@ def openapi():
                 "bw": {"type": "object", "description": "wie /settings/bandwidth"},
                 "window": {"type": "object", "nullable": True, "description": "Zeitfenster: {start: \"22:00\", end: \"06:00\", days: [0..6] (0 = Montag, Standard alle), mode: finish (durchlaufen lassen) | resume (am Ende anhalten, im nächsten Fenster weitermachen) | stop (am Ende anhalten)}; null = immer. Automatische Starts außerhalb warten auf das Fenster. Im Ergebnis zeigt window_wait, ob die Aufgabe gerade wartet (deferred oder resume)"},
                 "pause_chain": {"type": "string", "enum": ["skip", "stop"]},
+                "track_renames": {"type": "string", "enum": ["off", "hash", "modtime"], "description": "Umbenennungen und Verschiebungen erkennen (rclone --track-renames): im Ziel nur umbenennen statt neu kopieren. hash = über Prüfsumme (sicher), modtime = über Größe und Änderungszeit (für Speicher ohne Prüfsummen). Nur Spiegeln"},
+                "min_size": {"type": "string", "description": "Größenfilter: kleinere Dateien auslassen, z. B. 1K, 10M (leer = keiner)"},
+                "max_size": {"type": "string", "description": "Größenfilter: größere Dateien auslassen, z. B. 4G (leer = keiner)"},
+                "extra_dests": {"type": "string", "description": "Weitere Ziele, eins je Zeile (höchstens 10): dieselbe Quelle wird nacheinander auch dorthin gespiegelt. Nur Spiegeln ohne Verschlüsselung"},
+                "tags": {"description": "Tags als Liste oder kommagetrennter Text, z. B. [\"Fotos\", \"NAS\"]; in der Übersicht filterbar"},
+                "priority": {"type": "string", "enum": ["high", "normal", "low"], "description": "Reihenfolge in der Warteschlange, wenn die Zahl gleichzeitiger Läufe begrenzt ist"},
+                "note": {"type": "string", "description": "Notiz zur Aufgabe (bis 4000 Zeichen)"},
                 "versions_keep": {"type": "string", "description": "bei versioning: so viele Stände behalten (leer = alle)"},
                 "versions_days": {"type": "string", "description": "bei versioning: Stände älter als so viele Tage entfernen (leer = unbegrenzt)"},
                 "visible_to": {"description": "\"all\" (alle mit Recht) oder Liste aus user:<Name> und group:<Gruppen-ID>; Admins und Besitzer sehen die Aufgabe immer"},

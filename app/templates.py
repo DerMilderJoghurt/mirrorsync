@@ -71,7 +71,11 @@ input:focus,select:focus,textarea:focus{border-color:var(--acc);box-shadow:0 0 0
 .row{display:flex;gap:12px}.row>*{flex:1;min-width:0}.hint{color:var(--mut);font-size:12.5px;margin-top:5px}
 .check{display:flex;gap:9px;align-items:flex-start;font-weight:400;margin:8px 0}.check input{margin-top:3px;accent-color:var(--acc)}
 pre{background:var(--card2);border:1px solid var(--bd);border-radius:10px;padding:14px;overflow:auto;max-height:65vh;white-space:pre-wrap;font:12.5px/1.55 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
-pre.lines span{display:block}pre.lines .error{color:var(--err);background:var(--err-soft)}pre.lines .copied{color:var(--ok)}pre.lines .deleted{color:var(--warn)}pre.lines .notice{color:var(--mut)}
+pre.lines span{display:block}pre.lines .error{color:var(--err);background:var(--err-soft)}pre.lines .copied{color:var(--ok)}pre.lines .deleted{color:var(--warn)}pre.lines .notice{color:var(--mut)}pre.lines .warn{color:var(--warn);background:var(--warn-soft)}pre.lines mark{background:#fde047;color:#111;border-radius:2px;padding:0 1px}
+pre.lines.nowrap{white-space:pre;overflow-x:auto}pre.lines.nowrap span{width:max-content;min-width:100%}
+.lvbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:12px 0 8px}.lvbar .lvc{margin:0;white-space:nowrap}.lvbar select{width:auto}.lvbar input[type=search]{width:auto;flex:1 1 180px;min-width:140px}
+.lvinfo{font-size:12.5px;flex:1 1 auto}.lvwrap{position:relative}.lvjump{position:absolute;right:18px;bottom:14px;box-shadow:0 6px 18px rgba(0,0,0,.25);z-index:5}
+.lvdl>div{min-width:190px}
 tr.click{cursor:pointer}tr.click:hover td{background:var(--card2)}
 .chips{display:flex;gap:6px;flex-wrap:wrap;margin:4px 0 12px}.chip{display:inline-flex;gap:6px;align-items:center;padding:5px 11px;border:1px solid var(--bd2);border-radius:999px;color:var(--mut);text-decoration:none;font-size:13px}
 .chip b{color:var(--fg);font-weight:600}.chip.active{border-color:var(--acc);background:var(--acc-soft);color:var(--acc)}.chip.active b{color:var(--acc)}
@@ -132,6 +136,7 @@ body.fb-open .fbpanel{transform:none}.fbshade{display:none}
 .msg{padding:11px 14px;border-radius:10px;margin-bottom:14px;white-space:pre-wrap;border:1px solid}.msg.flash{position:relative;padding-right:40px}.msgx{position:absolute;top:6px;right:6px;width:28px;height:28px;border:0;border-radius:7px;background:transparent;color:inherit;font-size:20px;line-height:1;cursor:pointer;opacity:.6}.msgx:hover{opacity:1;background:rgba(0,0,0,.07)}
 .msg.ok{border-color:var(--ok);background:var(--ok-soft);color:var(--fg)}.msg.err{border-color:var(--err);background:var(--err-soft);color:var(--fg)}
 .msg.info{border-color:var(--bd2);background:var(--acc-soft);color:var(--fg)}
+.msg.warn{border-color:var(--warn);background:var(--warn-soft);color:var(--fg)}.maintbar form{margin-left:6px}
 .browse{border:1px solid var(--bd);border-radius:8px;margin-top:6px;max-height:230px;overflow:auto;display:none;background:var(--card2)}
 .browse div{padding:6px 11px;cursor:pointer}.browse div:hover{background:var(--acc-soft)}
 details summary{cursor:pointer;color:var(--mut);font-weight:500}
@@ -263,7 +268,7 @@ document.addEventListener('click',e=>{const p=document.getElementById('taskpop')
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!document.querySelector('dialog[open]')){const p=document.getElementById('taskpop');if(!p.hidden){p.hidden=true;open=false;tpKeep(false)}}});
 poll();})();
 </script>{% endif %}
-<main>{% set fl = session.pop('flash', None) %}{% if fl %}<div class="msg info flash" role="status">{{ fl }}</div>{% endif %}{% block body %}{% endblock %}</main>
+<main>{% set fl = session.pop('flash', None) %}{% if fl %}<div class="msg info flash" role="status">{{ fl }}</div>{% endif %}{% set mt = MAINT() if g.user else none %}{% if mt %}<div class="msg warn maintbar" role="status"><b>🛠 Wartungsmodus</b> · {% if mt.until %}{{ _("bis {0}", mt.until|replace("T", " ")) }}{% else %}bis er beendet wird{% endif %}{% if mt.by %} · {{ _("von {0}", mt.by) }}{% endif %}{% if mt.reason %} · {{ mt.reason }}{% endif %}<br><small>Zeitpläne, Live-Läufe, Ketten und Wiederholungen starten nicht. Von Hand gestartete Läufe gehen.</small>{% if can("system.maintenance") %} <form class="inline" method="post" action="/maintenance"><input type="hidden" name="action" value="off"><button class="btn sm">Wartungsmodus beenden</button></form>{% endif %}</div>{% endif %}{% block body %}{% endblock %}</main>
 </div></div>
 <script>
 // Meldungen (gespeichert, gelöscht, Fehler) mit X wegklicken
@@ -299,8 +304,16 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){window.addEventLis
 
 "index.html": r"""{% extends "base.html" %}{% block title %}Aufgaben{% endblock %}
 {% block subtitle %}<p>Spiegel-Aufgaben: Das Ziel wird exakt wie die Quelle.</p>{% endblock %}
-{% block actions %}{% if jobs and (can("jobs.run") or can("jobs.dryrun") or can("jobs.edit") or can("jobs.create") or can("jobs.delete")) %}<button type="button" class="btn" id="selbtn" onclick="selToggle('jobsel')" aria-pressed="false">☑ Auswahl</button>{% endif %}{% if can("jobs.create") %}<a class="btn pri" href="/job/new">{{ ICON.plus }} Neue Aufgabe</a>{% endif %}{% endblock %}
+{% block actions %}{% if jobs and (can("jobs.run") or can("jobs.dryrun") or can("jobs.edit") or can("jobs.create") or can("jobs.delete")) %}<button type="button" class="btn" id="selbtn" onclick="selToggle('jobsel')" aria-pressed="false">☑ Auswahl</button>{% endif %}{% if can("system.maintenance") and not maint %}<details class="pausemenu"><summary class="btn" title="Alle Zeitpläne, Live-Läufe und Ketten auf einmal anhalten">🛠 Wartungsmodus</summary><div class="pmenu">
+<b>Wartungsmodus einschalten</b><small class="mut">Keine automatischen Starts mehr. Von Hand gestartete Läufe gehen weiter, laufende Läufe werden nicht abgebrochen.</small>
+<form method="post" action="/maintenance"><input type="hidden" name="action" value="on"><input type="hidden" name="hours" value="1"><button class="btn sm">1 Stunde</button></form>
+<form method="post" action="/maintenance"><input type="hidden" name="action" value="on"><input type="hidden" name="hours" value="4"><button class="btn sm">4 Stunden</button></form>
+<form method="post" action="/maintenance"><input type="hidden" name="action" value="on"><input type="hidden" name="hours" value="24"><button class="btn sm">24 Stunden</button></form>
+<form method="post" action="/maintenance"><input type="hidden" name="action" value="on"><button class="btn sm">bis ich beende</button></form>
+<form method="post" action="/maintenance" class="pdate"><input type="hidden" name="action" value="on"><input type="datetime-local" name="until" required><button class="btn sm pri">bis</button></form>
+</div></details>{% endif %}{% if can("jobs.create") %}<a class="btn" href="/jobs/import" title="Aufgaben aus einer FreeFileSync-Datei (.ffs_batch, .ffs_gui) übernehmen">📥 Import</a><a class="btn pri" href="/job/new">{{ ICON.plus }} Neue Aufgabe</a>{% endif %}{% endblock %}
 {% block body %}
+<style>.jtag{font-size:12px;color:var(--acc);text-decoration:none;margin-left:2px}.jtag:hover{text-decoration:underline}.notei{cursor:help;font-size:13px}.tag.wartet{background:var(--warn-soft);color:var(--warn)}.tag.prio-high{color:var(--err)}.tag.prio-low{color:var(--mut)}</style>
 <div class="stats">
 <div class="stat"><div class="k">Aufgaben</div><div class="v">{{ jobs|length }}</div></div>
 <div class="stat"><div class="k">Automatisch</div><div class="v">{{ jobs|rejectattr('is_paused')|selectattr('trig','equalto','time')|selectattr('next_run')|list|length + jobs|rejectattr('is_paused')|selectattr('trig','in',['after','live'])|selectattr('enabled')|list|length }}</div></div>
@@ -308,8 +321,12 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){window.addEventLis
 <div class="stat"><div class="k">Laufen gerade</div><div class="v laeuft">{{ jobs|selectattr('running')|list|length }}</div></div>
 <div class="stat"><div class="k">Letzter Lauf fehlgeschlagen</div><div class="v {{ 'fehler' if jobs|selectattr('last_status','equalto','fehler')|list }}">{{ jobs|selectattr('last_status','equalto','fehler')|list|length }}</div></div>
 </div>
+{% if queue %}<div class="card" style="padding:12px 16px"><b>⏳ Warteschlange</b> <small class="mut">{{ _("Höchstens {0} Läufe gleichzeitig, die übrigen warten nach Priorität.", max_par) }}</small>
+<ol style="margin:8px 0 0;padding-left:22px">{% for q in queue %}<li><a href="/job/{{ q.id }}/log">{{ q.name }}</a> <span class="tag prio-{{ q.priority }}">{{ {"high": "Hoch", "normal": "Normal", "low": "Niedrig"}[q.priority] }}</span> <small class="mut">{{ _("wartet seit {0}", q.at[11:16]) }}{% if q.dry_run %} · Testlauf{% endif %}{% if q.mode == "verify" %} · Prüflauf{% endif %}</small>{% if can("jobs.run") %} <form class="inline" method="post" action="/job/{{ q.id }}/stop"><button class="btn sm" title="Aus der Warteschlange nehmen">✕</button></form>{% endif %}</li>{% endfor %}</ol></div>{% endif %}
+{% if tags %}<div class="chips" style="margin:0 0 10px"><a class="chip {{ 'active' if not tag }}" href="/">Alle Tags</a>{% for t in tags %}<a class="chip {{ 'active' if tag and tag|lower == t|lower }}" href="/?tag={{ t|urlencode }}">#{{ t }}</a>{% endfor %}</div>{% endif %}
 <div class="card" style="padding:6px 8px">
-{% if not jobs %}<div class="empty"><p style="font-size:15px;color:var(--fg);margin-bottom:4px">Noch keine Aufgaben</p>
+{% if not jobs and tag %}<div class="empty">{{ _("Keine Aufgabe mit dem Tag „{0}“.", tag) }} <a href="/">Alle zeigen</a></div>
+{% elif not jobs %}<div class="empty"><p style="font-size:15px;color:var(--fg);margin-bottom:4px">Noch keine Aufgaben</p>
 <p>Lege zuerst unter <a href="/remotes">Speicherorte</a> deine Server an, dann eine Aufgabe.</p>
 {% if can("jobs.create") %}<p><a class="btn pri" href="/job/new">{{ ICON.plus }} Neue Aufgabe</a></p>{% endif %}</div>
 {% else %}<form method="post" action="/jobs/bulk" class="selbar" id="jobsel-bar" hidden><input type="hidden" name="action"><b class="selcount">0 ausgewählt</b>
@@ -320,21 +337,21 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){window.addEventLis
 <button type="button" class="btn sm" onclick="selToggle('jobsel')">Fertig</button></form>
 <table id="jobsel" class="seltable"><tr><th class="selc"><input type="checkbox" class="selall" aria-label="Alle auswählen"></th><th>Aufgabe</th><th class="hide-sm">Zeitplan</th><th>Status</th><th style="text-align:right">Aktionen</th></tr>
 {% for j in jobs %}<tr class="{{ 'paused' if j.is_paused }}"><td class="selc"><input type="checkbox" class="selbox" value="{{ j.id }}" aria-label="{{ j.name }}"></td>
-<td style="{{ 'padding-left:%dpx' % (10 + 22 * j.depth) if j.depth }}">{% if j.depth %}<span class="chain">↳</span>{% endif %}<a href="/job/{{ j.id }}" style="color:inherit;text-decoration:none"><span class="jobname">{{ j.name }}</span></a>{% if j.is_paused %} <span class="tag pausetag" title="{{ 'von ' ~ j.paused_by if j.paused_by }}">{{ j.pause_text }}</span>{% endif %}
+<td style="{{ 'padding-left:%dpx' % (10 + 22 * j.depth) if j.depth }}">{% if j.depth %}<span class="chain">↳</span>{% endif %}<a href="/job/{{ j.id }}" style="color:inherit;text-decoration:none"><span class="jobname">{{ j.name }}</span></a>{% if j.note %} <span class="notei" title="{{ j.note }}" aria-label="Notiz">📝</span>{% endif %}{% for t in j.tags %} <a class="jtag" href="/?tag={{ t|urlencode }}">#{{ t }}</a>{% endfor %}{% if j.is_paused %} <span class="tag pausetag" title="{{ 'von ' ~ j.paused_by if j.paused_by }}">{{ j.pause_text }}</span>{% endif %}
 <div class="path">{% if j.direction == "bisync" %}<span title="Zwei-Wege-Sync">{{ j.source }} ⇄ {{ j.eff_dest }}</span>{% else %}{{ j.source }} → {{ j.eff_dest }}{% endif %}</div>
 {% if j.direction == "bisync" and j.bisync_need_resync %}<small class="fehler">Zwei-Wege-Sync abgebrochen, bitte neu zusammenführen.</small>
 {% if can("jobs.run") and not j.running %}<form class="inline" method="post" action="/job/{{ j.id }}/resync" onsubmit="return confirm('Beide Seiten neu zusammenführen? Was nur auf einer Seite liegt, wird auf die andere kopiert. Gelöscht wird nichts.')"><button class="btn sm">Neu zusammenführen</button></form>{% endif %}<br>{% endif %}
 {% if j.delete_hold %}{% set h = j.delete_hold %}<div class="msg err" style="margin:6px 0;padding:8px 10px"><b>🛑 Angehalten: Löschwarnung</b><br><small>{{ _("{0} von {1} Dateien im Ziel würden gelöscht ({2} %, Grenze {3} %).", h.deleted, h.total, h.pct, h.threshold) }}</small>
 {% if can("jobs.approve") and not j.running %}<div style="margin-top:6px"><form class="inline" method="post" action="/job/{{ j.id }}/approve" data-q="{{ _('Wirklich freigeben? Der Lauf startet jetzt und löscht {0} Dateien im Ziel.', h.deleted) }}" onsubmit="return confirm(this.dataset.q)"><button class="btn sm del">Freigeben und spiegeln</button></form> <form class="inline" method="post" action="/job/{{ j.id }}/hold/dismiss"><button class="btn sm">Warnung verwerfen</button></form> <a class="btn sm" href="/job/{{ j.id }}/log">Details</a></div>{% endif %}</div>{% endif %}
 {% if j.retry_pending and not j.running %}<small class="mut" title="Nach einem Fehler">↻ {{ _("neuer Versuch {0} von {1} um {2}", j.retry_pending.attempt, j.retry_pending.of, j.retry_pending.at[11:16]) }}</small><br>{% endif %}
-<small>{% if j.direction == "bisync" %}⇄ Zwei-Wege · {% endif %}{% if j.n_select %}☑ nur {{ j.n_select }} {{ "Eintrag" if j.n_select == 1 else "Einträge" }} · {% endif %}{% if j.n_excludes %}{{ j.n_excludes }} Ausschlüsse · {% endif %}{% if j.no_delete and j.direction != "bisync" %}ohne Löschen · {% endif %}{% if j.versioning %}Versionierung · {% endif %}{% if j.encrypt and j.direction != "bisync" %}<span title="Ziel verschlüsselt (rclone crypt)">🔒 verschlüsselt</span> · {% endif %}{% if j.verify and j.verify != "off" %}🔎 Prüflauf · {% endif %}{% if j.restore_test and j.restore_test != "off" and j.direction != "bisync" %}♻ Wiederherstellungs-Test · {% endif %}{% if j.delete_guard and j.direction != "bisync" %}🛡 Löschwarnung ab {{ j.delete_guard }} % · {% endif %}{% if j.retry %}↻ Wiederholen · {% endif %}{% if j.wol_mac %}⏰ Wake-on-LAN · {% endif %}{% if j.snapshot and j.snapshot != "off" %}📸 Snapshot · {% endif %}{% if j.window_text %}🕘 {{ j.window_text }} · {% endif %}{% if j.notify_summary %}🔔 {{ j.notify_summary }}{% endif %}{% if j.dry_run %} · nur Testlauf{% endif %}</small></td>
+<small>{% if j.direction == "bisync" %}⇄ Zwei-Wege · {% endif %}{% if j.n_select %}☑ nur {{ j.n_select }} {{ "Eintrag" if j.n_select == 1 else "Einträge" }} · {% endif %}{% if j.n_excludes %}{{ j.n_excludes }} Ausschlüsse · {% endif %}{% if j.no_delete and j.direction != "bisync" %}ohne Löschen · {% endif %}{% if j.n_dests %}<span title="Eine Quelle, mehrere Ziele">⇉ {{ _("+{0} Ziele", j.n_dests) }}</span> · {% endif %}{% if j.track_renames and j.track_renames != "off" and j.direction != "bisync" and not j.no_delete %}↪ Umbenennungen erkennen · {% endif %}{% if j.size_text %}📏 {{ j.size_text }} · {% endif %}{% if j.priority == "high" %}⬆ hohe Priorität · {% elif j.priority == "low" %}⬇ niedrige Priorität · {% endif %}{% if j.versioning %}Versionierung · {% endif %}{% if j.encrypt and j.direction != "bisync" %}<span title="Ziel verschlüsselt (rclone crypt)">🔒 verschlüsselt</span> · {% endif %}{% if j.verify and j.verify != "off" %}🔎 Prüflauf · {% endif %}{% if j.restore_test and j.restore_test != "off" and j.direction != "bisync" %}♻ Wiederherstellungs-Test · {% endif %}{% if j.delete_guard and j.direction != "bisync" %}🛡 Löschwarnung ab {{ j.delete_guard }} % · {% endif %}{% if j.retry %}↻ Wiederholen · {% endif %}{% if j.wol_mac %}⏰ Wake-on-LAN · {% endif %}{% if j.snapshot and j.snapshot != "off" %}📸 Snapshot · {% endif %}{% if j.window_text %}🕘 {{ j.window_text }} · {% endif %}{% if j.notify_summary %}🔔 {{ j.notify_summary }}{% endif %}{% if j.dry_run %} · nur Testlauf{% endif %}</small></td>
 <td class="hide-sm">{% if j.trig == "after" %}{% if j.parent_name %}<span title="startet nach einer anderen Aufgabe">⛓ nach „{{ j.parent_name }}“</span><br><small>{{ "immer" if j.after_when == "always" else "nur bei Erfolg" }}{% if not j.enabled %} · <span class="fehler">aus</span>{% endif %}</small>{% else %}<span class="fehler">Vorgänger fehlt</span>{% endif %}
 {% elif j.trig == "time" and j.enabled and j.next_run %}{% if j.schedule_text %}{{ j.schedule_text }}{% else %}<code>{{ j.schedule }}</code>{% endif %}
 {% elif j.trig == "live" and j.enabled %}<span title="gleicht laufend Quelle und Ziel ab">⚡ {{ j.live_text }}</span><br><small>{{ j.live_full_text }}{% if j.next_run %}, nächster {{ j.next_run }}{% endif %}</small>{% if j.live_fail_count %}<br><small class="fehler">{{ j.live_fail_count }} Live-Läufe in Folge fehlgeschlagen</small>{% elif j.live_checked %}<br><small class="mut">zuletzt geprüft {{ j.live_checked[11:16] }}</small>{% endif %}
 {% elif j.trig == "live" %}<small>Live aus</small>
 {% elif j.trig == "time" %}<small>Zeitplan aus</small>{% else %}<small>manuell</small>{% endif %}
 {% if j.followers %}<br><small class="mut">danach: {{ j.followers|join(", ") }}</small>{% endif %}</td>
-<td>{% if j.running %}<span class="tag laeuft">läuft</span>{% elif j.last_status %}<span class="tag {{ j.last_status }}">{{ STATUS.get(j.last_status, j.last_status) }}</span><br><small>{{ j.last_run }}</small>{% else %}<span class="tag">noch nie</span>{% endif %}
+<td>{% if j.running %}<span class="tag laeuft">läuft</span>{% elif j.queued %}<span class="tag wartet" title="Wartet auf einen freien Platz">{{ _("wartet (Platz {0})", j.queued) }}</span>{% elif j.last_status %}<span class="tag {{ j.last_status }}">{{ STATUS.get(j.last_status, j.last_status) }}</span><br><small>{{ j.last_run }}</small>{% else %}<span class="tag">noch nie</span>{% endif %}
 {% set w %}{% if j.next_day == 0 %}{{ _("heute, {0}", j.next_hm) }}{% elif j.next_day == 1 %}{{ _("morgen, {0}", j.next_hm) }}{% else %}{{ j.next_full }}{% endif %}{% endset %}
 <div class="nextrun"><small class="mut">{{ _("Nächster Lauf") }}:</small> {% if j.next_at and j.next_kind == "after" %}<small title="{{ _('geschätzt: startet nach „{0}“', j.parent_name) }}"><b>{{ _("ca. {0}", w) }}</b></small>
 {% elif j.next_at %}<small><b>{{ w }}</b></small>
@@ -396,6 +413,11 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){window.addEventLis
 </div>
 <div class="card" data-tab="basic"><h2 id="h_sd">Quelle und Ziel</h2>
 <label>Name</label><input type="text" name="name" value="{{ job.name }}" required>
+<div class="row"><div style="flex:1 1 260px"><label for="tags">Tags</label><input type="text" name="tags" id="tags" value="{{ (job.tags or [])|join(', ') }}" placeholder="z. B. Fotos, NAS, wichtig" list="taglist">
+<datalist id="taglist">{% for t in all_tags %}<option value="{{ t }}">{% endfor %}</datalist>
+<div class="hint">Durch Komma getrennt. In der Übersicht lässt sich danach filtern.</div></div>
+<div style="flex:2 1 320px"><label for="note">Notiz</label><textarea name="note" id="note" rows="2" placeholder="z. B. Wofür die Aufgabe da ist, wer sie betreut, Besonderheiten">{{ job.note or '' }}</textarea>
+<div class="hint">Nur zur Info. Steht in der Übersicht (📝) und im Log der Aufgabe.</div></div></div>
 <label id="lbl_src">Quelle</label>
 <div class="row" style="flex-direction:row"><input type="text" id="source" name="source" value="{{ job.source }}" placeholder="server-a:/var/www  oder  /data/daten/fotos" required>
 <button type="button" class="btn" style="flex:0 0 auto{{ ';display:none' if not can('remotes.browse') }}" onclick="openFB('source')">Durchsuchen</button></div>
@@ -416,6 +438,9 @@ Vorhanden: {% for r in remotes %}<code>{{ r.name }}:</code> ({{ r.type }}) {% el
 <label class="check" style="margin-top:14px"><input type="checkbox" name="include_source_dir" id="incdir" {{ "checked" if job.include_source_dir }} onchange="destPreview()"> Quellordner selbst mitkopieren (im Ziel wird ein Ordner mit dem Namen der Quelle angelegt)</label>
 <div class="hint" id="incoff" style="display:none">Bei einer Auswahl aus: Die gewählten Ordner und Dateien landen direkt im Ziel, ohne den Quellordner darüber.</div>
 <div class="hint" id="destprev"></div>
+<div class="ow-only" id="xdest"><label for="extra_dests" style="margin-top:14px">Weitere Ziele (optional)</label>
+<textarea name="extra_dests" id="extra_dests" rows="2" placeholder="nas2:backup/www&#10;/data/usb/www">{{ job.extra_dests or '' }}</textarea>
+<div class="hint">Eine Quelle, mehrere Ziele: ein Ziel pro Zeile, höchstens 10. Jeder Lauf spiegelt nach dem Hauptziel nacheinander in jedes weitere Ziel, mit denselben Filtern und Optionen. Prüflauf, Wiederherstellungs-Test, Löschwarnung, Speicherprüfung und Snapshot gelten nur für das Hauptziel. Nicht zusammen mit Verschlüsselung.</div></div>
 {% if can("jobs.preview") %}<p style="margin:10px 0 0"><button type="button" class="btn" onclick="pvOpen()">🗂 Vorschau der Ordnerstruktur</button> <button type="submit" form="jobform" class="btn" formaction="{{ "/job/" ~ job_id ~ "/preview/page" if job_id else "/job/preview/page" }}" formmethod="post" formtarget="_blank" formnovalidate>📂 Ergebnis im Browser öffnen</button> <span class="hint" style="display:inline">Zeigt, wie das Ziel nach dem nächsten Lauf aussieht. Es wird nichts kopiert oder gelöscht.</span></p>
 <dialog id="pvdlg" class="pvdlg"><div style="display:flex;align-items:center;gap:10px"><h3 style="margin:0;flex:1">Vorschau der Ordnerstruktur</h3><button type="button" class="btn sm" onclick="document.getElementById('pvdlg').close()">Schließen</button></div>
 <div id="pvbody" style="margin-top:12px"></div></dialog>
@@ -656,6 +681,9 @@ const TZN='{{ tz }}';
 <button type="button" class="btn sm" style="margin-top:8px{{ ';display:none' if not can('remotes.browse') }}" onclick="openFB('ex')">{{ ICON.plus }} Ordner oder Dateien aus der Quelle ausschließen</button>
 <div class="hint">Ein Eintrag pro Zeile, relativ zur Quelle. <code>/Temp/</code> = Ordner Temp direkt in der Quelle,
 <code>Temp/</code> = jeder Ordner namens Temp, <code>/Projekte/alt/bericht.docx</code> = eine Datei, <code>*.tmp</code> = alle .tmp-Dateien.</div>
+<div class="row" style="margin:6px 0 4px"><div style="flex:0 0 220px"><label for="min_size">Dateien kleiner als … auslassen</label><input type="text" name="min_size" id="min_size" value="{{ job.min_size or '' }}" placeholder="z. B. 1 KB"></div>
+<div style="flex:0 0 220px"><label for="max_size">Dateien größer als … auslassen</label><input type="text" name="max_size" id="max_size" value="{{ job.max_size or '' }}" placeholder="z. B. 4 GB"></div>
+<div><div class="hint" style="margin-top:28px">Größenfilter: leer = keine Grenze. Einheiten B, KB, MB, GB, TB (1 KB = 1024 Byte). Ausgelassene Dateien bleiben im Ziel liegen, außer „Ausgeschlossenes auch im Ziel löschen“ ist an.</div></div></div>
 <div class="ow-only"><label class="check"><input type="checkbox" name="no_delete" {{ "checked" if job.no_delete }}> Im Ziel nichts löschen: nur Neues und Geändertes kopieren (<code>rclone copy</code> statt <code>sync</code>). Was in der Quelle gelöscht wurde, bleibt im Ziel liegen.</label></div>
 <div class="ow-only"><label class="check"><input type="checkbox" name="delete_excluded" {{ "checked" if job.delete_excluded }}> Ausgeschlossenes auch im Ziel löschen (sonst bleibt es dort unangetastet liegen)</label>
 <div class="hint">Bei einer Auswahl (☑) gilt das nicht: Dann bleibt im Ziel alles außerhalb der Auswahl immer unberührt.</div></div>
@@ -760,6 +788,17 @@ document.getElementById('cmphint').textContent={standard:'Eine Datei wird übert
 document.getElementById('spdhint').textContent={gentle:'Schont Server, Platten und Leitung.',normal:'rclone-Standard: 4 Übertragungen und 8 Prüfungen gleichzeitig.',
  fast:'8 Übertragungen, 16 Prüfungen, Ordner in einem Rutsch auflisten. Gut bei vielen kleinen Dateien.',
  max:'16 Übertragungen, 32 Prüfungen. Braucht mehr Speicher und Leistung auf beiden Seiten.'}[sp]}cmpShow()</script>
+<div class="row" style="margin:4px 0 10px">
+<div style="flex:1 1 300px" class="ow-only"><label for="track_renames">Umbenennungen erkennen</label><select name="track_renames" id="track_renames">
+<option value="off" {{ "selected" if (job.track_renames or "off") == "off" }}>Aus: umbenannte Dateien werden neu kopiert</option>
+<option value="hash" {{ "selected" if job.track_renames == "hash" }}>An, per Prüfsumme (am sichersten)</option>
+<option value="modtime" {{ "selected" if job.track_renames == "modtime" }}>An, per Größe und Änderungszeit (ohne gemeinsame Prüfsumme)</option></select>
+<div class="hint">Wurde in der Quelle eine Datei umbenannt oder verschoben, wird sie im Ziel nur umbenannt statt neu kopiert (<code>--track-renames</code>). Spart bei großen Dateien viel Zeit. Geht nur beim Spiegeln mit Löschen, nicht bei „Im Ziel nichts löschen“.</div></div>
+<div style="flex:1 1 260px"><label for="priority">Priorität in der Warteschlange</label><select name="priority" id="priority">
+<option value="high" {{ "selected" if job.priority == "high" }}>Hoch</option>
+<option value="normal" {{ "selected" if (job.priority or "normal") == "normal" }}>Normal</option>
+<option value="low" {{ "selected" if job.priority == "low" }}>Niedrig</option></select>
+<div class="hint">Wenn mehr Aufgaben starten wollen als gleichzeitig laufen dürfen{% if max_par %} (eingestellt: {{ max_par }}){% else %} (unter Einstellungen → Allgemein, zurzeit unbegrenzt){% endif %}, starten wartende Aufgaben mit hoher Priorität zuerst.</div></div></div>
 <label class="check"><input type="checkbox" name="dry_run" {{ "checked" if job.dry_run }}> Immer nur Testlauf (nichts wird verändert)</label>
 <div class="row"><div class="ow-only"><label>Max. Löschungen pro Lauf</label><input type="text" name="max_delete" value="{{ job.max_delete }}">
 <div class="hint">Schutz, falls die Quelle plötzlich leer ist. Leer = kein Limit.</div></div>
@@ -1059,8 +1098,23 @@ jtShow(start,true);if(hc)setTimeout(()=>he.scrollIntoView({block:'start'}),50);}
 </script>
 {% endblock %}""",
 
-"log.html": r"""{% extends "base.html" %}{% block title %}{{ job.name }}{% endblock %}{% block subtitle %}<p class="path">{{ job.source }} {{ "⇄" if job.direction == "bisync" else "→" }} {{ job.dest }}</p>{% endblock %}
-{% block actions %}{% if can("jobs.restore") and job.versioning %}<a class="btn" href="/job/{{ job_id }}/versions">🗑 Papierkorb</a>{% endif %}{% if can("jobs.preview") %}<a class="btn" href="/job/{{ job_id }}/usage">📊 Platzbedarf</a>{% endif %}{% endblock %}
+"log.html": r"""{% extends "base.html" %}{% block title %}{{ job.name }}<script>(()=>{const f=document.getElementById('cmpform');if(!f)return;const b=document.getElementById('cmpbtn');
+const boxes=[...document.querySelectorAll('.cmpbox')];const upd=()=>{const on=boxes.filter(x=>x.checked);b.disabled=on.length!==2;
+ boxes.forEach(x=>{x.disabled=!x.checked&&on.length>=2})};boxes.forEach(x=>x.onchange=upd);
+f.onsubmit=e=>{const on=boxes.filter(x=>x.checked).map(x=>x.value).sort();if(on.length!==2){e.preventDefault();return}
+ f.innerHTML='';[['a',on[0]],['b',on[1]]].forEach(([k,v])=>{const i=document.createElement('input');i.type='hidden';i.name=k;i.value=v;f.append(i)})}})()</script>
+{% endblock %}{% block subtitle %}<p class="path">{{ job.source }} {{ "⇄" if job.direction == "bisync" else "→" }} {{ job.dest }}</p><script>(()=>{const f=document.getElementById('cmpform');if(!f)return;const b=document.getElementById('cmpbtn');
+const boxes=[...document.querySelectorAll('.cmpbox')];const upd=()=>{const on=boxes.filter(x=>x.checked);b.disabled=on.length!==2;
+ boxes.forEach(x=>{x.disabled=!x.checked&&on.length>=2})};boxes.forEach(x=>x.onchange=upd);
+f.onsubmit=e=>{const on=boxes.filter(x=>x.checked).map(x=>x.value).sort();if(on.length!==2){e.preventDefault();return}
+ f.innerHTML='';[['a',on[0]],['b',on[1]]].forEach(([k,v])=>{const i=document.createElement('input');i.type='hidden';i.name=k;i.value=v;f.append(i)})}})()</script>
+{% endblock %}
+{% block actions %}{% if can("jobs.restore") and job.versioning %}<a class="btn" href="/job/{{ job_id }}/versions">🗑 Papierkorb</a>{% endif %}{% if can("jobs.preview") %}<a class="btn" href="/job/{{ job_id }}/usage">📊 Platzbedarf</a>{% endif %}{% if can("jobs.preview") %}<a class="btn" href="/job/{{ job_id }}/duplicates" title="Doppelte Dateien in Quelle oder Ziel finden">♊ Doppelte</a>{% endif %}<script>(()=>{const f=document.getElementById('cmpform');if(!f)return;const b=document.getElementById('cmpbtn');
+const boxes=[...document.querySelectorAll('.cmpbox')];const upd=()=>{const on=boxes.filter(x=>x.checked);b.disabled=on.length!==2;
+ boxes.forEach(x=>{x.disabled=!x.checked&&on.length>=2})};boxes.forEach(x=>x.onchange=upd);
+f.onsubmit=e=>{const on=boxes.filter(x=>x.checked).map(x=>x.value).sort();if(on.length!==2){e.preventDefault();return}
+ f.innerHTML='';[['a',on[0]],['b',on[1]]].forEach(([k,v])=>{const i=document.createElement('input');i.type='hidden';i.name=k;i.value=v;f.append(i)})}})()</script>
+{% endblock %}
 {% block body %}{% if msg %}<div class="msg ok flash" role="status">{{ msg }}</div>{% endif %}
 {% if job.delete_hold %}{% set h = job.delete_hold %}<div class="card" style="border-color:var(--err)"><h2>🛑 Angehalten: Löschwarnung</h2>
 <p>{{ _("{0} von {1} Dateien im Ziel würden gelöscht ({2} %, Grenze {3} %).", h.deleted, h.total, h.pct, h.threshold) }} {{ _("Festgestellt am {0}.", h.at|dt) }} Nichts wurde verändert. Das kann auf eine versehentlich leere Quelle, ein nicht eingehängtes Laufwerk oder Ransomware hindeuten.</p>
@@ -1069,6 +1123,8 @@ jtShow(start,true);if(hc)setTimeout(()=>he.scrollIntoView({block:'start'}),50);}
 <form class="inline" method="post" action="/job/{{ job_id }}/hold/dismiss"><button class="btn">Warnung verwerfen (nächster Lauf prüft wieder)</button></form>
 {% if can("jobs.preview") %}<a class="btn" href="/job/{{ job_id }}">Aufgabe öffnen (Vorschau)</a>{% endif %}</p>{% endif %}</div>{% endif %}
 {% if job.retry_pending and not running %}<div class="msg info">↻ {{ _("Neuer Versuch {0} von {1} um {2}. Gemeldet wird erst, wenn auch der letzte scheitert.", job.retry_pending.attempt, job.retry_pending.of, job.retry_pending.at[11:16]) }}</div>{% endif %}
+{% if queued %}<div class="msg info">⏳ {{ _("Wartet in der Warteschlange (Platz {0}). Sie startet, sobald ein Platz frei ist.", queued) }}</div>{% endif %}
+{% if job.note %}<div class="card" style="padding:12px 16px"><b>📝 Notiz</b><div style="white-space:pre-wrap;margin-top:4px">{{ job.note }}</div></div>{% endif %}
 <div class="card">
 <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
 <h2 style="margin:0">{{ "Aktueller Lauf" if running else "Letzter Lauf" }} {% if running %}<span class="tag laeuft">läuft</span>{% endif %}</h2>
@@ -1078,26 +1134,32 @@ jtShow(start,true);if(hc)setTimeout(()=>he.scrollIntoView({block:'start'}),50);}
 {% if can("jobs.run") %}<form class="inline" method="post" action="/job/{{ job_id }}/verify"><button class="btn" title="Quelle und Ziel vergleichen, ohne etwas zu ändern">🔎 Jetzt prüfen</button></form>{% endif %}{% if can("jobs.run") and job.direction != "bisync" %}<form class="inline" method="post" action="/job/{{ job_id }}/restoretest"><button class="btn" title="Ein paar zufällige Dateien aus dem Ziel zurückholen und mit der Quelle vergleichen">♻ Wiederherstellung testen</button></form>{% endif %}{% endif %}
 {% if current %}<a class="btn" href="/job/{{ job_id }}/run/{{ current }}">Ganzes Log mit Filter</a>{% endif %}
 <a class="btn" href="/">Zurück</a></div></div>
-<pre id="log">{{ log }}</pre>
+{% if current %}{% set lv_url = "/job/" ~ job_id ~ "/run/" ~ current ~ "/tail" %}{% set lv_dl = "/job/" ~ job_id ~ "/run/" ~ current ~ "/download" %}{% set lv_live = running %}{% set lv_init = none %}{% set lv_pos = none %}{% set lv_levels = true %}{% set lv_reload = true %}{% include "logview.html" %}{% else %}<div class="empty">Noch kein Lauf.</div>{% endif %}
 </div>
 
 <div class="card"><h2>Verlauf</h2>
 <p class="hint" style="margin-top:-6px">Klick auf einen Lauf zeigt sein vollständiges Log. Aufbewahrt werden die letzten {{ keep_runs }} Läufe{% if keep_days %}, höchstens {{ keep_days }} Tage{% endif %}{% if can("system.settings") %} (<a href="/settings/logs">ändern</a>){% endif %}.</p>
-{% if job.history or running %}<table><tr><th>Start</th><th class="hide-sm">Dauer</th><th>Status</th><th title="kopiert">Kopiert</th><th title="gelöscht">Gelöscht</th><th>Fehler</th><th class="hide-sm">Gestartet von</th><th></th></tr>
-{% if running and current %}<tr class="click" onclick="location='/job/{{ job_id }}/run/{{ current }}'"><td>jetzt</td><td class="hide-sm">–</td><td><span class="tag laeuft">läuft</span></td><td>–</td><td>–</td><td>–</td><td class="hide-sm">–</td><td><a class="btn sm" href="/job/{{ job_id }}/run/{{ current }}">Log</a></td></tr>{% endif %}
+{% if job.history|length > 1 %}<form method="get" action="/job/{{ job_id }}/compare" id="cmpform" style="margin:0 0 8px"><button class="btn sm" id="cmpbtn" disabled title="Zwei Läufe ankreuzen">⇆ <span>Zwei Läufe vergleichen</span></button> <small class="mut">Zwei Läufe ankreuzen, um zu sehen, was sich geändert hat.</small></form>{% endif %}
+{% if job.history or running %}<table><tr>{% if job.history|length > 1 %}<th style="width:26px"></th>{% endif %}<th>Start</th><th class="hide-sm">Dauer</th><th>Status</th><th title="kopiert">Kopiert</th><th title="gelöscht">Gelöscht</th><th>Fehler</th><th class="hide-sm">Gestartet von</th><th></th></tr>
+{% if running and current %}<tr class="click" onclick="location='/job/{{ job_id }}/run/{{ current }}'">{% if job.history|length > 1 %}<td></td>{% endif %}<td>jetzt</td><td class="hide-sm">–</td><td><span class="tag laeuft">läuft</span></td><td>–</td><td>–</td><td>–</td><td class="hide-sm">–</td><td><a class="btn sm" href="/job/{{ job_id }}/run/{{ current }}">Log</a></td></tr>{% endif %}
 {% for h in job.history %}{% set ok = has_file.get(h.run) %}<tr {% if ok %}class="click" onclick="location='/job/{{ job_id }}/run/{{ h.run }}'"{% endif %}>
+{% if job.history|length > 1 %}<td onclick="event.stopPropagation()">{% if ok and h.mode != "verify" %}<input type="checkbox" class="cmpbox" value="{{ h.run }}" aria-label="Zum Vergleich auswählen">{% endif %}</td>{% endif %}
 <td>{{ h.start }}</td><td class="hide-sm">{{ h.duration }} s</td>
 <td><span class="tag {{ h.status }}">{{ STATUS.get(h.status, h.status) }}</span>{% if h.dry_run %} <small>Testlauf</small>{% endif %}{% if h.mode == "verify" and h.restore_only %} <small>nur Wiederherstellungs-Test</small>{% elif h.mode == "verify" %} <small>nur Prüflauf</small>{% endif %}{% if h.retry %} <small class="mut">↻ Versuch {{ h.retry }}</small>{% endif %}
 {% if h.verify %}<br><small class="{{ 'ok' if h.verify.result == 'ok' else 'fehler' }}" title="{{ _('{0} gleich, {1} fehlen im Ziel, {2} nur im Ziel, {3} unterschiedlich', h.verify.matched, h.verify.missing, h.verify.extra, h.verify.differ) }}">{% if h.verify.result == "ok" %}✔ {{ _("1:1 gleich ({0} Dateien)", h.verify.matched) }}{% elif h.verify.result == "diff" %}✖ {{ _("{0} Abweichungen", h.verify.missing + h.verify.extra + h.verify.differ + h.verify.errors) }}{% else %}✖ Prüflauf fehlgeschlagen{% endif %}</small>{% endif %}
 {% if h.restore %}<br><small class="{{ 'ok' if h.restore.result == 'ok' else ('mut' if h.restore.result == 'empty' else 'fehler') }}" title="{{ (h.restore.files or [])|join(', ') }}">{% if h.restore.result == "ok" %}♻ {{ _("Wiederherstellung geprüft ({0} Dateien)", h.restore.ok) }}{% elif h.restore.result == "fail" %}♻ {{ _("Wiederherstellung: {0} von {1} Dateien fehlerhaft", h.restore.bad, h.restore.checked) }}{% elif h.restore.result == "empty" %}♻ Wiederherstellungs-Test: nichts zu testen{% else %}♻ Wiederherstellungs-Test fehlgeschlagen{% endif %}</small>{% endif %}
-{% if h.hold %}<br><small class="fehler">🛑 {{ _("{0} % würden gelöscht", h.hold.pct) }}</small>{% endif %}{% if h.snapshot %}<br><small class="mut" title="{{ h.snapshot }}">📸 Snapshot</small>{% elif h.snapshot is defined %}<br><small class="fehler">📸 Snapshot fehlgeschlagen</small>{% endif %}{% if h.retry_next %}<br><small class="mut">↻ {{ _("nächster Versuch {0}", h.retry_next[11:16]) }}</small>{% endif %}{% if h.space_low %}<br><small class="fehler">💽 wenig Speicher</small>{% endif %}{% if h.window %}<br><small class="mut" title="{{ 'Geht im nächsten Zeitfenster weiter' if h.window == 'resume' else 'Am Ende des Zeitfensters angehalten' }}">🕘 Zeitfenster zu Ende</small>{% endif %}</td>
+{% if h.hold %}<br><small class="fehler">🛑 {{ _("{0} % würden gelöscht", h.hold.pct) }}</small>{% endif %}{% if h.snapshot %}<br><small class="mut" title="{{ h.snapshot }}">📸 Snapshot</small>{% elif h.snapshot is defined %}<br><small class="fehler">📸 Snapshot fehlgeschlagen</small>{% endif %}{% if h.retry_next %}<br><small class="mut">↻ {{ _("nächster Versuch {0}", h.retry_next[11:16]) }}</small>{% endif %}{% if h.space_low %}<br><small class="fehler">💽 wenig Speicher</small>{% endif %}{% if h.dests %}<br><small class="{{ 'fehler' if h.dests|selectattr('code')|list else 'mut' }}" title="{{ h.dests|map(attribute='dest')|join(', ') }}">⇉ {{ _("{0} von {1} Zielen erfolgreich", h.dests|rejectattr('code')|list|length, h.dests|length) }}</small>{% endif %}{% if h.window %}<br><small class="mut" title="{{ 'Geht im nächsten Zeitfenster weiter' if h.window == 'resume' else 'Am Ende des Zeitfensters angehalten' }}">🕘 Zeitfenster zu Ende</small>{% endif %}</td>
 <td class="num" data-l="Kopiert">{{ h.copied if h.copied is defined else "–" }}</td><td class="num" data-l="Gelöscht">{{ h.deleted if h.deleted is defined else "–" }}</td>
 <td class="num {{ 'err' if h.errors }}" data-l="Fehler">{{ h.errors if h.errors is defined else "–" }}</td>
 <td class="hide-sm"><small>{{ h.by or "–" }}</small></td>
-<td style="white-space:nowrap">{% if ok %}<a class="btn sm" href="/job/{{ job_id }}/run/{{ h.run }}">Log</a> <a class="btn sm hide-sm" href="/job/{{ job_id }}/run/{{ h.run }}/download" onclick="event.stopPropagation()" title="Herunterladen">↓</a>{% else %}<small class="mut">kein Log</small>{% endif %}</td></tr>{% endfor %}
+<td style="white-space:nowrap">{% if ok %}<a class="btn sm" href="/job/{{ job_id }}/run/{{ h.run }}">Log</a> <a class="btn sm hide-sm" href="/job/{{ job_id }}/run/{{ h.run }}/download" onclick="event.stopPropagation()" title="Als Textdatei herunterladen">↓</a> <a class="btn sm hide-sm" href="/job/{{ job_id }}/run/{{ h.run }}/pdf" onclick="event.stopPropagation()" title="Laufbericht als PDF">PDF</a>{% else %}<small class="mut">kein Log</small>{% endif %}</td></tr>{% endfor %}
 </table>{% else %}<div class="empty">Noch kein Lauf.</div>{% endif %}
 </div>
-<script>const l=document.getElementById('log');l.scrollTop=l.scrollHeight</script>
+<script>(()=>{const f=document.getElementById('cmpform');if(!f)return;const b=document.getElementById('cmpbtn');
+const boxes=[...document.querySelectorAll('.cmpbox')];const upd=()=>{const on=boxes.filter(x=>x.checked);b.disabled=on.length!==2;
+ boxes.forEach(x=>{x.disabled=!x.checked&&on.length>=2})};boxes.forEach(x=>x.onchange=upd);
+f.onsubmit=e=>{const on=boxes.filter(x=>x.checked).map(x=>x.value).sort();if(on.length!==2){e.preventDefault();return}
+ f.innerHTML='';[['a',on[0]],['b',on[1]]].forEach(([k,v])=>{const i=document.createElement('input');i.type='hidden';i.name=k;i.value=v;f.append(i)})}})()</script>
 {% endblock %}""",
 
 "remotes.html": r"""{% extends "base.html" %}{% block title %}Speicherorte{% endblock %}{% block subtitle %}<p>Server und Clouds, zwischen denen gespiegelt wird.</p>{% endblock %}{% block actions %}{% if remotes and (can("remotes.test") or can("remotes.create") or can("remotes.delete")) %}<button type="button" class="btn" id="selbtn" onclick="selToggle('remsel')" aria-pressed="false">☑ Auswahl</button>{% endif %}{% if can("remotes.create") %}<a class="btn pri" href="/remotes/new">{{ ICON.plus }} Neuer Speicherort</a>{% endif %}{% endblock %}{% block body %}
@@ -1233,6 +1295,11 @@ const PVUP={can:{{ can("remotes.browse")|tojson }},cache:{},
 .fm-dlg{border:1px solid var(--bd);border-radius:12px;background:var(--card);color:var(--fg);padding:18px;width:min(560px,94vw)}
 .fm-dlg.big{width:min(1100px,96vw)}.fm-dlg::backdrop{background:rgba(0,0,0,.45)}
 .fm-dlg textarea{width:100%;min-height:55vh;font-family:var(--mono,monospace);font-size:13px}
+.fm .thm{width:44px;height:44px;object-fit:cover;border-radius:6px;vertical-align:middle;margin-right:8px;background:var(--card2);cursor:zoom-in}
+.imgdlg{border:0;background:rgba(0,0,0,.88);padding:0;max-width:100vw;max-height:100vh;width:100vw;height:100vh}.imgdlg::backdrop{background:rgba(0,0,0,.88)}
+.imgdlg .iv{display:flex;align-items:center;justify-content:center;width:100%;height:calc(100% - 52px)}.imgdlg img{max-width:96vw;max-height:calc(100vh - 70px);object-fit:contain}
+.imgdlg .ib{display:flex;gap:8px;align-items:center;justify-content:center;color:#fff;height:52px;font-size:14px}.imgdlg .ib b{max-width:50vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.shr td{vertical-align:middle}.shr input{font-family:var(--mono,monospace);font-size:12.5px}
 .fm-scroll.dropon{outline:2px dashed var(--acc);outline-offset:-2px;background:var(--acc-soft)}.fm tr.dropdir td{background:var(--acc-soft);box-shadow:inset 0 0 0 1px var(--acc)}.fm tr[draggable=true]{cursor:grab}
 </style>
 {% if not locations %}<div class="card"><div class="empty">Keine Speicherorte, die du sehen darfst. Unter <a href="/remotes">Speicherorte</a> anlegen.</div></div>{% else %}
@@ -1249,6 +1316,7 @@ const PVUP={can:{{ can("remotes.browse")|tojson }},cache:{},
 <button type="button" class="btn sm" onclick="P.{{ side }}.newfile()">{{ ICON.plus }} Datei</button>
 <label class="btn sm" style="margin:0;cursor:pointer">Hochladen<input type="file" multiple style="display:none" onchange="P.{{ side }}.upload(this)"></label>{% endif %}
 <button type="button" class="btn sm" onclick="P.{{ side }}.sizeAll()">Ordnergrößen</button>
+{% if thumbs %}<button type="button" class="btn sm thb" onclick="P.{{ side }}.toggleThumbs()" aria-pressed="false" title="Bilder als kleine Vorschau zeigen">🖼 Vorschaubilder</button>{% endif %}
 <span class="mut selinfo" style="align-self:center;font-size:13px"></span>
 {% if can("files.edit") %}<button type="button" class="btn sm sa" onclick="P.{{ side }}.transfer(false,true)">Kopieren nach …</button>
 {% if can("files.delete") %}<button type="button" class="btn sm sa" onclick="P.{{ side }}.transfer(true,true)">Verschieben nach …</button>{% endif %}
@@ -1263,6 +1331,19 @@ const PVUP={can:{{ can("remotes.browse")|tojson }},cache:{},
 </div>{% endfor %}
 </div>
 {% endif %}
+{% if can("files.share") and share_on %}<div class="card" id="sharecard"><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><h2 style="margin:0;flex:1">🔗 Freigabelinks</h2><button type="button" class="btn sm" onclick="loadShares()">Neu laden</button></div>
+<p class="hint">Zeitlich begrenzte Links für einzelne Dateien: Wer den Link hat, kann die Datei ohne Anmeldung herunterladen, bis er abläuft. Neuen Link über das Menü ⋯ einer Datei → „Freigabelink“.{% if g.role != "admin" %} Du siehst deine eigenen Links.{% endif %}</p>
+<div id="sharelist" class="mut">Lädt …</div></div>
+<dialog class="fm-dlg" id="dlg_share"><h3 style="margin-top:0">🔗 Freigabelink erstellen</h3><p class="sf mut" style="overflow-wrap:anywhere;margin-top:0"></p>
+<div class="share-form"><label>Gültig</label><select class="sd"><option value="1h">1 Stunde</option><option value="24h" selected>24 Stunden</option><option value="7d">7 Tage</option><option value="30d">30 Tage</option><option value="90d">90 Tage</option></select>
+<div class="row"><div><label>Höchstens so viele Downloads</label><input type="text" class="sm_" inputmode="numeric" placeholder="unbegrenzt"></div>
+<div><label>Passwort (optional)</label><input type="text" class="sp" autocomplete="off" placeholder="ohne Passwort"></div></div>
+<div class="hint">{{ _("Längstens {0} Tage (Einstellungen → Allgemein → Dateimanager).", share_max) }}</div>
+<p style="margin-top:14px"><button type="button" class="btn pri sgo">Link erstellen</button> <button type="button" class="btn" onclick="this.closest('dialog').close()">Abbrechen</button></p></div>
+<div class="share-done" hidden><label>Link</label><div class="row" style="flex-direction:row"><input type="text" class="su" readonly><button type="button" class="btn" style="flex:0 0 auto" onclick="copyShare(this)">Kopieren</button></div>
+<div class="hint sh"></div><p style="margin-top:14px"><button type="button" class="btn" onclick="this.closest('dialog').close()">Schließen</button></p></div></dialog>{% endif %}
+<dialog class="imgdlg" id="dlg_img"><div class="iv"><img alt=""></div><div class="ib"><button type="button" class="btn sm ip">‹</button><b class="it"></b><button type="button" class="btn sm in">›</button>
+<a class="btn sm idl">Herunterladen</a><button type="button" class="btn sm" onclick="this.closest('dialog').close()">Schließen</button></div></dialog>
 <div class="fmmenu" id="ctxmenu" style="position:fixed;display:none;z-index:95"><div style="position:static"></div></div>
 <dialog class="fm-dlg" id="dlg_ask"><form method="dialog" onsubmit="return false"><h3 class="t" style="margin-top:0"></h3><input type="text" class="v" style="width:100%"><div class="hint h"></div>
 <p style="margin-top:14px"><button type="button" class="btn pri ok">OK</button> <button type="button" class="btn no">Abbrechen</button></p></form></dialog>
@@ -1272,6 +1353,7 @@ const PVUP={can:{{ can("remotes.browse")|tojson }},cache:{},
 <p style="margin-top:12px"><button type="button" class="btn" onclick="this.closest('dialog').close()">Schließen</button></p></dialog>
 <script>
 const LOCS={{ locations|tojson }}, CAN_EDIT={{ 'true' if can("files.edit") else 'false' }}, CAN_DEL={{ 'true' if can("files.delete") else 'false' }};
+const CAN_SHARE={{ 'true' if can("files.share") and share_on else 'false' }}, THUMBS={{ 'true' if thumbs else 'false' }}, IMG_EXT=/\.(jpe?g|png|gif|webp|bmp|avif|ico)$/i;
 const I_DIR={{ ICON.folder|tojson }};
 const esc=t=>String(t??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const fmt=n=>{if(n==null)return '';const u=['B','KB','MB','GB','TB'];let i=0;while(n>=1024&&i<4){n/=1024;i++}return (i?n.toFixed(1):n)+' '+u[i]};
@@ -1288,7 +1370,7 @@ function ask(title,val,hint){return new Promise(res=>{const d=document.getElemen
   v.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();done(v.value.trim())}};d.oncancel=()=>res(null);d.showModal();v.focus();v.select();});}
 function joinp(a,b){return a?(b?a+'/'+b:a):b}
 class Pane{
-  constructor(side){this.side=side;this.el=document.getElementById('fm_'+side);this.loc=LOCS[0].id;this.path='';this.entries=[];this.sel=new Set();this.dnd();this.el.querySelector('.fm-scroll').addEventListener('contextmenu',ev=>this.ctx(ev));}
+  constructor(side){this.side=side;try{this.thumbs=THUMBS&&localStorage.getItem('ms-thumbs-'+side)==='1'}catch(x){this.thumbs=false}setTimeout(()=>this.thumbBtn(),0);this.el=document.getElementById('fm_'+side);this.loc=LOCS[0].id;this.path='';this.entries=[];this.sel=new Set();this.dnd();this.el.querySelector('.fm-scroll').addEventListener('contextmenu',ev=>this.ctx(ev));}
   other(){return this.side==='a'?P.b:P.a}
   async open(loc,path){this.loc=loc;this.path=path||'';this.sel.clear();this.el.querySelector('.loc').value=loc;await this.reload();saveState();}
   async reload(){const tb=this.el.querySelector('tbody');tb.innerHTML='<tr><td colspan="6" class="mut">'+'Lädt …'+'</td></tr>';
@@ -1303,11 +1385,11 @@ class Pane{
   render(){this.crumb();const tb=this.el.querySelector('tbody');
     if(!this.entries.length){tb.innerHTML='<tr><td colspan="6" class="mut">'+'Ordner ist leer.'+'</td></tr>';this.tools();return}
     tb.innerHTML=this.entries.map((e,i)=>'<tr data-i="'+i+'" class="'+(this.sel.has(e.name)?'sel':'')+'"><td><input type="checkbox" '+(this.sel.has(e.name)?'checked':'')+'></td>'+
-      '<td class="nm"><span class="ico">'+(e.dir?I_DIR:'')+'</span>'+esc(e.name)+'</td>'+
+      '<td class="nm">'+(this.thumbs&&!e.dir&&IMG_EXT.test(e.name)?'<img class="thm" loading="lazy" alt="" src="'+this.thumbUrl(e)+'" onerror="this.style.visibility=\'hidden\'">':'<span class="ico">'+(e.dir?I_DIR:'')+'</span>')+esc(e.name)+'</td>'+
       '<td class="sz nw">'+(e.dir?(e.dsize!=null?esc(fmt(e.dsize))+'<br><small class="mut">'+esc(e.dcount||'')+'</small>':'<button type="button" class="btn sm szb">'+'berechnen'+'</button>'):fmt(e.size))+'</td>'+
       '<td class="hide-sm nw"><small>'+(e.mod?esc(e.mod):'<span class="mut">–</span>')+'</small></td><td class="hide-sm nw"><small>'+(e.mode?'<code>'+esc(e.mode)+'</code>':'<span class="mut" title="'+esc('Dieser Speichertyp liefert keine Berechtigungen (z. B. SMB, WebDAV, Clouds).')+'">–</span>')+'</small></td>'+
       '<td class="acts"><details class="fmmenu"><summary title="Aktionen">⋯</summary><div><button type="button" class="inf">'+'Eigenschaften'+'</button>'+
-      (e.dir?'<button type="button" class="op">'+'Öffnen'+'</button>':'<button type="button" class="ed">'+(CAN_EDIT?'Bearbeiten':'Ansehen')+'</button><a href="/files/download?loc='+encodeURIComponent(this.loc)+'&path='+encodeURIComponent(joinp(this.path,e.name))+'">'+'Herunterladen'+'</a>')+
+      (e.dir?'<button type="button" class="op">'+'Öffnen'+'</button>':'<button type="button" class="ed">'+(CAN_EDIT?'Bearbeiten':'Ansehen')+'</button><a href="/files/download?loc='+encodeURIComponent(this.loc)+'&path='+encodeURIComponent(joinp(this.path,e.name))+'">'+'Herunterladen'+'</a>'+(CAN_SHARE?'<button type="button" class="sh">'+'🔗 Freigabelink'+'</button>':''))+
       (CAN_EDIT?'<button type="button" class="rn">'+'Umbenennen'+'</button><button type="button" class="cp">'+'Kopieren nach …'+'</button>':'')+
       (CAN_EDIT&&CAN_DEL?'<button type="button" class="mv">'+'Verschieben nach …'+'</button>':'')+(CAN_DEL?'<button type="button" class="dl" style="color:var(--err)">'+'Löschen'+'</button>':'')+'</div></details></td></tr>').join('');
     tb.querySelectorAll('tr').forEach(tr=>{const e=this.entries[+tr.dataset.i];
@@ -1315,7 +1397,8 @@ class Pane{
         DRAG={pane:this,loc:this.loc,path:this.path,names};ev.dataTransfer.setData('application/x-mirrorsync',names.join('\n'));ev.dataTransfer.effectAllowed='copyMove';});
         tr.addEventListener('dragend',()=>setTimeout(()=>{DRAG=null},0));}
       tr.querySelector('input').onchange=ev=>{ev.target.checked?this.sel.add(e.name):this.sel.delete(e.name);tr.classList.toggle('sel',ev.target.checked);this.tools()};
-      tr.querySelector('.nm').onclick=()=>e.dir?this.open(this.loc,joinp(this.path,e.name)):this.edit(e);
+      tr.querySelector('.nm').onclick=ev=>e.dir?this.open(this.loc,joinp(this.path,e.name)):(THUMBS&&IMG_EXT.test(e.name)?this.viewImg(e):this.edit(e));
+      const shb=tr.querySelector('.sh');if(shb)shb.onclick=()=>{tr.querySelector('details').open=false;shareDlg(this.loc,joinp(this.path,e.name))};
       tr.querySelector('.inf').onclick=()=>this.info(e);
       const ed=tr.querySelector('.ed');if(ed)ed.onclick=()=>this.edit(e);
       const rn=tr.querySelector('.rn');if(rn)rn.onclick=()=>this.rename(e);
@@ -1329,6 +1412,15 @@ class Pane{
     this.el.querySelectorAll('.other').forEach(b=>b.style.display=n&&DUAL?'':'none');
     this.el.querySelector('.selinfo').textContent=n?fill('{0} ausgewählt',n):'';this.el.querySelector('.all').checked=n&&n===this.entries.length;fitPanes();}
   selAll(on){this.sel=new Set(on?this.entries.map(e=>e.name):[]);this.render()}
+  thumbUrl(e){return '/files/thumb?loc='+encodeURIComponent(this.loc)+'&path='+encodeURIComponent(joinp(this.path,e.name))}
+  toggleThumbs(){this.thumbs=!this.thumbs;try{localStorage.setItem('ms-thumbs-'+this.side,this.thumbs?'1':'0')}catch(x){}this.thumbBtn();this.render()}
+  thumbBtn(){const b=this.el.querySelector('.thb');if(b){b.setAttribute('aria-pressed',this.thumbs?'true':'false');b.classList.toggle('pri',!!this.thumbs)}}
+  viewImg(e){const imgs=this.entries.filter(x=>!x.dir&&IMG_EXT.test(x.name));let i=Math.max(0,imgs.indexOf(e));const d=document.getElementById('dlg_img');
+    const show=()=>{const x=imgs[i];d.querySelector('img').src=this.thumbUrl(x);d.querySelector('.it').textContent=x.name+' ('+(i+1)+'/'+imgs.length+')';
+      d.querySelector('.idl').href='/files/download?loc='+encodeURIComponent(this.loc)+'&path='+encodeURIComponent(joinp(this.path,x.name))};
+    d.querySelector('.ip').onclick=()=>{i=(i-1+imgs.length)%imgs.length;show()};d.querySelector('.in').onclick=()=>{i=(i+1)%imgs.length;show()};
+    d.onkeydown=ev=>{if(ev.key==='ArrowLeft')d.querySelector('.ip').click();if(ev.key==='ArrowRight')d.querySelector('.in').click()};
+    d.onclick=ev=>{if(ev.target===d||ev.target.classList.contains('iv'))d.close()};show();d.showModal()}
   up(){if(!this.path)return;this.open(this.loc,this.path.split('/').slice(0,-1).join('/'))}
   async dirSize(e,tr){const c=tr.querySelector('.sz');c.textContent='…';const d=await op('size',{loc:this.loc,path:joinp(this.path,e.name)});
     if(d.ok){e.dsize=d.bytes;e.dcount=fill('{0} Ordner, {1} Dateien',d.dirs,d.files);c.innerHTML=esc(fmt(d.bytes))+'<br><small class="mut">'+esc(e.dcount)+'</small>'}else c.textContent=d.error;}
@@ -1369,7 +1461,8 @@ class Pane{
     if(!n){if(CAN_EDIT){add('Neuer Ordner',()=>this.mkdir());add('Neue Datei',()=>this.newfile());add('Hochladen',()=>this.el.querySelector('input[type=file]').click());sep()}
       add('Neu laden',()=>this.reload());add('Ordnergrößen',()=>this.sizeAll());if(this.path)add('Nach oben',()=>this.up());if(this.entries.length)add('Alle auswählen',()=>this.selAll(true));}
     else{if(one){if(one.dir)add('Öffnen',()=>this.open(this.loc,joinp(this.path,one.name)));else{add(CAN_EDIT?'Bearbeiten':'Ansehen',()=>this.edit(one));
-          add('Herunterladen',()=>{location.href='/files/download?loc='+encodeURIComponent(this.loc)+'&path='+encodeURIComponent(joinp(this.path,one.name))})}
+          add('Herunterladen',()=>{location.href='/files/download?loc='+encodeURIComponent(this.loc)+'&path='+encodeURIComponent(joinp(this.path,one.name))});
+          if(IMG_EXT.test(one.name))add('Bild ansehen',()=>this.viewImg(one));if(CAN_SHARE)add('🔗 Freigabelink',()=>shareDlg(this.loc,joinp(this.path,one.name)))}
         add('Eigenschaften',()=>this.info(one));if(one.dir)add('Größe berechnen',()=>{const tr=[...this.el.querySelectorAll('tbody tr')].find(t=>this.entries[+t.dataset.i]===one);if(tr)this.dirSize(one,tr)});
         if(CAN_EDIT)add('Umbenennen',()=>this.rename(one));sep()}
       else{add(fill('{0} ausgewählt',n),null,'mut');sep()}
@@ -1412,6 +1505,27 @@ class Pane{
   refreshBoth(){this.reload();const o=this.other();if(DUAL&&o.loc===this.loc)o.reload()}
 }
 let EDIT=null, DRAG=null;
+function shareDlg(loc,path){const d=document.getElementById('dlg_share');if(!d)return;d.querySelector('.sf').textContent=loc.replace(/:$/,'')+':/'+path;
+  d.querySelector('.share-form').hidden=false;d.querySelector('.share-done').hidden=true;d.querySelector('.sp').value='';d.querySelector('.sm_').value='';
+  d.querySelector('.sgo').onclick=async()=>{const r=await fetch('/files/share',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},
+    body:JSON.stringify({loc,path,duration:d.querySelector('.sd').value,max_downloads:d.querySelector('.sm_').value,password:d.querySelector('.sp').value})});
+    let x={};try{x=await r.json()}catch(e){x={ok:false,error:'Fehler'}}if(!x.ok){alertMsg(x.error);return}
+    d.querySelector('.share-form').hidden=true;d.querySelector('.share-done').hidden=false;d.querySelector('.su').value=x.url;
+    d.querySelector('.sh').textContent=fill('Gültig bis {0}',x.expires)+(x.max_downloads?' · '+fill('höchstens {0} Downloads',x.max_downloads):'')+(x.password?' · '+'mit Passwort':'');
+    d.querySelector('.su').select();loadShares()};d.showModal()}
+function copyShare(b){const i=b.parentNode.querySelector('input');i.select();(navigator.clipboard?navigator.clipboard.writeText(i.value):Promise.reject()).then(()=>{b.textContent='✓'},()=>{document.execCommand('copy');b.textContent='✓'})}
+async function loadShares(){const box=document.getElementById('sharelist');if(!box)return;const r=await fetch('/files/shares',{headers:{Accept:'application/json'}});
+  let d={};try{d=await r.json()}catch(e){}if(!d.ok){box.textContent=d.error||'Fehler';return}
+  const st={active:'aktiv',expired:'abgelaufen',used:'aufgebraucht',revoked:'gelöscht'};
+  if(!d.links.length){box.innerHTML='<div class="empty">'+'Noch keine Freigabelinks.'+'</div>';return}
+  box.innerHTML='<table class="shr"><tr><th>'+'Datei'+'</th><th>'+'Link'+'</th><th class="hide-sm">'+'Gültig bis'+'</th><th class="hide-sm">'+'Downloads'+'</th><th>'+'Status'+'</th><th></th></tr>'+
+    d.links.map(l=>'<tr><td><small>'+esc(l.display)+'</small>'+(l.password?' 🔒':'')+'<br><small class="mut">'+esc(l.created)+' · '+esc(l.created_by)+'</small></td>'+
+      '<td>'+(l.state==='active'?'<div class="row" style="flex-direction:row;gap:6px"><input type="text" readonly value="'+esc(l.url)+'"><button type="button" class="btn sm" style="flex:0 0 auto" onclick="copyShare(this)">'+'Kopieren'+'</button></div>':'<span class="mut">–</span>')+'</td>'+
+      '<td class="hide-sm nw"><small>'+esc(l.expires)+'</small></td><td class="hide-sm nw"><small>'+l.downloads+(l.max_downloads?' / '+l.max_downloads:'')+(l.last_download?'<br><span class="mut">'+esc(l.last_download)+'</span>':'')+'</small></td>'+
+      '<td><span class="tag '+(l.state==='active'?'ok':'')+'">'+esc(st[l.state]||l.state)+'</span></td><td><button type="button" class="btn sm del" data-id="'+esc(l.id)+'">'+'Löschen'+'</button></td></tr>').join('')+'</table>';
+  box.querySelectorAll('button.del').forEach(b=>b.onclick=async()=>{if(!confirm('Diesen Freigabelink löschen? Er funktioniert danach nicht mehr.'))return;
+    await fetch('/files/share/'+encodeURIComponent(b.dataset.id)+'/delete',{method:'POST',headers:{Accept:'application/json'}});loadShares()})}
+if(CAN_SHARE)loadShares();
 function showCtx(x,y,items){const m=document.getElementById('ctxmenu'),box=m.firstElementChild;box.innerHTML='';
   items.forEach((it,i)=>{if(!it){if(box.lastElementChild&&box.lastElementChild.tagName!=='HR')box.append(document.createElement('hr'));return}
     const b=document.createElement(it[1]?'button':'div');b.type='button';b.textContent=it[0];if(it[2]==='danger')b.style.color='var(--err)';if(it[2]==='mut'){b.className='mut';b.style.cursor='default'}
@@ -2354,6 +2468,13 @@ async function pkAdd(){const m=document.getElementById('pkmsg');m.className='hin
 {% endif %}
 </div>
 
+{% if not welcome and can("jobs.view") %}<div class="card"><h2 id="ical">📅 Kalender-Abo (iCal)</h2>
+<p class="hint" style="margin-top:-4px">Zeigt die geplanten Läufe der nächsten {{ ical_days }} Tage in deinem Kalender (Outlook, Google, Apple, Thunderbird, Home Assistant). Folgeaufgaben einer Kette stehen geschätzt dahinter. Der Kalender enthält nur Aufgaben, die du sehen darfst, und aktualisiert sich von selbst.</p>
+{% if ical_url %}<label>Abo-Adresse</label><div class="row" style="flex-direction:row"><input type="text" readonly value="{{ ical_url }}" id="icalurl" onclick="this.select()">
+<button type="button" class="btn" style="flex:0 0 auto" onclick="const i=document.getElementById('icalurl');i.select();navigator.clipboard&&navigator.clipboard.writeText(i.value);this.textContent='✓'">Kopieren</button></div>
+<div class="hint">Wer diese Adresse kennt, sieht die Namen und Zeitpläne deiner Aufgaben. Bei Bedarf erneuern, dann gilt die alte nicht mehr.</div>
+<p><form class="inline" method="post" action="/account/ical"><button class="btn">Neue Adresse erzeugen</button></form> <form class="inline" method="post" action="/account/ical"><input type="hidden" name="action" value="delete"><button class="btn del">Abo löschen</button></form> <a class="btn" href="/schedules/calendar.ics">↓ .ics herunterladen</a></p>
+{% else %}<p><form class="inline" method="post" action="/account/ical"><button class="btn pri">Abo-Adresse erstellen</button></form> <a class="btn" href="/schedules/calendar.ics">↓ .ics einmalig herunterladen</a></p>{% endif %}</div>{% endif %}
 {% if not welcome %}<form method="post" class="card"><h2 id="password">Passwort ändern</h2><input type="hidden" name="action" value="password">
 <label>Aktuelles Passwort</label><input type="password" name="old" autocomplete="current-password" required>
 <div class="row"><div><label>Neues Passwort</label><input type="password" name="password" autocomplete="new-password" required></div>
@@ -2532,7 +2653,7 @@ scope();
 <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
 <h2 style="margin:0">Lauf {{ entry.start if entry else run_id }}
 {% if live %}<span class="tag laeuft">läuft</span>{% elif entry %}<span class="tag {{ entry.status }}">{{ STATUS.get(entry.status, entry.status) }}</span>{% if entry.dry_run %} <small>Testlauf</small>{% endif %}{% endif %}</h2>
-<div><a class="btn" href="/job/{{ job_id }}/run/{{ run_id }}/download">↓ Herunterladen</a> <a class="btn" href="/job/{{ job_id }}/log">Zurück</a></div></div>
+<div><a class="btn" href="/job/{{ job_id }}/run/{{ run_id }}/download">↓ Herunterladen (.txt)</a>{% if not live and can("jobs.logs") %} <a class="btn" href="/job/{{ job_id }}/run/{{ run_id }}/pdf" title="Laufbericht als PDF">📄 PDF-Bericht</a>{% endif %} <a class="btn" href="/job/{{ job_id }}/log">Zurück</a></div></div>
 {% if entry %}<p class="mut" style="margin:8px 0 0">Dauer {{ entry.duration }} s · gestartet von {{ entry.by or "–" }}{% if entry.code is defined %} · Rückgabewert {{ entry.code }}{% endif %}</p>{% endif %}
 
 <form method="get" style="margin-top:14px">
@@ -2541,11 +2662,9 @@ scope();
 <input type="hidden" name="f" value="{{ flt }}">
 <div style="flex:0 0 auto"><button class="btn">Suchen</button>{% if q %} <a class="btn" href="?f={{ flt }}">Zurücksetzen</a>{% endif %}</div></div>
 </form>
-<p class="hint">{{ total }} {{ "Zeile" if total == 1 else "Zeilen" }}{% if flt != "all" or q %} gefunden{% endif %}{% if total > max_lines %}, angezeigt werden die letzten {{ max_lines }}. Das ganze Log bekommst du über „Herunterladen“{% endif %}.{% if live %} Die Seite aktualisiert sich alle 3 Sekunden.{% endif %}</p>
-{% if lines %}<pre id="log" class="lines">{% for kind, line in lines %}<span class="{{ kind }}">{{ line }}</span>{% endfor %}</pre>
-{% else %}<div class="empty">Keine passenden Zeilen.</div>{% endif %}
+<p class="hint">{{ total }} {{ "Zeile" if total == 1 else "Zeilen" }}{% if flt != "all" or q %} gefunden{% endif %}{% if total > max_lines %}, angezeigt werden die letzten {{ max_lines }}. Das ganze Log bekommst du über „Herunterladen“{% endif %}.</p>
+{% set lv_url = "/job/" ~ job_id ~ "/run/" ~ run_id ~ "/tail?f=" ~ flt ~ "&q=" ~ (q|urlencode) %}{% set lv_dl = "/job/" ~ job_id ~ "/run/" ~ run_id ~ "/download" %}{% set lv_live = live %}{% set lv_init = lines %}{% set lv_pos = end_pos %}{% set lv_levels = false %}{% set lv_q = q %}{% set lv_reload = false %}{% include "logview.html" %}
 </div>
-<script>const l=document.getElementById('log');if(l&&{{ 'true' if live else 'false' }})l.scrollTop=l.scrollHeight</script>
 {% endblock %}""",
 "general.html": r"""{% extends "base.html" %}{% block title %}{{ gtitle }}{% endblock %}{% block body %}{% include "tabs.html" %}
 {% if msg %}<div class="msg ok flash" role="status">{{ msg }}</div>{% endif %}
@@ -2562,7 +2681,63 @@ scope();
 <option value="fast" {{ "selected" if fsp == "fast" }}>Schnell (8 parallel)</option>
 <option value="max" {{ "selected" if fsp == "max" }}>Sehr schnell (16 parallel)</option></select></div>
 <div style="align-self:end"><button class="btn pri">Speichern</button></div></div>
-<div class="hint">Wie viele Dateien der Dateimanager gleichzeitig überträgt. Mehr parallel lohnt sich vor allem bei vielen kleinen Dateien und bei Clouds. Aufgaben haben ihr eigenes Tempo unter „Optionen“.</div></form>
+<div class="hint">Wie viele Dateien der Dateimanager gleichzeitig überträgt. Mehr parallel lohnt sich vor allem bei vielen kleinen Dateien und bei Clouds. Aufgaben haben ihr eigenes Tempo unter „Optionen“.</div>
+<div class="section"><h3 id="thumbs">Bildvorschau</h3>
+<label class="check"><input type="checkbox" name="thumbs" {{ "checked" if s.thumbs is not false }}> Vorschaubilder und Bildansicht im Dateimanager anbieten</label>
+<div class="row"><div style="flex:0 0 260px"><label for="thumbs_max_mb">Bilder bis höchstens (MB)</label><input type="text" inputmode="decimal" name="thumbs_max_mb" id="thumbs_max_mb" value="{{ s.thumbs_max_mb or '20' }}"></div>
+<div><div class="hint" style="margin-top:28px">Für die Vorschau wird das Bild vom Speicherort geladen. Größere Bilder zeigt der Dateimanager nicht als Vorschau, herunterladen geht trotzdem.</div></div></div></div>
+<div class="section"><h3 id="share">Freigabelinks</h3>
+<label class="check"><input type="checkbox" name="share_enabled" {{ "checked" if s.share_enabled is not false }}> Zeitlich begrenzte Freigabelinks für Dateien erlauben (Recht <code>files.share</code>)</label>
+<div class="row"><div style="flex:0 0 260px"><label for="share_max_days">Längste Gültigkeit (Tage)</label><input type="text" inputmode="numeric" name="share_max_days" id="share_max_days" value="{{ s.share_max_days or '30' }}"></div>
+<div><div class="hint" style="margin-top:28px">Wer einen Link hat, lädt die Datei ohne Anmeldung herunter. Die Zugriffsregeln (IP-Adresse und Land) gelten trotzdem. Ausschalten sperrt sofort alle vorhandenen Links. Links nutzen die öffentliche Adresse unter Anmeldung und Sicherheit.</div></div></div></div>
+<p><button class="btn pri">Speichern</button></p></form>
+<form method="post" class="card" id="runs"><input type="hidden" name="section" value="runs"><h2>Läufe und Kalender</h2>
+<div class="row"><div style="flex:0 0 300px"><label for="max_parallel">Höchstens gleichzeitig laufende Aufgaben</label><input type="text" inputmode="numeric" name="max_parallel" id="max_parallel" value="{{ s.max_parallel or '0' }}"></div>
+<div><div class="hint" style="margin-top:28px">0 = unbegrenzt. Starten mehr Aufgaben, warten die übrigen in einer Warteschlange und laufen nach ihrer Priorität (Aufgabe → Verhalten → Optionen), bei gleicher Priorität in der Reihenfolge ihres Starts. Live-Runden warten nicht, sie fallen aus und holen beim nächsten Mal alles nach.</div></div></div>
+<div class="row"><div style="flex:0 0 300px"><label for="ical_days">Kalender: Tage im Voraus</label><input type="text" inputmode="numeric" name="ical_days" id="ical_days" value="{{ s.ical_days or '14' }}"></div>
+<div><div class="hint" style="margin-top:28px">Wie weit der Kalender-Export (iCal) die geplanten Läufe vorausberechnet, 1 bis 90 Tage. Abonnieren unter <a href="/account#ical">Mein Konto</a>.</div></div></div>
+<p><button class="btn pri">Speichern</button></p></form>
+{% endif %}
+{% if gpage == "maintenance" %}{% set mt = MAINT() %}
+<div class="card" id="maint"><h2>🛠 Wartungsmodus</h2>
+<p class="mut" style="margin-top:-4px">Hält mit einem Klick alle automatischen Starts an: Zeitpläne, Live-Läufe, Folgeaufgaben in Ketten, Wiederholungen nach Fehlern und Zeitfenster. Laufende Läufe werden nicht abgebrochen, von Hand gestartete laufen wie gewohnt. Einzelne Aufgaben pausierst du in der Übersicht unter „Pause“.</p>
+{% if mt %}<div class="msg warn" style="margin:0 0 10px"><b>Eingeschaltet</b>{% if mt.since %} {{ _("seit {0}", mt.since) }}{% endif %}{% if mt.by %} {{ _("von {0}", mt.by) }}{% endif %} · {% if mt.until %}{{ _("endet automatisch am {0}", mt.until|replace("T", " ")) }}{% else %}bis er beendet wird{% endif %}{% if mt.reason %}<br><small>{{ mt.reason }}</small>{% endif %}</div>
+{% if can("system.maintenance") %}<form method="post" action="/maintenance"><input type="hidden" name="action" value="off"><input type="hidden" name="back" value="/settings/maintenance"><button class="btn pri">Wartungsmodus beenden</button></form>{% endif %}
+{% elif can("system.maintenance") %}<form method="post" action="/maintenance"><input type="hidden" name="action" value="on"><input type="hidden" name="back" value="/settings/maintenance">
+<div class="row"><div style="flex:0 0 220px"><label for="mhours">Dauer</label><select name="hours" id="mhours"><option value="1">1 Stunde</option><option value="2">2 Stunden</option><option value="4">4 Stunden</option><option value="8">8 Stunden</option><option value="24">24 Stunden</option><option value="72">3 Tage</option><option value="168">1 Woche</option><option value="">bis zum Datum bzw. bis ich beende</option></select></div>
+<div style="flex:0 0 240px"><label for="muntil">oder bis</label><input type="datetime-local" name="until" id="muntil"></div>
+<div style="flex:1 1 260px"><label for="mreason">Grund (optional)</label><input type="text" name="reason" id="mreason" maxlength="300" placeholder="z. B. NAS-Update, Umzug der Server"></div></div>
+<div class="hint">Bei einem Datum bitte „Dauer“ auf „bis zum Datum“ stellen. Nach Ablauf laufen alle Zeitpläne von selbst wieder.</div>
+<p><button class="btn pri">Wartungsmodus einschalten</button></p></form>
+{% else %}<p class="mut">Zum Ein- und Ausschalten fehlt dir das Recht „Wartungsmodus ein- und ausschalten“.</p>{% endif %}
+{% if s.maintenance and s.maintenance.ended %}<p class="hint">{{ _("Zuletzt automatisch beendet am {0}.", s.maintenance.ended) }}</p>{% endif %}</div>
+{% if queue %}<div class="card"><h2>⏳ Warteschlange</h2><ol style="margin:0;padding-left:22px">{% for q in queue %}<li>{{ q.name }} <small class="mut">{{ {"high": "Hoch", "normal": "Normal", "low": "Niedrig"}[q.priority] }} · {{ q.at }}</small></li>{% endfor %}</ol></div>{% endif %}
+{% endif %}
+{% if gpage == "mqtt" %}
+<form method="post" class="card" id="mqtt" autocomplete="off"><input type="hidden" name="section" value="mqtt"><h2>MQTT für Home Assistant</h2>
+<p class="mut" style="margin-top:-4px">Sendet Status und Fortschritt aller Aufgaben live an einen MQTT-Broker (z. B. Mosquitto in Home Assistant). Mit MQTT-Discovery erscheinen die Aufgaben in Home Assistant automatisch als Gerät „MirrorSync“ mit Sensoren.</p>
+{% if mq.enabled %}<div class="msg {{ 'ok' if mq.connected else 'err' }}" style="margin:0 0 10px">{% if mq.connected %}✔ {{ _("Verbunden seit {0}", mq.since) }} · {{ _("{0} Nachrichten gesendet", mq.messages) }}{% else %}✖ Nicht verbunden{% if mq.error %}: {{ mq.error }}{% endif %}{% endif %}</div>{% endif %}
+<label class="check"><input type="checkbox" name="mqtt_enabled" {{ "checked" if s.mqtt_enabled }}> MQTT einschalten</label>
+<div class="row"><div style="flex:2 1 260px"><label for="mqtt_host">Broker (Name oder IP-Adresse)</label><input type="text" name="mqtt_host" id="mqtt_host" value="{{ s.mqtt_host or '' }}" placeholder="z. B. 192.168.1.10 oder homeassistant.local"></div>
+<div style="flex:0 0 140px"><label for="mqtt_port">Port</label><input type="text" inputmode="numeric" name="mqtt_port" id="mqtt_port" value="{{ s.mqtt_port or '1883' }}"></div></div>
+<div class="row"><div><label for="mqtt_user">Benutzer</label><input type="text" name="mqtt_user" id="mqtt_user" value="{{ s.mqtt_user or '' }}" autocomplete="off"></div>
+<div><label for="mqtt_password">Passwort</label><input type="password" name="mqtt_password" id="mqtt_password" value="" placeholder="{{ '•••••••• (gespeichert, leer lassen = behalten)' if s.mqtt_password else '' }}" autocomplete="new-password">
+{% if s.mqtt_password %}<label class="check"><input type="checkbox" name="mqtt_password_clear"> Gespeichertes Passwort löschen</label>{% endif %}</div></div>
+<label class="check"><input type="checkbox" name="mqtt_tls" {{ "checked" if s.mqtt_tls }}> TLS (verschlüsselt, meist Port 8883)</label>
+<label class="check" style="margin-left:26px"><input type="checkbox" name="mqtt_tls_insecure" {{ "checked" if s.mqtt_tls_insecure }}> Zertifikat nicht prüfen (selbst signiert)</label>
+<div class="row"><div><label for="mqtt_topic">Basis-Thema</label><input type="text" name="mqtt_topic" id="mqtt_topic" value="{{ s.mqtt_topic or 'mirrorsync' }}"></div>
+<div style="flex:0 0 220px"><label for="mqtt_interval">Fortschritt alle … Sekunden</label><input type="text" inputmode="numeric" name="mqtt_interval" id="mqtt_interval" value="{{ s.mqtt_interval or '10' }}"></div></div>
+<label class="check"><input type="checkbox" name="mqtt_discovery" {{ "checked" if s.mqtt_discovery is not false }}> Home Assistant MQTT-Discovery (Geräte und Sensoren automatisch anlegen)</label>
+<div class="row" style="margin-left:26px"><div style="flex:0 0 260px"><label for="mqtt_discovery_prefix">Discovery-Präfix</label><input type="text" name="mqtt_discovery_prefix" id="mqtt_discovery_prefix" value="{{ s.mqtt_discovery_prefix or 'homeassistant' }}"></div></div>
+<label class="check"><input type="checkbox" name="mqtt_commands" {{ "checked" if s.mqtt_commands }}> Befehle über MQTT erlauben: Knöpfe „Starten“, „Testlauf“, „Stopp“ je Aufgabe und Schalter „Wartungsmodus“</label>
+<div class="hint">Achtung: Wer auf dem Broker schreiben darf, kann dann Aufgaben starten und stoppen. Jeder Befehl steht im Audit-Log unter „MQTT“.</div>
+<details style="margin-top:10px"><summary>Themen und Beispiele</summary>
+<table class="chg" style="margin-top:6px"><tr><td><code>{{ s.mqtt_topic or 'mirrorsync' }}/status</code></td><td><small>online / offline</small></td></tr>
+<tr><td><code>{{ s.mqtt_topic or 'mirrorsync' }}/state</code></td><td><small>JSON: laufende, wartende und fehlgeschlagene Aufgaben, Wartungsmodus</small></td></tr>
+<tr><td><code>{{ s.mqtt_topic or 'mirrorsync' }}/job/&lt;id&gt;/state</code></td><td><small>JSON: status, progress (%), stats, last_run, last_status, next_run, last_copied, last_bytes …</small></td></tr>
+<tr><td><code>{{ s.mqtt_topic or 'mirrorsync' }}/job/&lt;id&gt;/set</code></td><td><small>run, dry, verify oder stop (nur mit Befehlen)</small></td></tr>
+<tr><td><code>{{ s.mqtt_topic or 'mirrorsync' }}/maintenance/set</code></td><td><small>ON oder OFF (nur mit Befehlen)</small></td></tr></table></details>
+<p><button class="btn pri">Speichern</button> <button class="btn" name="mqtt_test" value="1">Verbindung testen</button></p></form>
 {% endif %}
 {% if gpage == "updates" %}{% set su = selfupd or {} %}{% set sst = su.state or {} %}
 <div class="card upd-hero" id="update-status"><div class="upd-top">
@@ -2708,7 +2883,7 @@ Die Abfrage erfolgt lokal im Container, es werden keine Adressen an fremde Diens
 {% if bw_tt %}<details style="margin-top:10px"><summary class="hint" style="cursor:pointer">rclone-Zeittabelle anzeigen</summary><pre style="margin-top:6px">--bwlimit "{{ bw_tt }}"</pre></details>{% endif %}
 <p style="margin-top:16px"><button class="btn pri">Bandbreite speichern</button></p></div></form>
 {% endif %}
-{% if gpage == "general" %}<script>(function(){const m={update:'updates',selfupdate:'updates',restart:'restart',monitor:'monitoring',volume:'monitoring',logs:'logs',purge:'logs',security:'security',proxy:'security',passkeys:'security',geoip:'security',bw:'network'};const h=location.hash.slice(1);if(m[h])location.replace('/settings/'+m[h]+'#'+h)})()</script>{% endif %}
+{% if gpage == "general" %}<script>(function(){const m={update:'updates',selfupdate:'updates',restart:'restart',monitor:'monitoring',volume:'monitoring',logs:'logs',purge:'logs',security:'security',proxy:'security',passkeys:'security',geoip:'security',bw:'network',maint:'maintenance',mqtt:'mqtt'};const h=location.hash.slice(1);if(m[h])location.replace('/settings/'+m[h]+'#'+h)})()</script>{% endif %}
 {% include "tabs_end.html" %}{% endblock %}""",
 "bw_editor.html": r"""<input type="hidden" name="bw_json" id="bw_json">
 {% if bw_unit_select %}<div class="row"><div style="flex:0 0 220px"><label>Einheit</label><select name="bw_unit" id="bw_unit"><option value="MB/s" {{ "selected" if bw_unit() == "MB/s" }}>MB/s (Megabyte pro Sekunde)</option><option value="Mbit/s" {{ "selected" if bw_unit() == "Mbit/s" }}>Mbit/s (Megabit pro Sekunde)</option></select></div></div>{% endif %}
@@ -2848,7 +3023,7 @@ Aufbewahrung: {{ keep if keep != "0" else "unbegrenzt" }}{% if keep != "0" %} Ta
 {% endblock %}""",
 "schedules.html": r"""{% extends "base.html" %}{% block title %}Zeitpläne{% endblock %}
 {% block subtitle %}<p>Wann welche Aufgabe startet. Änderungen hier gelten sofort auch in der Aufgabe und umgekehrt.</p>{% endblock %}
-{% block actions %}<span class="savestate" id="state"></span>{% endblock %}
+{% block actions %}<span class="savestate" id="state"></span><a class="btn" href="/schedules/calendar.ics" title="Geplante Läufe als Kalenderdatei (iCal)">📅 Kalender (.ics)</a><a class="btn" href="/account#ical" title="Kalender abonnieren, aktualisiert sich von selbst">Abonnieren</a>{% endblock %}
 {% block body %}
 <div id="err" class="msg err" style="display:none"></div>
 <div class="card" id="zeit"><h2>🕒 Nach Uhrzeit</h2><div id="sec-time"></div></div>
@@ -3196,6 +3371,182 @@ function tog(el,c){const i=document.getElementById('cc');let l=i.value.split(/[,
  if(l.includes(c)){l=l.filter(x=>x!==c);el.classList.remove('active')}else{l.push(c);el.classList.add('active')}i.value=l.join(', ')}
 </script>
 {% include "tabs_end.html" %}{% endblock %}""",
+"logview.html": r"""{# Live-Log (seit 1.58.0). Erwartet: lv_url (tail-Adresse), lv_dl (Download), lv_live, lv_init (Liste [art, text] oder None = per Abruf laden),
+   lv_pos (Byte-Position nach lv_init), lv_levels (Auswahl Fehler/Warnungen zeigen), lv_q (Suchbegriff vorbelegen), lv_reload (Seite am Ende neu laden) #}
+<div class="lvbar" id="lvbar">
+<label class="check lvc"><input type="checkbox" id="lv_auto" {{ "checked" if lv_live }} {{ "disabled" if not lv_live }}> Auto-Refresh</label>
+<label class="check lvc"><input type="checkbox" id="lv_wrap" checked> Zeilenumbruch</label>
+{% if lv_levels %}<select id="lv_lvl" aria-label="Zeilen zeigen"><option value="all">Alle Zeilen</option><option value="error">Nur Fehler</option><option value="error,warn">Fehler und Warnungen</option><option value="warn">Nur Warnungen</option><option value="copied">Nur Kopiert</option><option value="deleted">Nur Gelöscht</option></select>{% endif %}
+<input type="search" id="lv_q" value="{{ lv_q or '' }}" placeholder="Suchen und hervorheben" aria-label="Im Log suchen">
+<label class="check lvc"><input type="checkbox" id="lv_only"> nur Treffer</label>
+<span class="mut lvinfo" id="lv_info"></span>
+<details class="fmmenu lvdl"><summary class="btn sm" title="Log als Textdatei herunterladen">↓ .txt</summary><div>
+<a href="{{ lv_dl }}">Ganzes Log</a><button type="button" id="lv_dlshown">Angezeigte Zeilen</button></div></details>
+</div>
+<div class="lvwrap"><pre id="log" class="lines lv"></pre>
+<button type="button" class="btn pri lvjump" id="lv_jump" hidden>⬇ <span>Nach unten springen</span> <b id="lv_new"></b></button></div>
+<script>(()=>{
+const URL_={{ lv_url|tojson }},INIT={{ (lv_init if lv_init is not none else None)|tojson }},RELOAD={{ 'true' if lv_reload else 'false' }};
+let live={{ 'true' if lv_live else 'false' }},pos={{ (lv_pos if lv_pos is not none else None)|tojson }},lines=[],buf=[],auto=live,busy=false,ended=false;
+const $=id=>document.getElementById(id),pre=$('log'),MAX=20000;
+const esc=t=>String(t).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+try{if(localStorage.getItem('ms-logwrap')==='0')$('lv_wrap').checked=false}catch(e){}
+const wrap=()=>{pre.classList.toggle('nowrap',!$('lv_wrap').checked);try{localStorage.setItem('ms-logwrap',$('lv_wrap').checked?'1':'0')}catch(e){}};
+wrap();$('lv_wrap').onchange=wrap;
+function want(k){const l=$('lv_lvl');if(!l||l.value==='all')return true;return l.value.split(',').includes(k)}
+function q(){return $('lv_q').value.trim().toLowerCase()}
+function line(k,t){const s=q();let h=esc(t);
+  if(s){const lo=t.toLowerCase();let i=0,o='',f;while((f=lo.indexOf(s,i))>=0){o+=esc(t.slice(i,f))+'<mark>'+esc(t.slice(f,f+s.length))+'</mark>';i=f+s.length}h=o+esc(t.slice(i))}
+  return '<span class="'+k+'">'+(h||' ')+'</span>'}
+function shown(){const s=q(),only=$('lv_only').checked;return lines.filter(([k,t])=>want(k)&&(!only||!s||t.toLowerCase().includes(s)))}
+function render(){const v=shown();pre.innerHTML=v.length?v.map(([k,t])=>line(k,t)).join(''):'<span class="mut">'+(lines.length?'Keine passenden Zeilen.':(live?'Warte auf die ersten Zeilen …':'Noch keine Zeilen.'))+'</span>';info()}
+function append(rows){const s=q(),only=$('lv_only').checked;if(!lines.length||pre.querySelector('span.mut:only-child')){lines.push(...rows);render();return}
+  lines.push(...rows);let h='';rows.forEach(([k,t])=>{if(want(k)&&(!only||!s||t.toLowerCase().includes(s)))h+=line(k,t)});
+  if(h)pre.insertAdjacentHTML('beforeend',h);if(lines.length>MAX){lines=lines.slice(-MAX);render()}info()}
+function info(){const n=buf.length,j=$('lv_jump');let t='';
+  if(live&&auto)t='Aktualisiert sich alle 2 Sekunden.';else if(live)t='Auto-Refresh pausiert.';else if(ended)t='Lauf beendet.';
+  const s=q();if(s){const c=lines.filter(([k,x])=>x.toLowerCase().includes(s)).length;t+=' '+'Treffer'+': '+c}
+  $('lv_info').textContent=t;$('lv_new').textContent=n?'('+n+' '+(n===1?'neue Zeile':'neue Zeilen')+')':'';
+  j.hidden=!(n||(!atBottom()&&lines.length>40))}
+const atBottom=()=>pre.scrollHeight-pre.scrollTop-pre.clientHeight<30;
+const bottom=()=>{pre.scrollTop=pre.scrollHeight};
+function setAuto(on){auto=on&&live;$('lv_auto').checked=auto;if(auto&&buf.length){const b=buf;buf=[];append(b)}if(auto)bottom();info()}
+$('lv_auto').onchange=e=>setAuto(e.target.checked);
+$('lv_jump').onclick=()=>{if(live)setAuto(true);else{if(buf.length){const b=buf;buf=[];append(b)}bottom();info()}};
+pre.addEventListener('scroll',()=>{if(auto&&!atBottom()&&!busy)setAuto(false);else info()});
+['lv_q','lv_only','lv_lvl'].forEach(id=>{const e=$(id);if(e)e.addEventListener(id==='lv_q'?'input':'change',()=>{render();if(auto)bottom()})});
+$('lv_dlshown').onclick=()=>{const b=new Blob([shown().map(x=>x[1]).join('\n')+'\n'],{type:'text/plain;charset=utf-8'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='mirrorsync-log-auszug.txt';document.body.append(a);a.click();a.remove();
+  document.querySelector('.lvdl').open=false};
+async function poll(){if(busy||document.hidden&&pos!==null)return;busy=true;
+  try{const r=await fetch(URL_+(URL_.includes('?')?'&':'?')+'pos='+(pos===null?'':pos),{headers:{Accept:'application/json'}});
+    if(!r.ok)throw 0;const d=await r.json();pos=d.pos;
+    if(d.lines.length){if(auto||!live){append(d.lines);bottom()}else buf.push(...d.lines)}
+    const was=live;live=d.live;if(was&&!live){ended=true;$('lv_auto').disabled=true;if(auto&&RELOAD&&!d.more){setTimeout(()=>location.reload(),1500)}auto=false;$('lv_auto').checked=false}
+    info();if(d.more){busy=false;return poll()}
+  }catch(e){}busy=false}
+if(INIT){lines=INIT.slice(-MAX);render();bottom();info()}else{poll().then(()=>{render();bottom();info()})}
+if(live)setInterval(poll,2000);
+})()</script>
+""",
+"compare.html": r"""{% extends "base.html" %}{% block title %}{{ job.name }} · Läufe vergleichen{% endblock %}{% block subtitle %}<p class="path">{{ job.source }} {{ "⇄" if job.direction == "bisync" else "→" }} {{ job.dest }}</p>{% endblock %}
+{% block actions %}<a class="btn" href="/job/{{ job_id }}/log">Zurück</a>{% endblock %}
+{% block body %}
+<style>.cmpgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}.cmpgrid ul{margin:6px 0 0;padding-left:18px;max-height:320px;overflow:auto;font:12.5px/1.6 ui-monospace,Menlo,Consolas,monospace;overflow-wrap:anywhere}
+.cmphead{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}.cmphead select{width:auto;min-width:240px}.dpos{color:var(--err)}.dneg{color:var(--ok)}
+table.cmpt td,table.cmpt th{text-align:right}table.cmpt td:first-child,table.cmpt th:first-child{text-align:left}</style>
+<div class="card"><h2>Zwei Läufe vergleichen</h2>
+<form method="get" class="cmphead">
+<div><label for="ca">Älterer Lauf (A)</label><select name="a" id="ca">{% for h in runs %}<option value="{{ h.run }}" {{ "selected" if h.run == a }}>{{ h.start }} · {{ STATUS.get(h.status, h.status) }}{% if h.dry_run %} · Testlauf{% endif %}</option>{% endfor %}</select></div>
+<div><label for="cb">Neuerer Lauf (B)</label><select name="b" id="cb">{% for h in runs %}<option value="{{ h.run }}" {{ "selected" if h.run == b }}>{{ h.start }} · {{ STATUS.get(h.status, h.status) }}{% if h.dry_run %} · Testlauf{% endif %}</option>{% endfor %}</select></div>
+<div><button class="btn pri">Vergleichen</button></div></form>
+{% if err %}<div class="msg err" style="margin-top:12px">{{ err }}</div>{% elif not r %}<div class="empty">Es gibt noch keine zwei Läufe mit Log.</div>{% endif %}
+</div>
+{% if r %}
+{% macro num(v) %}{% if v is none %}–{% elif v > 0 %}<span class="dpos">+{{ v }}</span>{% elif v < 0 %}<span class="dneg">{{ v }}</span>{% else %}±0{% endif %}{% endmacro %}
+<div class="card"><h2>Kennzahlen</h2>
+<table class="cmpt"><tr><th></th><th><a href="/job/{{ job_id }}/run/{{ r.a.run }}">A · {{ r.a.start }}</a></th><th><a href="/job/{{ job_id }}/run/{{ r.b.run }}">B · {{ r.b.start }}</a></th><th>Änderung</th></tr>
+<tr><td>Status</td><td><span class="tag {{ r.a.status }}">{{ STATUS.get(r.a.status, r.a.status) }}</span></td><td><span class="tag {{ r.b.status }}">{{ STATUS.get(r.b.status, r.b.status) }}</span></td><td></td></tr>
+<tr><td>Dauer (s)</td><td>{{ r.a.duration }}</td><td>{{ r.b.duration }}</td><td>{{ num(r.diff.duration) }}</td></tr>
+<tr><td>Datenmenge</td><td>{{ (r.a.bytes or 0)|hbytes }}</td><td>{{ (r.b.bytes or 0)|hbytes }}</td><td>{% if r.diff.bytes is not none %}{{ "+" if r.diff.bytes > 0 }}{{ r.diff.bytes|hbytes if r.diff.bytes >= 0 else "−" ~ (0 - r.diff.bytes)|hbytes }}{% else %}–{% endif %}</td></tr>
+<tr><td>Kopiert</td><td>{{ r.a.copied }}</td><td>{{ r.b.copied }}</td><td>{{ num(r.diff.copied) }}</td></tr>
+<tr><td>Gelöscht</td><td>{{ r.a.deleted }}</td><td>{{ r.b.deleted }}</td><td>{{ num(r.diff.deleted) }}</td></tr>
+<tr><td>Fehler</td><td>{{ r.a.errors }}</td><td>{{ r.b.errors }}</td><td>{{ num(r.diff.errors) }}</td></tr>
+<tr><td>Gestartet von</td><td><small>{{ r.a.by }}</small></td><td><small>{{ r.b.by }}</small></td><td></td></tr></table></div>
+{% set labels = {"copied": "Kopiert", "deleted": "Gelöscht", "renamed": "Umbenannt/verschoben", "errors": "Fehler"} %}
+{% for k in ["errors", "copied", "deleted", "renamed"] %}{% set x = r.kinds[k] %}{% if x.a or x.b %}
+<div class="card"><h2>{{ labels[k] }} <small class="mut">A: {{ x.a }} · B: {{ x.b }}</small></h2>
+<div class="cmpgrid">
+<div><b>Nur in B (neu)</b> <small class="mut">{{ x.n_only_b }}</small>{% if x.only_b %}<ul>{% for p in x.only_b %}<li>{{ p }}{% if x.msg_b.get(p) %}<br><small class="fehler">{{ x.msg_b[p] }}</small>{% endif %}</li>{% endfor %}</ul>{% if x.n_only_b > x.only_b|length %}<small class="mut">{{ _("… und {0} weitere", x.n_only_b - x.only_b|length) }}</small>{% endif %}{% else %}<p class="mut" style="margin:6px 0 0">–</p>{% endif %}</div>
+<div><b>Nur in A (nicht mehr)</b> <small class="mut">{{ x.n_only_a }}</small>{% if x.only_a %}<ul>{% for p in x.only_a %}<li>{{ p }}</li>{% endfor %}</ul>{% if x.n_only_a > x.only_a|length %}<small class="mut">{{ _("… und {0} weitere", x.n_only_a - x.only_a|length) }}</small>{% endif %}{% else %}<p class="mut" style="margin:6px 0 0">–</p>{% endif %}</div>
+<div><b>In beiden</b> <small class="mut">{{ x.n_both }}</small>{% if x.both %}<ul>{% for p in x.both %}<li>{{ p }}{% if x.msg_b.get(p) %}<br><small class="fehler">{{ x.msg_b[p] }}</small>{% endif %}</li>{% endfor %}</ul>{% if x.n_both > x.both|length %}<small class="mut">{{ _("… und {0} weitere", x.n_both - x.both|length) }}</small>{% endif %}{% else %}<p class="mut" style="margin:6px 0 0">–</p>{% endif %}
+{% if k == "copied" and x.n_both %}<div class="hint">Dateien, die in beiden Läufen kopiert wurden, ändern sich ständig (z. B. Datenbanken, Logs, offene Dateien).</div>{% endif %}</div>
+</div></div>{% endif %}{% endfor %}
+{% if not (r.kinds.copied.a or r.kinds.copied.b or r.kinds.deleted.a or r.kinds.deleted.b or r.kinds.errors.a or r.kinds.errors.b or r.kinds.renamed.a or r.kinds.renamed.b) %}<div class="card"><div class="empty">In beiden Läufen wurde nichts kopiert, gelöscht oder gemeldet.</div></div>{% endif %}
+{% endif %}
+{% endblock %}
+""",
+"ffs_import.html": r"""{% extends "base.html" %}{% block title %}FreeFileSync-Import{% endblock %}
+{% block subtitle %}<p>Aufgaben aus einer FreeFileSync-Datei (.ffs_batch oder .ffs_gui) übernehmen.</p>{% endblock %}
+{% block actions %}<a class="btn" href="/">Zurück</a>{% endblock %}
+{% block body %}
+{% if err %}<div class="msg err">{{ err }}</div>{% endif %}
+{% if not res %}
+<div class="card"><h2>1. Datei auswählen</h2>
+<form method="post" enctype="multipart/form-data">
+<input type="file" name="file" accept=".ffs_batch,.ffs_gui,.xml" required>
+<label for="mappings" style="margin-top:14px">Pfad-Ersetzungen (optional)</label>
+<textarea name="mappings" id="mappings" rows="3" placeholder="\\NAS\daten = NAS:daten&#10;D:\Backup = Server:/backup">{{ mappings }}</textarea>
+<div class="hint">MirrorSync kann Windows-Pfade wie <code>C:\…</code> oder <code>\\NAS\freigabe</code> nicht direkt lesen. Eine Zeile pro Ersetzung: Anfang des Windows-Pfads = Speicherort mit Pfad. <code>\\NAME\freigabe</code> wird automatisch zu <code>NAME:freigabe</code>, wenn es einen Speicherort mit diesem Namen gibt.{% if remotes %} Vorhanden: {% for r in remotes %}<code>{{ r }}:</code> {% endfor %}{% endif %}</div>
+<p style="margin-top:14px"><button class="btn pri">Datei lesen</button></p>
+</form></div>
+<div class="card"><h2>Was übernommen wird</h2>
+<ul class="hint" style="margin:0;padding-left:18px;line-height:1.7">
+<li>Jedes Ordnerpaar wird eine Aufgabe: links = Quelle, rechts = Ziel.</li>
+<li>Spiegeln → Spiegeln, Aktualisieren → „Im Ziel nichts löschen“, Zwei-Wege → Zwei-Wege-Sync.</li>
+<li>Vergleich nach Zeit und Größe, Inhalt oder Größe; „Verschobene Dateien erkennen“ → Umbenennungen erkennen.</li>
+<li>Papierkorb und Versionierung → Papierkorb/Versionierung (mit Anzahl und Alter).</li>
+<li>Ausschlüsse und Größenfilter. Nicht übernommen: Include-Filter, Zeitfilter, eigene Sync-Regeln und eigene Versionen-Ordner (du bekommst einen Hinweis).</li>
+<li>Die Aufgaben werden erst nach deiner Bestätigung angelegt, standardmäßig ausgeschaltet und nur manuell.</li></ul></div>
+{% else %}
+<form method="post">
+<input type="hidden" name="step" value="create"><input type="hidden" name="data" value="{{ data }}"><input type="hidden" name="mappings" value="{{ mappings }}">
+<div class="card"><h2>2. Ordnerpaare prüfen</h2>
+{% for w in res.warnings %}<div class="msg info" style="margin:0 0 8px">ℹ {{ _(w) }}</div>{% endfor %}
+<table><tr><th style="width:26px"></th><th>Name</th><th>Quelle</th><th>Ziel</th><th class="hide-sm">Einstellungen</th></tr>
+{% for p in res.pairs %}{% set i = loop.index0 %}<tr>
+<td><input type="checkbox" name="use_{{ i }}" checked aria-label="Übernehmen"></td>
+<td><input type="text" name="name_{{ i }}" value="{{ p.name }}"></td>
+<td><input type="text" name="source_{{ i }}" value="{{ p.source }}" style="{{ '' if p.ok else 'border-color:var(--err)' }}"><small class="mut">FreeFileSync: {{ p.left }}</small></td>
+<td><input type="text" name="dest_{{ i }}" value="{{ p.dest }}" style="{{ '' if p.ok else 'border-color:var(--err)' }}"><small class="mut">FreeFileSync: {{ p.right }}</small></td>
+<td class="hide-sm"><small>{% if p.direction == "bisync" %}⇄ Zwei-Wege{% elif p.no_delete %}➡ ohne Löschen{% else %}➡ Spiegeln{% endif %}
+ · {{ {"standard": "Zeit und Größe", "checksum": "Prüfsumme", "size": "nur Größe"}[p.compare] }}{% if p.track_renames != "off" %} · ↪ Umbenennungen{% endif %}{% if p.versioning %} · 🗑 Papierkorb{% endif %}{% if p.excludes %} · {{ _("{0} Ausschlüsse", p.excludes.split("\n")|length) }}{% endif %}{% if p.min_size or p.max_size %} · 📏 {{ p.min_size or "0" }}–{{ p.max_size or "∞" }}{% endif %}</small>
+{% for w in p.warnings %}<br><small class="fehler">{{ _(w) }}</small>{% endfor %}</td></tr>{% endfor %}</table></div>
+<div class="card"><h2>3. Start der neuen Aufgaben</h2>
+<div class="seg"><label><input type="radio" name="trigger" value="manual" {{ "checked" if trigger != "time" }}><span>Nur manuell</span></label>
+<label><input type="radio" name="trigger" value="time" {{ "checked" if trigger == "time" }}><span>Zeitplan (Cron)</span></label></div>
+<div class="row"><div style="flex:0 0 220px"><label for="schedule">Zeitplan</label><input type="text" name="schedule" id="schedule" value="{{ schedule }}"></div>
+<div><label class="check" style="margin-top:28px"><input type="checkbox" name="enabled" {{ "checked" if enabled }}> Gleich einschalten</label></div></div>
+<div class="hint">Tipp: Erst ausgeschaltet anlegen, dann jede Aufgabe öffnen und mit „Speichern und testen“ einen Testlauf machen.</div>
+<p style="margin-top:14px"><button class="btn pri">Aufgaben anlegen</button> <a class="btn" href="/jobs/import">Andere Datei</a></p></div>
+</form>
+{% endif %}
+{% endblock %}
+""",
+"dupes.html": r"""{% extends "base.html" %}{% block title %}Doppelte Dateien: {{ job.name }}{% endblock %}{% block subtitle %}<p class="path">{{ job.source }} → {{ job.dest }}</p>{% endblock %}
+{% block actions %}<a class="btn" href="/job/{{ job_id }}/usage">📊 Platzbedarf</a><a class="btn" href="/job/{{ job_id }}/log">Zurück</a>{% endblock %}
+{% block body %}
+<div class="tabs"><a href="?side=source" class="{{ 'active' if side == 'source' }}">{{ "Seite A" if job.direction == "bisync" else "Quelle" }}</a><a href="?side=dest" class="{{ 'active' if side == 'dest' }}">{{ "Seite B" if job.direction == "bisync" else "Ziel" }}</a></div>
+<div class="card"><h2>Doppelte Dateien finden</h2>
+<p class="hint" style="margin-top:0">Sucht in {{ "der Quelle" if side == "source" else "dem Ziel" }} nach Dateien mit gleichem Inhalt und zeigt, wie viel Platz sich sparen ließe. Es wird nichts gelöscht. Es gelten die Filter der Aufgabe.</p>
+{% if d.state == "läuft" %}<div class="msg info">⏳ {% if d.phase == "hash" %}{{ _("Prüfsummen von {0} Kandidaten werden berechnet ({1}) …", d.candidates, (d.candidate_bytes or 0)|hbytes) }}{% else %}{{ _("Suche läuft, {0} Dateien gelesen …", d.files) }}{% endif %}
+<form class="inline" method="post"><input type="hidden" name="side" value="{{ side }}"><input type="hidden" name="action" value="stop"><button class="btn sm">Abbrechen</button></form></div>
+{% else %}<form method="post" class="row" style="align-items:flex-end"><input type="hidden" name="side" value="{{ side }}">
+<div style="flex:1 1 300px"><label for="dmode">Gleich heißt</label><select name="mode" id="dmode">
+<option value="hash" {{ "selected" if d.mode in (none, "hash") }}>gleicher Inhalt (Prüfsumme, sicher)</option>
+<option value="name" {{ "selected" if d.mode == "name" }}>gleicher Name und gleiche Größe (schnell)</option>
+<option value="size" {{ "selected" if d.mode == "size" }}>nur gleiche Größe (sehr schnell, nur Hinweis)</option></select>
+<div class="hint">Bei „Prüfsumme“ werden nur Dateien gleicher Größe geprüft. Speicher ohne Prüfsummen (z. B. SMB, verschlüsselt) müssen sie dafür lesen, das kann dauern.</div></div>
+<div style="flex:0 0 200px"><label for="min_kb">Mindestgröße (KB)</label><input type="text" name="min_kb" id="min_kb" inputmode="decimal" value="{{ ((d.min_bytes or 1024) / 1024)|round(1)|string|replace('.0', '') }}"></div>
+<div style="flex:0 0 auto"><button class="btn pri">🔍 {{ "Neu suchen" if d.state else "Suchen" }}</button></div></form>{% endif %}
+{% if d.state == "fehler" %}<div class="msg err" style="margin-top:10px">{{ d.error }}</div>{% endif %}
+</div>
+{% if d.state == "ok" %}
+<div class="stats">
+<div class="stat"><div class="k">Dateien geprüft</div><div class="v">{{ d.files }}</div></div>
+<div class="stat"><div class="k">Gruppen mit Doppelten</div><div class="v">{{ d.n_groups }}</div></div>
+<div class="stat"><div class="k">Überzählige Kopien</div><div class="v">{{ d.dup_files }}</div></div>
+<div class="stat"><div class="k">Mögliche Ersparnis</div><div class="v">{{ (d.wasted or 0)|hbytes }}</div></div>
+</div>
+<div class="card"><h2>Gefundene Doppelte <small class="mut">{{ _("Stand {0}", d.at) }}{% if d.mode == "size" %} · nur gleiche Größe, Inhalt nicht geprüft{% elif d.mode == "name" %} · gleicher Name und Größe{% endif %}</small></h2>
+{% if not d.groups %}<div class="empty">Keine doppelten Dateien gefunden.</div>{% else %}
+<table><tr><th>Dateien</th><th class="nw">Größe je Datei</th><th class="nw">Kopien</th><th class="nw">Ersparnis</th></tr>
+{% for gr in d.groups %}<tr><td><code style="white-space:pre-wrap;overflow-wrap:anywhere">{{ gr.paths|join("\n") }}</code></td><td class="num">{{ gr.size|hbytes }}</td><td class="num">{{ gr.count }}</td><td class="num">{{ gr.wasted|hbytes }}</td></tr>{% endfor %}</table>
+{% if d.n_groups > d.groups|length %}<p class="hint">{{ _("Angezeigt werden die {0} Gruppen mit der größten Ersparnis.", d.groups|length) }}</p>{% endif %}
+<p class="hint">Löschen kannst du im <a href="/files">Dateimanager</a>. Im Ziel wird jede Löschung beim nächsten Lauf wieder angelegt, solange die Datei in der Quelle liegt.</p>{% endif %}</div>
+{% endif %}
+{% endblock %}
+""",
 }
 
 ICONS = {'chart': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6" rx="1"/><rect x="12" y="8" width="3" height="10" rx="1"/><rect x="17" y="5" width="3" height="13" rx="1"/></svg>', 'dash': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>', 'folder': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>', 'audit': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/><path d="M8 13h8M8 17h5"/></svg>', 'clock': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>', 'jobs': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 1-15.5 6.2L3 16"/><path d="M3 12a9 9 0 0 1 15.5-6.2L21 8"/><path d="M21 3v5h-5"/><path d="M3 21v-5h5"/></svg>', 'storage': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="7" rx="2"/><rect x="3" y="13" width="18" height="7" rx="2"/><path d="M7 7.5h.01M7 16.5h.01"/></svg>', 'bell': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/></svg>', 'theme': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 3v18" /><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor"/></svg>', 'logout': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>', 'play': '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l12.5-7.5z"/></svg>', 'plus': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>', 'gear': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>', 'lock': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>'}

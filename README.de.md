@@ -4,7 +4,7 @@
 
 # MirrorSync – 1:1-Spiegelung mit Web-GUI und Zeitplänen
 
-Version **1.57.0** · Änderungen siehe [CHANGELOG.md](CHANGELOG.md) (englisch) · [English version](README.md)
+Version **1.58.0** · Änderungen siehe [CHANGELOG.md](CHANGELOG.md) (englisch) · [English version](README.md)
 
 Ein Docker-Container, der Ordner **einweg 1:1 spiegelt** (wie FreeFileSync „Spiegeln"):
 Das Ziel wird exakt wie die Quelle, inklusive Löschungen. Als Sync-Motor dient
@@ -57,6 +57,11 @@ Dann `http://<docker-host>:8080` öffnen und den ersten Admin anlegen.
 - **Versionierung**: gelöschte/überschriebene Dateien landen in `<ziel>.versions/<datum>`, optional nur die
   letzten N Versionen bzw. höchstens X Tage behalten (Ältere werden nach jedem Lauf entfernt)
 - **Lösch-Schutz**: Lauf bricht ab, wenn mehr als N Dateien gelöscht würden
+- **Live-Log** (seit 1.58.0): Auto-Refresh, „Nach unten springen“ mit Zähler neuer Zeilen, Suche mit Hervorhebung, nur Fehler/Warnungen, Zeilenfarben, Zeilenumbruch und Download als .txt auch während des Laufs
+- **Läufe vergleichen, PDF-Bericht, doppelte Dateien** (seit 1.58.0): was hat sich zwischen zwei Läufen geändert, Laufbericht als PDF, Doppelte in Quelle oder Ziel mit Platzersparnis
+- **Umbenennungen erkennen, Größenfilter, mehrere Ziele** (seit 1.58.0): verschobene Dateien nur umbenennen statt neu kopieren, große oder kleine Dateien auslassen, eine Quelle in bis zu 10 weitere Ziele spiegeln
+- **Tags, Notizen, Prioritäten und Warteschlange** (seit 1.58.0), **globaler Wartungsmodus** mit automatischem Ende und **FreeFileSync-Import** (.ffs_batch)
+- **MQTT für Home Assistant** (seit 1.58.0) mit Discovery und Befehlen, **Kalender-Export (iCal)** der geplanten Läufe, **Bildvorschau** und **zeitlich begrenzte Freigabelinks** im Dateimanager
 - **Wiederherstellungs-Test** (seit 1.57.0): holt stichprobenartig Dateien aus dem Ziel zurück und vergleicht sie Byte für Byte mit der Quelle
 - **Sicherung mit Haken pro Bereich** (seit 1.57.0): Aufgaben, Speicherorte, Benutzer, einzelne Einstellungs-Gruppen usw. einzeln exportieren und wiederherstellen, ersetzen oder ergänzen
 - **Mehrfachauswahl** (seit 1.56.0): mehrere Aufgaben oder Speicherorte markieren und gemeinsam starten, testen, duplizieren oder löschen; **▶ Nur diese** startet eine Aufgabe ohne Folgeaufgaben
@@ -81,7 +86,7 @@ Geänderte Dateien werden komplett neu übertragen (kein Delta wie bei rsync).
 
 ## Installation
 Das fertige Image liegt in der GitHub Container Registry: `ghcr.io/dermilderjoghurt/mirrorsync`
-(für amd64 und arm64, z. B. Raspberry Pi). Tags: `latest` (neueste Version), `1.57.0` (feste Version),
+(für amd64 und arm64, z. B. Raspberry Pi). Tags: `latest` (neueste Version), `1.58.0` (feste Version),
 `1.40` (neuester Patch dieser Version). Das Image wird nur veröffentlicht, wenn sich die Versionsnummer ändert.
 Update-Prüfer wie Dockhand oder Watchtower melden deshalb nur dann ein Update, wenn es wirklich eine neue Version gibt.
 
@@ -307,6 +312,28 @@ In der Aufgabe unter **Prüfen und schützen**:
   erst, wenn auch der letzte Versuch scheitert.
 - **`.nosync`**: Liegt in einem Ordner der Quelle eine Datei `.nosync`, wird er übersprungen; im Ziel bleibt er
   unberührt (bei neuen Aufgaben an).
+
+## Neu in 1.58.0
+- **Live-Log**: neue Zeilen kommen ohne Neuladen dazu. **Auto-Refresh** abschalten, damit das Log beim Hochscrollen
+  nicht wegspringt; **⬇ Nach unten springen** zeigt die Zahl neuer Zeilen und schaltet Auto-Refresh wieder ein. Suche
+  mit Hervorhebung („nur Treffer“), Auswahl nur Fehler / nur Warnungen, Fehler rot, Warnungen gelb, Zeilenumbruch
+  umschaltbar, **↓ .txt** lädt das ganze Log (auch während des Laufs) oder die angezeigten Zeilen.
+- **Umbenennungen erkennen** (Aufgabe → Verhalten → Optionen): rclone `--track-renames`, per Prüfsumme oder per Größe
+  und Änderungszeit. **Größenfilter** (Reiter Filter): Dateien unter/über einer Größe auslassen.
+- **Eine Quelle, mehrere Ziele**: unter Ziel bis zu 10 weitere Ziele, die im selben Lauf nacheinander gespiegelt werden.
+- **Tags** mit Filter in der Übersicht, **Notiz** pro Aufgabe, **Priorität** für die **Warteschlange**
+  (Einstellungen → Allgemein → Läufe und Kalender: höchstens N Läufe gleichzeitig).
+- **Wartungsmodus** (Übersicht → 🛠 Wartung oder Einstellungen → Wartungsmodus): alle automatischen Starts anhalten,
+  für eine Dauer, bis zu einem Datum oder bis zum Beenden. Recht `system.maintenance`.
+- **FreeFileSync-Import** (Übersicht → 📥 Import): `.ffs_batch`/`.ffs_gui` einlesen, Pfade ersetzen, Aufgaben anlegen.
+- **Läufe vergleichen** (Verlauf → zwei Läufe ankreuzen), **Laufbericht als PDF**, **♊ Doppelte Dateien** finden.
+- **Dateimanager**: 🖼 Vorschaubilder mit Bildansicht, 🔗 **Freigabelinks** mit Ablauf, Passwort und Download-Limit
+  (Recht `files.share`).
+- **MQTT für Home Assistant** (Einstellungen → MQTT): Status und Fortschritt live, MQTT-Discovery, optional Befehle.
+- **Kalender (iCal)**: Zeitpläne → 📅 Kalender (.ics) oder persönliches Abo unter Mein Konto.
+- API/MCP: `get_run_log_tail`, `compare_runs`, `get_run_report`, `find_duplicates`, `get_duplicates`, `import_ffs`,
+  `get_maintenance`, `set_maintenance`, `get_queue`, `list_share_links`, `create_share_link`, `delete_share_link`,
+  `get_calendar`, `get_mqtt`, `update_mqtt`, `test_mqtt`, `update_run_settings`.
 
 ## Wiederherstellungs-Test, Sicherung nach Bereichen (seit 1.57.0)
 - **Wiederherstellungs-Test** (Aufgabe → Prüfen & schützen): nach einem erfolgreichen Lauf ein paar zufällige Dateien

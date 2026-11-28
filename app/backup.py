@@ -46,6 +46,7 @@ PARTS = [
     ("apikeys", "API-Keys", "ns", "apikey"),
     ("ipguard", "IP- und Länderregeln", "ns", "ipguard"),
     ("dashboard", "Dashboards", "ns", "dashboard"),
+    ("shares", "Freigabelinks", "ns", "share"),
     ("s_notify", "Benachrichtigungen (Kanäle, Ruhezeiten, Vorlagen)", "settings",
      ("when", "webhook_", "smtp_", "telegram_", "apprise_", "quiet_", "msg_templates", "notify")),
     ("s_report", "Wochenbericht", "settings", ("report_",)),
@@ -56,6 +57,8 @@ PARTS = [
     ("s_network", "Bandbreite und Datenvolumen", "settings", ("bw", "volume_")),
     ("s_logs", "Aufbewahrung der Logs", "settings", ("log_keep_", "audit_keep")),
     ("s_monitor", "Monitoring", "settings", ("monitor_", "health_", "metrics_")),
+    ("s_mqtt", "MQTT (Home Assistant)", "settings", ("mqtt_",)),
+    ("s_files", "Dateimanager (Tempo, Bildvorschau, Freigabelinks)", "settings", ("files_", "thumbs", "share_")),
     ("s_general", "Allgemeine Einstellungen (Sprache, Adresse, übrige)", "settings", ()),
     ("stats", "Statistik", "ns", "stats"),
     ("login_log", "Anmeldeverlauf", "table", "login_log"),
@@ -65,7 +68,7 @@ PARTS = [
 PART_KEYS = [p[0] for p in PARTS]
 PART_INFO = {p[0]: p for p in PARTS}
 DEFAULT_OFF = {"logs"}   # wird nicht vorausgewaehlt (kann gross werden)
-EXTRA_NS = ("dashboard", "stats")   # stehen nicht in db.NS, gehoeren aber zum Stand
+EXTRA_NS = ("dashboard", "stats", "share")   # stehen nicht in db.NS, gehoeren aber zum Stand
 
 
 def settings_part(key):

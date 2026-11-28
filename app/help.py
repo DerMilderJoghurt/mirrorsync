@@ -74,6 +74,15 @@ SECTIONS = [
          "**Ergebnis im Browser öffnen** zeigt dasselbe als eigene Seite. Es wird nichts kopiert. Recht `jobs.preview`."),
         ("Sichtbar für",
          "Wer die Aufgabe sehen darf: alle oder nur bestimmte Benutzer, Gruppen und API-Keys. Admins sehen immer alles."),
+        ("Mehrere Ziele",
+         "Unter **Ziel** → **Weitere Ziele** trägst du zusätzliche Ziele ein, eines je Zeile (höchstens 10). Nach dem "
+         "Hauptziel wird dieselbe Quelle nacheinander in jedes weitere Ziel gespiegelt, alles im selben Lauf und Log. "
+         "Prüflauf, Löschwarnung und Snapshot gelten für das Hauptziel. Nur bei Spiegeln ohne Verschlüsselung."),
+        ("Aus FreeFileSync importieren",
+         "**📥 Import** in der Übersicht liest eine `.ffs_batch`- oder `.ffs_gui`-Datei. Jedes Ordnerpaar wird ein "
+         "Vorschlag mit Name, Quelle, Ziel, Vergleich, Ausschlüssen, Größenfilter und Versionierung. Windows-Pfade wie "
+         "`\\\\NAS\\daten` ordnest du über **Pfad-Ersetzungen** einem Speicherort zu (z. B. `\\\\NAS\\daten = NAS:daten`). "
+         "Danach Paare auswählen, Startart wählen und anlegen. Zwei-Wege-Paare werden als Zwei-Wege-Sync angelegt."),
     ]),
     ("trigger", "🕒", "Start, Zeitplan und Zeitfenster", "/schedules", [
         ("Zu einer Uhrzeit",
@@ -134,6 +143,18 @@ SECTIONS = [
         ("Eigene Texte für diese Aufgabe",
          "Überschreibt die Texte der Benachrichtigungen nur für diese Aufgabe, mit Platzhaltern wie `{job}` oder "
          "`{status}`."),
+        ("Umbenennungen erkennen",
+         "Unter **Verhalten** → **Optionen**: Wird eine Datei in der Quelle umbenannt oder verschoben, benennt MirrorSync "
+         "sie im Ziel nur um, statt sie neu zu kopieren und die alte zu löschen (rclone `--track-renames`). **Über "
+         "Prüfsumme** ist sicher, **über Größe und Änderungszeit** passt für Speicher ohne Prüfsummen (z. B. SMB, "
+         "verschlüsselt). Gilt beim Spiegeln, nicht bei Zwei-Wege-Sync."),
+        ("Größenfilter",
+         "Im Reiter **Filter**: Dateien unter einer Mindestgröße oder über einer Höchstgröße auslassen, z. B. `1K` oder "
+         "`4G` (Einheiten B, K, M, G, T). Ausgelassene Dateien werden im Ziel nicht gelöscht, außer „Ausgeschlossene "
+         "Dateien im Ziel löschen“ ist an."),
+        ("Priorität",
+         "Unter **Verhalten** → **Optionen**: hoch, normal oder niedrig. Bestimmt die Reihenfolge in der Warteschlange, "
+         "wenn die Zahl gleichzeitiger Läufe begrenzt ist."),
     ]),
     ("protect", "🛡", "Aufgabe: Prüfen und schützen", "/job/new", [
         ("Prüflauf nach dem Sync",
@@ -200,8 +221,41 @@ SECTIONS = [
         ("Mehrfachauswahl",
          "**☑ Auswahl** oben rechts blendet links Kästchen ein. Markierte Aufgaben lassen sich gemeinsam starten (auch ohne Folgeaufgaben), testen, prüfen, pausieren, fortsetzen, duplizieren und entfernen, **Logs öffnen** öffnet jedes Log in einem eigenen Tab. Umschalt-Klick markiert einen Bereich. Jede Aktion braucht dasselbe Recht wie einzeln."),
         ("Log",
-         "Jeder Lauf hat ein eigenes Log mit Filter (Fehler, kopiert, gelöscht, Hinweise), Suche und Download. Läuft "
-         "die Aufgabe, aktualisiert es sich laufend."),
+         "Jeder Lauf hat ein eigenes Log mit Filter (Fehler, Warnungen, kopiert, gelöscht, Hinweise), Suche und Download. "
+         "Fehler sind rot, Warnungen gelb markiert. Läuft die Aufgabe, kommen neue Zeilen live dazu, ohne dass die Seite neu lädt."),
+        ("Live-Log: Auto-Refresh und Springen",
+         "Mit **Auto-Refresh** folgt das Log den neuen Zeilen. Scrollst du nach oben, bleibt es stehen und der Knopf "
+         "**⬇ Nach unten springen** zeigt, wie viele neue Zeilen inzwischen gekommen sind. Ein Klick springt ans Ende und "
+         "schaltet Auto-Refresh wieder ein. **Zeilenumbruch** schaltet lange Zeilen zwischen umbrechen und waagerecht scrollen um."),
+        ("Log durchsuchen und herunterladen",
+         "Das Suchfeld hebt Treffer hervor, **nur Treffer** blendet die übrigen Zeilen aus. Die Auswahl daneben zeigt nur "
+         "Fehler, nur Warnungen oder beides. **↓ .txt** lädt das ganze Log als Textdatei, auch während der Sync läuft "
+         "(Stand von jetzt), oder nur die gerade angezeigten Zeilen."),
+        ("Läufe vergleichen",
+         "Im Verlauf einer Aufgabe zwei Läufe ankreuzen und **⇆ Zwei Läufe vergleichen** wählen (ohne Auswahl die beiden letzten). "
+         "Du siehst Dauer, Datenmenge, kopierte und gelöschte Dateien und Fehler nebeneinander sowie, welche Dateien nur im "
+         "einen, nur im anderen oder in beiden Läufen kopiert, gelöscht, umbenannt oder mit Fehler gemeldet wurden. Dateien, "
+         "die jedes Mal kopiert werden, ändern sich ständig (z. B. Datenbanken)."),
+        ("Laufbericht als PDF",
+         "**📄 PDF** im Verlauf oder in einem Lauf erstellt einen Bericht mit Quelle, Ziel, Status, Dauer, Datenmenge, "
+         "Fehlern, Warnungen und den Listen kopierter, gelöschter und umbenannter Dateien, z. B. zum Ablegen oder Weitergeben."),
+        ("Doppelte Dateien finden",
+         "**♊ Doppelte** im Verlauf sucht in Quelle oder Ziel nach Dateien mit gleichem Inhalt (Prüfsumme), gleichem Namen "
+         "und gleicher Größe oder nur gleicher Größe, ab einer Mindestgröße. Ergebnis: Gruppen gleicher Dateien und die "
+         "mögliche Platzersparnis. Gelöscht wird nichts. Recht `jobs.preview`."),
+        ("Warteschlange und Priorität",
+         "Ist unter Einstellungen → Allgemein → **Läufe und Kalender** eine Höchstzahl gleichzeitiger Läufe eingestellt, "
+         "warten weitere Starts in der Warteschlange (Status „wartet“). Sie starten, sobald ein Platz frei wird: zuerst "
+         "hohe, dann normale, dann niedrige Priorität, bei gleicher Priorität nach Startzeit. Stopp nimmt eine wartende "
+         "Aufgabe wieder heraus. Live-Runden warten nicht, die nächste Runde holt alles nach."),
+        ("Wartungsmodus",
+         "**🛠 Wartung** in der Übersicht oder Einstellungen → Wartungsmodus hält alle automatischen Starts an "
+         "(Zeitpläne, Live, Ketten, Wiederholungen, Zeitfenster), für eine Dauer, bis zu einem Datum oder bis zum "
+         "Beenden. Oben erscheint ein Hinweis mit **Beenden**. Von Hand starten geht weiter, laufende Läufe laufen zu Ende. "
+         "Recht `system.maintenance`."),
+        ("Tags und Notizen",
+         "Im Reiter **Grundlagen** bekommt jede Aufgabe Tags (z. B. „Fotos, NAS“) und eine Notiz. Über der Übersicht "
+         "filtern die Tag-Knöpfe die Liste, die Notiz steht in der Übersicht und im Log der Aufgabe."),
         ("Papierkorb durchsuchen",
          "Mit Versionierung: gelöschte und überschriebene Dateien nach Name suchen, herunterladen oder in Quelle oder "
          "Ziel zurückholen. Recht `jobs.restore`."),
@@ -250,6 +304,14 @@ SECTIONS = [
          "Ein oder zwei Speicherorte nebeneinander: browsen, hoch- und herunterladen, umbenennen, löschen, kopieren und "
          "verschieben, Textdateien bearbeiten, Eigenschaften ansehen. Rechte `files.view`, `files.edit`, "
          "`files.delete`. Das Tempo stellst du unter Einstellungen → Allgemein ein."),
+        ("Bildvorschau",
+         "Im Dateimanager zeigt **🖼 Vorschaubilder** Bilder (JPG, PNG, GIF, WebP, AVIF, BMP) als Vorschaubilder, ein Klick öffnet "
+         "das Bild groß. Ausschalten und Größengrenze unter Einstellungen → Allgemein → Bildvorschau."),
+        ("Freigabelinks",
+         "Im Dateimanager über **🔗** an einer Datei einen Link erstellen, der eine Stunde bis höchstens die eingestellte "
+         "Zahl Tage gilt, optional mit Passwort und begrenzten Downloads. Wer den Link hat, lädt die Datei ohne Anmeldung "
+         "herunter; die Zugriffsregeln gelten trotzdem. Unter **Freigabelinks** siehst du Downloads und löschst Links "
+         "vorzeitig. Recht `files.share`, jeder Download steht im Audit-Log."),
     ]),
     ("dashboard", "📊", "Dashboard", "/dashboard", [
         ("Kacheln",
@@ -288,9 +350,20 @@ SECTIONS = [
          "unter Mein Konto ein."),
         ("Aufbau der Einstellungen",
          "Die Leiste links ist nach Themen sortiert: **Benutzer & Rechte**, **Sicherheit** (Anmeldung und Sicherheit, "
-         "Zugriff, API), **System** (Allgemein, Benachrichtigungen, Sicherung), **Wartung** (Updates, Neustart, Logs), "
-         "**Monitoring** (Überwachung) und **Netzwerk** (Bandbreite). Das Suchfeld oben findet jede Einstellung."),
+         "Zugriff, API), **System** (Allgemein, Benachrichtigungen, Sicherung), **Wartung** (Wartungsmodus, Updates, "
+         "Neustart, Logs), **Monitoring** (Überwachung, MQTT) und **Netzwerk** (Bandbreite). Das Suchfeld oben findet jede Einstellung."),
         ("Dateimanager: Tempo", "Wie schnell Kopieren und Verschieben im Dateimanager laufen."),
+        ("Bildvorschau",
+         "Vorschaubilder im Dateimanager ein- oder ausschalten und bis zu welcher Dateigröße (Standard 20 MB). Für die "
+         "Vorschau wird das Bild vom Speicherort geladen."),
+        ("Freigabelinks",
+         "Freigabelinks erlauben und die längste Gültigkeit in Tagen (Standard 30). Ausschalten sperrt sofort alle Links. "
+         "Die Links nutzen die öffentliche Adresse unter Anmeldung und Sicherheit."),
+        ("Gleichzeitige Läufe",
+         "Höchstens so viele Aufgaben laufen gleichzeitig (0 = unbegrenzt). Weitere warten in der Warteschlange nach Priorität."),
+        ("Kalender",
+         "Wie viele Tage der Kalender-Export im Voraus enthält (Standard 14). Den Kalender gibt es unter Zeitpläne → "
+         "**📅 Kalender (.ics)** und als Abo unter Mein Konto."),
     ]),
     ("security", "🔐", "Einstellungen: Anmeldung und Sicherheit", "/settings/security", [
         ("Anmeldung und Sicherheit",
@@ -316,6 +389,10 @@ SECTIONS = [
          "Läufe pro Aufgabe (Standard 50) und höchstens so lange (Standard 30 Tage, 0 = unbegrenzt). Dazu die "
          "Aufbewahrung des Audit-Logs in Tagen."),
         ("Alte Logs löschen", "Einmalig alle Läufe vor einem Datum löschen; vorher zeigt MirrorSync die Anzahl."),
+        ("Wartungsmodus",
+         "Hält mit einem Klick alle automatischen Starts an, für 1 Stunde bis 1 Woche, bis zu einem Datum oder bis zum "
+         "Beenden, optional mit Grund. Nach Ablauf laufen die Zeitpläne von selbst weiter. Ein- und ausschalten mit dem "
+         "Recht `system.maintenance` (Vorlage-Rolle Operator hat es), auch per API, MCP und MQTT."),
     ]),
     ("monnet", "📈", "Einstellungen: Monitoring und Netzwerk", "/settings/monitoring", [
         ("Überwachung",
@@ -325,6 +402,11 @@ SECTIONS = [
          "Limit in GB, Warnschwelle in %, Benachrichtigung und auf Wunsch automatische Läufe bis Monatsende anhalten."),
         ("Bandbreite (Standard)",
          "Limit für alle Aufgaben, die „Standard“ verwenden, wahlweise nach Uhrzeit und Wochentag gestaffelt."),
+        ("MQTT für Home Assistant",
+         "Einstellungen → MQTT: Broker, Port, Benutzer, Passwort und optional TLS. MirrorSync sendet Status und Fortschritt "
+         "aller Aufgaben live, mit **MQTT-Discovery** erscheinen sie in Home Assistant automatisch als Gerät „MirrorSync“. "
+         "Mit **Befehle erlauben** kommen Knöpfe zum Starten, Testen und Stoppen und ein Schalter für den Wartungsmodus dazu. "
+         "**Verbindung testen** prüft die Angaben."),
     ]),
     ("access", "🌐", "Einstellungen: Zugriff", "/settings/access", [
         ("Deine Verbindung", "Zeigt deine IP-Adresse und dein Land, damit du dich nicht aussperrst."),
@@ -364,6 +446,10 @@ SECTIONS = [
          "Mit einer Authenticator-App (QR-Code). Dazu gibt es Backup-Codes für den Notfall; neue Codes ersetzen die alten."),
         ("Passkeys", "Anmeldung mit Fingerabdruck, Gesicht oder Sicherheitsschlüssel statt Passwort. Pro Gerät ein Passkey."),
         ("Deine letzten Anmeldungen", "Zeigt Zeit, IP, Land und Gerät deiner Anmeldungen."),
+        ("Kalender abonnieren",
+         "**Abo-Adresse erstellen** gibt dir eine geheime Adresse, die du in Outlook, Google Kalender oder Apple Kalender "
+         "abonnierst. Sie zeigt die geplanten Läufe der Aufgaben, die du sehen darfst, und aktualisiert sich selbst. "
+         "**Neue Adresse erzeugen** macht die alte ungültig."),
     ]),
     ("backup", "💾", "Einstellungen: Sicherung", "/settings/backup", [
         ("Exportieren",
@@ -444,6 +530,12 @@ SECTIONS = [
         ("Tipp: eigener Key pro Assistent",
          "Lege für jeden Assistenten einen eigenen Key mit passender Rolle an (z. B. nur ansehen und starten). So lässt "
          "er sich einzeln sperren, und das Audit-Log zeigt, was er getan hat."),
+        ("Neue Tools in 1.58.0",
+         "`get_run_log_tail` (neue Log-Zeilen live), `compare_runs`, `get_run_report` (PDF), `find_duplicates` und "
+         "`get_duplicates`, `import_ffs` (FreeFileSync), `get_maintenance` und `set_maintenance`, `get_queue`, "
+         "`list_share_links`, `create_share_link` und `delete_share_link`, `get_calendar`, `get_mqtt`, `update_mqtt` und "
+         "`test_mqtt`, `update_run_settings`. Aufgaben haben neu `track_renames`, `min_size`, `max_size`, `extra_dests`, "
+         "`tags`, `priority` und `note`."),
     ]),
     ("monitor", "📈", "Überwachung mit Uptime Kuma und Home Assistant", "/settings/monitoring", [
         ("Health-Check /health/jobs",
@@ -474,6 +566,12 @@ SECTIONS = [
          "Dauer, Status, Alter des letzten Laufs, Prüfläufe, Datenvolumen.",
          "scrape_configs:\n  - job_name: mirrorsync\n    scheme: https\n    metrics_path: /metrics\n"
          "    authorization:\n      credentials: msk_…\n    static_configs:\n      - targets: [\"{host}\"]"),
+        ("Home Assistant per MQTT",
+         "Einfacher als REST: Einstellungen → MQTT einschalten, Broker (z. B. der Mosquitto-Broker in Home Assistant) und "
+         "Zugang eintragen, MQTT-Discovery anlassen. Home Assistant legt das Gerät „MirrorSync“ mit Sensoren je Aufgabe an "
+         "(Status, Fortschritt, letzter Lauf, nächster Start, Problem). Ohne Discovery liest du die Themen selbst:",
+         "mqtt:\n  sensor:\n    - name: \"MirrorSync Fotos\"\n      state_topic: \"mirrorsync/job/<ID>/state\"\n"
+         "      value_template: \"{{ value_json.status }}\"\n      json_attributes_topic: \"mirrorsync/job/<ID>/state\""),
     ]),
 ]
 

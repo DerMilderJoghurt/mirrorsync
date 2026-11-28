@@ -4,7 +4,7 @@
 
 # MirrorSync – 1:1 mirroring with a web GUI and schedules
 
-Version **1.57.0** · Changes: [CHANGELOG.md](CHANGELOG.md) · [Deutsche Version](README.de.md)
+Version **1.58.0** · Changes: [CHANGELOG.md](CHANGELOG.md) · [Deutsche Version](README.de.md)
 
 A Docker container that **mirrors folders one-way, 1:1** (like FreeFileSync "Mirror"):
 the destination becomes an exact copy of the source, including deletions. The sync engine is
@@ -56,6 +56,11 @@ Then open `http://<docker-host>:8080` and create the first admin.
 - **Versioning**: deleted/overwritten files go to `<destination>.versions/<date>`, optionally keep only the
   last N versions or at most X days (older ones are removed after each run)
 - **Deletion protection**: the run aborts if more than N files would be deleted
+- **Live log** (since 1.58.0): auto-refresh, "jump to bottom" with a counter of new lines, search with highlighting, errors/warnings only, line colors, line wrap and download as .txt even while running
+- **Compare runs, PDF report, duplicate files** (since 1.58.0): what changed between two runs, run report as PDF, duplicates in source or destination with the possible saving
+- **Detect renames, size filter, multiple destinations** (since 1.58.0): only rename moved files instead of copying them again, skip large or small files, mirror one source into up to 10 further destinations
+- **Tags, notes, priorities and queue** (since 1.58.0), **global maintenance mode** with automatic end and **FreeFileSync import** (.ffs_batch)
+- **MQTT for Home Assistant** (since 1.58.0) with discovery and commands, **calendar export (iCal)** of planned runs, **image thumbnails** and **time-limited share links** in the file manager
 - **Restore test** (since 1.57.0): brings back sample files from the destination and compares them byte by byte with the source
 - **Backup with a checkbox per area** (since 1.57.0): export and restore jobs, storages, users, single settings groups etc. separately, replace or add
 - **Multi-select** (since 1.56.0): tick several jobs or storages and start, test, duplicate or delete them together; **▶ Only this** starts a job without its follow-up jobs
@@ -80,7 +85,7 @@ Changed files are transferred completely (no delta transfer like rsync).
 
 ## Installation
 The ready-made image is in the GitHub Container Registry: `ghcr.io/dermilderjoghurt/mirrorsync`
-(for amd64 and arm64, e.g. Raspberry Pi). Tags: `latest` (newest version), `1.57.0` (fixed version),
+(for amd64 and arm64, e.g. Raspberry Pi). Tags: `latest` (newest version), `1.58.0` (fixed version),
 `1.40` (newest patch of this version). The image is only published when the version number changes, so
 update checkers such as Dockhand or Watchtower only report an update when there really is a new version.
 
@@ -301,6 +306,29 @@ In the job under **Verify and protect**:
   the last attempt fails as well.
 - **`.nosync`**: if a source folder contains a file `.nosync`, it is skipped; it stays untouched in the destination
   (on for new jobs).
+
+## New in 1.58.0
+- **Live log**: new lines arrive without reloading. Turn **Auto-refresh** off so the log doesn't jump away while you
+  scroll up; **⬇ Jump to bottom** shows the number of new lines and turns auto-refresh back on. Search with highlighting
+  ("only matches"), errors only / warnings only, errors red, warnings yellow, toggleable line wrap, **↓ .txt** downloads
+  the whole log (even while running) or the lines shown.
+- **Detect renames** (Job → Behavior → Options): rclone `--track-renames`, by checksum or by size and modification time.
+  **Size filter** (Filter tab): skip files below/above a size.
+- **One source, multiple destinations**: up to 10 further destinations under Destination, mirrored one after another in
+  the same run.
+- **Tags** with a filter in the overview, a **note** per job, **priority** for the **queue** (Settings → General → Runs
+  and calendar: at most N runs at the same time).
+- **Maintenance mode** (overview → 🛠 Maintenance or Settings → Maintenance mode): pause all automatic starts for a
+  duration, until a date or until you end it. Permission `system.maintenance`.
+- **FreeFileSync import** (overview → 📥 Import): read `.ffs_batch`/`.ffs_gui`, replace paths, create jobs.
+- **Compare runs** (history → tick two runs), **run report as PDF**, find **♊ duplicate files**.
+- **File manager**: 🖼 thumbnails with image view, 🔗 **share links** with expiry, password and download limit
+  (permission `files.share`).
+- **MQTT for Home Assistant** (Settings → MQTT): status and progress live, MQTT discovery, optional commands.
+- **Calendar (iCal)**: Schedules → 📅 Calendar (.ics) or a personal subscription under My account.
+- API/MCP: `get_run_log_tail`, `compare_runs`, `get_run_report`, `find_duplicates`, `get_duplicates`, `import_ffs`,
+  `get_maintenance`, `set_maintenance`, `get_queue`, `list_share_links`, `create_share_link`, `delete_share_link`,
+  `get_calendar`, `get_mqtt`, `update_mqtt`, `test_mqtt`, `update_run_settings`.
 
 ## Restore test, backup by area (since 1.57.0)
 - **Restore test** (Job → Check & protect): after a successful run, bring back a few random files from the destination

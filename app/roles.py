@@ -36,6 +36,7 @@ PERM_GROUPS = [
         ("files.view", "Dateien ansehen (durchsuchen, Größen, Berechtigungen, herunterladen)"),
         ("files.edit", "Dateien hochladen, bearbeiten, umbenennen, Ordner anlegen, kopieren"),
         ("files.delete", "Dateien und Ordner löschen (auch nötig zum Verschieben)"),
+        ("files.share", "zeitlich begrenzte Freigabelinks für Dateien erstellen und löschen (jeder mit dem Link kann die Datei laden)"),
     ]),
     ("Benachrichtigungen (Standard)", [
         ("notify.view", "ansehen"),
@@ -55,6 +56,7 @@ PERM_GROUPS = [
         ("system.update", "MirrorSync aktualisieren (Selbst-Update über den Docker-Socket)"),
         ("system.restart", "MirrorSync neu starten (Container)"),
         ("system.monitor", "Health-Status (/health/jobs) und Prometheus-Metriken (/metrics) abrufen"),
+        ("system.maintenance", "Wartungsmodus ein- und ausschalten (alle automatischen Starts auf einmal anhalten)"),
     ]),
 ]
 ALL_PERMS = [p for _, perms in PERM_GROUPS for p, _ in perms]
@@ -67,7 +69,7 @@ IMPLIES = {
     "jobs.approve": ["jobs.view", "jobs.logs"], "jobs.restore": ["jobs.view"], "jobs.scripts": ["jobs.view"], "jobs.encrypt": ["jobs.view"],
     "remotes.test": ["remotes.view"], "remotes.browse": ["remotes.view"], "remotes.create": ["remotes.view"],
     "remotes.edit": ["remotes.view"], "remotes.delete": ["remotes.view"],
-    "files.edit": ["files.view"], "files.delete": ["files.view"],
+    "files.edit": ["files.view"], "files.delete": ["files.view"], "files.share": ["files.view"],
     "notify.edit": ["notify.view"], "users.manage": ["users.view"], "roles.manage": ["users.view"], "groups.manage": ["users.view"],
 }
 
@@ -77,7 +79,7 @@ DEFAULT_ROLES = {
     "operator": {"name": "Operator", "description": "Aufgaben anlegen, bearbeiten, starten; Speicherorte ansehen und testen",
                  "perms": ["jobs.view", "jobs.create", "jobs.edit", "jobs.delete", "jobs.run", "jobs.dryrun", "jobs.preview",
                            "jobs.logs", "jobs.notify", "jobs.advanced", "jobs.twoway", "jobs.approve", "jobs.restore", "remotes.view", "remotes.test",
-                           "remotes.browse", "local.paths"],
+                           "remotes.browse", "local.paths", "system.maintenance"],
                  "jobs": "all", "remotes": "all", "builtin": True},
     "viewer": {"name": "Nur lesen", "description": "Aufgaben, Status und Logs ansehen",
                "perms": ["jobs.view", "jobs.logs", "remotes.view"], "jobs": "all", "remotes": "all", "builtin": True},
@@ -134,6 +136,10 @@ class RoleStore:
             if op and op.get("builtin") and not self.db.meta("roles_1_52"):   # neue Rechte 1.52.0 fuer die Vorlage Operator
                 op["perms"] = normalize(list(op.get("perms", [])) + ["jobs.approve", "jobs.restore"])
                 self.db.set_meta("roles_1_52", "1")
+                changed = True
+            if op and op.get("builtin") and not self.db.meta("roles_1_58"):   # neues Recht 1.58.0 fuer die Vorlage Operator
+                op["perms"] = normalize(list(op.get("perms", [])) + ["system.maintenance"])
+                self.db.set_meta("roles_1_58", "1")
                 changed = True
             if data["admin"].get("perms") != ALL_PERMS:
                 data["admin"].update(perms=list(ALL_PERMS), jobs="all", remotes="all", locked=True)

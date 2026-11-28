@@ -24,6 +24,8 @@ PAGES = {
     "logs": ("Logs", "/settings/logs", "system.settings", "📜"),
     "monitoring": ("Überwachung", "/settings/monitoring", "system.settings", "📈"),
     "network": ("Bandbreite", "/settings/network", "system.settings", "🚀"),
+    "maintenance": ("Wartungsmodus", "/settings/maintenance", ("system.settings", "system.maintenance"), "🛠"),
+    "mqtt": ("MQTT (Home Assistant)", "/settings/mqtt", "system.settings", "📡"),
     "account": ("Mein Konto", "/account", None, "🪪"),
     "help": ("Hilfe", "/help", None, "❓"),
 }
@@ -32,8 +34,8 @@ GROUPS = [
     ("Benutzer & Rechte", ["users", "roles", "groups"]),
     ("Sicherheit", ["security", "access", "api"]),
     ("System", ["general", "notify", "backup"]),
-    ("Wartung", ["updates", "restart", "logs"]),
-    ("Monitoring", ["monitoring"]),
+    ("Wartung", ["maintenance", "updates", "restart", "logs"]),
+    ("Monitoring", ["monitoring", "mqtt"]),
     ("Netzwerk", ["network"]),
     ("Persönlich", ["account", "help"]),
 ]
@@ -43,6 +45,12 @@ INDEX = [
     # Allgemein
     ("Sprache", "general", "lang", "Standardsprache language Deutsch English Oberfläche"),
     ("Dateimanager: Tempo", "general", "files", "parallel kopieren verschieben schnell"),
+    ("Bildvorschau im Dateimanager", "general", "thumbs", "Vorschaubilder Thumbnails Bilder Fotos Galerie"),
+    ("Freigabelinks", "general", "share", "teilen Link Download zeitlich begrenzt Passwort öffentlich"),
+    ("Gleichzeitige Läufe und Warteschlange", "general", "runs", "parallel Limit Priorität wartet Queue"),
+    ("Kalender-Export (iCal)", "general", "runs", "Kalender ics Outlook Google abonnieren Zeitplan"),
+    ("Wartungsmodus", "maintenance", "maint", "Pause alle Zeitpläne anhalten Wartung automatisch beenden"),
+    ("MQTT für Home Assistant", "mqtt", "mqtt", "Broker Mosquitto Discovery Sensor Status Fortschritt"),
     ("Nach Updates suchen", "updates", "update", "neue Version prüfen Intervall GitHub Benachrichtigung"),
     ("Selbst aktualisieren", "updates", "selfupdate", "Docker-Socket automatisch Update Image"),
     ("Update-Verlauf", "updates", "history", "Updates früher Versionen Ergebnis"),
@@ -90,6 +98,7 @@ INDEX = [
     ("Passkeys", "account", "passkeys", "WebAuthn Fingerabdruck Face ID Sicherheitsschlüssel"),
     ("Zwei-Faktor-Anmeldung (2FA)", "account", "twofa", "Authenticator Backup-Codes TOTP"),
     ("Passwort ändern", "account", "password", "Kennwort neu"),
+    ("Kalender abonnieren", "account", "ical", "iCal ics Outlook Google Kalender Zeitplan Abo"),
 ]
 
 # Seiten, die zu einem Leisten-Eintrag gehoeren (z. B. /users/log zu Benutzer)

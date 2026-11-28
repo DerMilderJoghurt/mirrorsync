@@ -3,6 +3,60 @@
 Versionsnummern nach [SemVer](https://semver.org/lang/de/): MAJOR.MINOR.PATCH
 (MAJOR = inkompatible Änderung, MINOR = neue Funktion, PATCH = Fehlerbehebung).
 
+## 1.58.0 – 2026-11-28
+**Live-Log**
+- Das Log eines laufenden Syncs lädt neue Zeilen nach, ohne die Seite neu zu laden. Kästchen **Auto-Refresh**: aus,
+  bleibt das Log stehen, statt beim Hochscrollen wegzuspringen.
+- Beim Hochscrollen erscheint **⬇ Nach unten springen** mit der Zahl neuer Zeilen seit der Pause; ein Klick springt ans
+  Ende und schaltet Auto-Refresh wieder ein.
+- **Suche** mit Hervorhebung und „nur Treffer“, Auswahl **nur Fehler**, **nur Warnungen** oder beides; Fehler sind rot,
+  Warnungen gelb. **Zeilenumbruch** umschaltbar.
+- **↓ .txt**: ganzes Log als Textdatei, auch während der Sync läuft (Stand von jetzt), oder nur die angezeigten Zeilen.
+- Neuer Log-Filter „Warnungen“ (GUI, API, MCP).
+
+**Aufgaben**
+- **Umbenennungen erkennen** (Verhalten → Optionen): umbenannte oder verschobene Dateien werden im Ziel nur umbenannt
+  statt neu kopiert (rclone `--track-renames`), per Prüfsumme oder per Größe und Änderungszeit.
+- **Größenfilter** (Reiter Filter): Dateien kleiner bzw. größer als eine Grenze auslassen (z. B. < 1 KB, > 4 GB).
+- **Eine Quelle, mehrere Ziele**: bis zu 10 weitere Ziele, die im selben Lauf nach dem Hauptziel gespiegelt werden.
+  Der Verlauf zeigt das Ergebnis je Ziel.
+- **Tags** pro Aufgabe mit Tag-Filter in der Übersicht, **Notiz** pro Aufgabe (Übersicht, Log, PDF, Kalender).
+- **Priorität** (hoch, normal, niedrig) und **Warteschlange**: Einstellungen → Allgemein → Läufe und Kalender begrenzt
+  die Zahl gleichzeitiger Läufe; weitere warten (Status „wartet“) und starten nach Priorität.
+- **Globaler Wartungsmodus**: alle Zeitpläne, Live-Läufe, Ketten und Wiederholungen mit einem Klick anhalten, für eine
+  Dauer, bis zu einem Datum (endet automatisch) oder bis zum Beenden. Banner mit „Beenden“. Neue Seite
+  Einstellungen → Wartungsmodus, neues Recht `system.maintenance` (Vorlage-Rolle Bediener hat es).
+- **FreeFileSync-Import** (Übersicht → 📥 Import): `.ffs_batch` und `.ffs_gui` einlesen, Windows-Pfade ersetzen,
+  Ordnerpaare prüfen und als Aufgaben anlegen (Vergleich, Ausschlüsse, Größenfilter, Versionierung, Zwei-Wege).
+
+**Auswerten**
+- **Zwei Läufe vergleichen**: Kennzahlen nebeneinander und welche Dateien nur im einen, nur im anderen oder in beiden
+  Läufen kopiert, gelöscht, umbenannt oder mit Fehler gemeldet wurden.
+- **Laufbericht als PDF** im Verlauf und in jedem Lauf.
+- **♊ Doppelte Dateien finden** in Quelle oder Ziel (Prüfsumme, Name und Größe oder nur Größe) mit möglicher Ersparnis.
+
+**Dateimanager**
+- **🖼 Vorschaubilder** und Bildansicht für JPG, PNG, GIF, WebP, AVIF und BMP (abschaltbar, Größengrenze).
+- **🔗 Freigabelinks**: zeitlich begrenzter Download-Link für eine Datei, optional mit Passwort und Download-Limit, Liste
+  mit Downloads und Löschen. Neues Recht `files.share`, jeder Download steht im Audit-Log.
+
+**Integrationen**
+- **MQTT für Home Assistant** (Einstellungen → MQTT): Status und Fortschritt aller Aufgaben live, MQTT-Discovery legt
+  das Gerät „MirrorSync“ mit Sensoren an, optional Knöpfe zum Starten, Testen, Stoppen und ein Schalter für den
+  Wartungsmodus. Verbindung testen, TLS, Benutzer und Passwort.
+- **Kalender-Export (iCal)**: Zeitpläne → 📅 Kalender (.ics) und ein persönliches Kalender-Abo unter Mein Konto
+  (Outlook, Google, Apple). Folgeaufgaben erscheinen geschätzt hinter ihrem Vorgänger.
+
+**Einstellungen, Rechte, API/MCP, Hilfe, Sprachen**
+- Neue Seiten **Wartungsmodus** (Gruppe Wartung) und **MQTT** (Gruppe Monitoring); unter Allgemein neue Bereiche
+  **Bildvorschau**, **Freigabelinks** und **Läufe und Kalender**. Alles über das Suchfeld der Einstellungen zu finden.
+- Sicherung: neue Bereiche „MQTT (Home Assistant)“, „Dateimanager“ und „Freigabelinks“.
+- Neue API/MCP-Tools: `get_run_log_tail`, `compare_runs`, `get_run_report`, `find_duplicates`, `get_duplicates`,
+  `import_ffs`, `get_maintenance`, `set_maintenance`, `get_queue`, `list_share_links`, `create_share_link`,
+  `delete_share_link`, `get_calendar`, `get_mqtt`, `update_mqtt`, `test_mqtt`, `update_run_settings`. Aufgaben kennen
+  `track_renames`, `min_size`, `max_size`, `extra_dests`, `tags`, `priority` und `note`; `run_job` meldet `queued`.
+- Hilfe mit Einträgen zu allen neuen Funktionen, alle Texte auf Englisch, Spanisch, Französisch und Italienisch.
+
 ## 1.57.0 – 2026-11-26
 **Wiederherstellungs-Test**
 - Neu unter **Aufgabe → Prüfen & schützen**: Nach einem erfolgreichen Lauf holt MirrorSync ein paar zufällige Dateien

@@ -1,5 +1,6 @@
 """Benachrichtigungen: Webhook, E-Mail (SMTP), Telegram und Apprise."""
 import json
+import re
 import os
 import smtplib
 import ssl
@@ -88,7 +89,7 @@ def describe(settings, job):
 
 
 def classify(line):
-    """Ordnet eine rclone-Logzeile ein: error, copied, deleted, notice oder other."""
+    """Ordnet eine rclone-Logzeile ein: error, copied, deleted, warn, notice oder other."""
     if "ERROR :" in line or "CRITICAL:" in line:
         return "error"
     if "Copied (" in line or "Skipped copy as --dry-run" in line or "Skipped update modification time as --dry-run" in line:
@@ -96,9 +97,17 @@ def classify(line):
     if ("Deleted" in line and "INFO  :" in line) or "Moved into backup dir" in line or "Skipped delete as --dry-run" in line \
             or "Skipped move as --dry-run" in line:
         return "deleted"
+    if "WARNING" in line or "WARN :" in line or ("NOTICE:" in line and not _STATS_LINE.search(line)
+                                                   and not _QUIET_NOTICE.search(line)):
+        return "warn"   # rclone meldet Warnungen als NOTICE (z. B. Symlinks, fehlende Prüfsumme, --max-delete); seit 1.58.0
     if "NOTICE:" in line or line.startswith("==="):
         return "notice"
     return "other"
+
+
+# Statuszeilen (--stats-one-line) und reine Hinweise von rclone sind keine Warnungen
+_STATS_LINE = re.compile(r"NOTICE:\s*(?:[\d.]+\s*[KMGTPE]?i?B(?:ytes)?\s*/|Transferred:|Checks:|Elapsed time:|Errors:|Deleted:|Renamed:|Server Side)")
+_QUIET_NOTICE = re.compile(r"NOTICE: (?:Config file .* not found|Encrypted drive|.*: Dry run|.*Skipped (?:copy|delete|update|move|make directory|remove directory|set directory modification time) as --dry-run)")
 
 
 def summarize_log(path):

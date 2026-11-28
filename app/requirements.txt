@@ -7,3 +7,4 @@ apprise==2.3.0
 webauthn==3.0.1
 swagger-ui-bundle==1.1.0
 paramiko==5.1.0
+paho-mqtt==2.1.0
